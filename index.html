@@ -749,7 +749,7 @@ canvas.chart{width:100%!important;height:100%!important;}
   <div class="logo">STERK<span>GUTT</span></div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
     <div class="header-right" id="header-date"></div>
-    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v1.4.0</div>
+    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v2.0.0</div>
     <div id="sync-status" style="font-size:9px;letter-spacing:1px;transition:color 0.3s;"></div>
   </div>
 </div>
@@ -874,6 +874,24 @@ canvas.chart{width:100%!important;height:100%!important;}
     <div class="stat-card" style="margin-bottom:12px;">
       <div class="stat-card-title">Muscle Group Volume</div>
       <div id="muscle-bars"></div>
+    </div>
+
+    <div class="stat-card" style="margin-bottom:12px;">
+      <div class="stat-card-title">Version History</div>
+      <div style="font-size:12px;color:var(--muted2);line-height:1.8;padding-top:6px;">
+        <div style="color:var(--neon);font-weight:600;margin-bottom:4px;">v2.0.0 — May 2026</div>
+        <div>• Strava integration — connect &amp; upload workouts</div>
+        <div>• Supabase-only data — removed localStorage dependency</div>
+        <div>• Set flow: START → STOP (instant log, rest timer begins)</div>
+        <div>• Inputs always editable during workout</div>
+        <div>• Full session history — no display limit</div>
+        <div>• PWA support — install as app with icon</div>
+        <div>• Blue START button styling</div>
+        <div style="color:var(--muted);font-weight:600;margin-top:10px;margin-bottom:4px;">v1.4.0 and earlier</div>
+        <div>• Core workout tracking with localStorage</div>
+        <div>• Routines, exercises, sets &amp; reps</div>
+        <div>• Stats, PRs, muscle group volume</div>
+      </div>
     </div>
   </div>
 
@@ -1370,7 +1388,7 @@ function confirmOk() {
 // ═══════════════════════════════════════════
 function renderHome() {
   const sessions = load(SK.sessions) || [];
-  const recent = sessions.slice(-10).reverse();
+  const recent = [...sessions].reverse(); // all sessions, newest first
   const list = document.getElementById('recent-list');
 
   const now = new Date();
@@ -1611,7 +1629,7 @@ function buildSetRow(s, si, ei, isUni) {
   let btnLabel, btnClass;
   if (s.state === 'idle')   { btnLabel = 'START'; btnClass = 'state-idle'; }
   if (s.state === 'active') { btnLabel = 'STOP';  btnClass = 'state-active'; }
-  if (s.state === 'logged') { btnLabel = '✓ DONE'; btnClass = 'state-logged'; }
+  if (s.state === 'logged') { btnLabel = '✓';     btnClass = 'state-logged'; }
 
   // Set duration badge
   const durBadge = s.setDuration
@@ -1734,7 +1752,7 @@ function showRestBanner(ei, si, startTime) {
     <div>
       <div class="rest-banner-label">Rest</div>
       <div class="rest-banner-time" id="rest-banner-time">0:00</div>
-      <div class="rest-banner-sub">Fill in your reps &amp; weight above, then tap DONE</div>
+      <div class="rest-banner-sub">Edit reps &amp; weight above · Start next set to reset timer</div>
     </div>
     <div style="font-size:28px;opacity:0.3;">☕</div>
   `;
