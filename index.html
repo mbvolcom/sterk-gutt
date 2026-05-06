@@ -755,6 +755,12 @@ canvas.chart{width:100%!important;height:100%!important;}
           <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
           Start Workout
         </button>
+        <div id="strava-connect-row" style="margin-top:12px;display:none;">
+          <button class="btn btn-ghost" id="strava-home-btn" onclick="handleStravaHomeBtn()" style="width:100%;justify-content:center;gap:8px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+            <span id="strava-home-label">Connect Strava</span>
+          </button>
+        </div>
       </div>
 
       <div class="section-title">Recent Sessions</div>
@@ -1892,11 +1898,19 @@ function finishWorkout() {
     const sessions = load(SK.sessions) || [];
     sessions.push(activeSession);
     save(SK.sessions, sessions);
-    await dbSaveSession(activeSession); // final sync with duration set
+    await dbSaveSession(activeSession);
     save(SK.activeSession, null);
+
+    const completedSession = { ...activeSession };
     activeSession = null;
+
     showToast('Workout saved! 💪');
     showPage('home', document.getElementById('nav-home'));
+
+    // Offer Strava upload if connected
+    if (stravaConnected) {
+      setTimeout(() => showStravaUploadPrompt(completedSession), 800);
+    }
   });
 }
 
@@ -2761,14 +2775,162 @@ function init() {
   renderHome();
 
   // Pull latest data from Supabase in background
-  // This updates localStorage and re-renders if data has changed
   syncFromCloud().then(() => {
     renderHome();
-    // If we're on stats or routines, refresh those too
     const activePage = document.querySelector('.page.active');
     if (activePage && activePage.id === 'page-routines') renderRoutines();
     if (activePage && activePage.id === 'page-stats') renderStats();
   });
+
+  // Init Strava
+  initStrava();
+}
+
+// ═══════════════════════════════════════════
+// STRAVA INTEGRATION
+// ═══════════════════════════════════════════
+const STRAVA_CLIENT_ID = '232651';
+const STRAVA_REFRESH_FN = 'https://fzbovpdnpvsfdnxyftqv.supabase.co/functions/v1/strava-refresh';
+const SG_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6Ym92cGRucHZzZmRueHlmdHF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwMzM5NzcsImV4cCI6MjA5MzYwOTk3N30.LqtdpwtEfZweiQW3NJmtFkVZuCG7_ANLP8yLB8XfIn4';
+
+let stravaConnected = false;
+
+async function initStrava() {
+  // Check if just connected
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('strava') === 'connected') {
+    showToast('Strava connected! 🎉');
+    window.history.replaceState({}, '', '/');
+  }
+  if (params.get('strava') === 'error') {
+    showToast('Strava connection failed.');
+    window.history.replaceState({}, '', '/');
+  }
+
+  // Check if we have a valid token
+  try {
+    const res = await fetch(STRAVA_REFRESH_FN, {
+      headers: { 'apikey': SG_ANON_KEY, 'Authorization': 'Bearer ' + SG_ANON_KEY }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      stravaConnected = !!data.access_token;
+    }
+  } catch(e) { stravaConnected = false; }
+
+  updateStravaBtn();
+}
+
+function updateStravaBtn() {
+  const row = document.getElementById('strava-connect-row');
+  const lbl = document.getElementById('strava-home-label');
+  if (row) row.style.display = '';
+  if (lbl) lbl.textContent = stravaConnected ? '✓ Strava connected' : 'Connect Strava';
+  const btn = document.getElementById('strava-home-btn');
+  if (btn) btn.style.color = stravaConnected ? 'var(--green)' : 'var(--neon)';
+}
+
+function handleStravaHomeBtn() {
+  if (stravaConnected) {
+    showToast('Strava is connected ✓');
+  } else {
+    connectStrava();
+  }
+}
+
+function connectStrava() {
+  const redirectUri = encodeURIComponent('https://sterk-gutt.pages.dev/callback.html');
+  const scope = 'activity:write,activity:read';
+  const url = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${redirectUri}&approval_prompt=force&scope=${scope}`;
+  window.location.href = url;
+}
+
+async function getStravaToken() {
+  const res = await fetch(STRAVA_REFRESH_FN, {
+    headers: { 'apikey': SG_ANON_KEY, 'Authorization': 'Bearer ' + SG_ANON_KEY }
+  });
+  if (!res.ok) throw new Error('Could not get Strava token');
+  const data = await res.json();
+  return data.access_token;
+}
+
+function showStravaUploadPrompt(session) {
+  const exerciseSummary = (session.exercises || [])
+    .map(ex => {
+      const logged = (ex.sets || []).filter(s => s.logged);
+      if (!logged.length) return null;
+      const maxW = Math.max(...logged.map(s => parseFloat(s.weight) || 0));
+      return `${ex.name} ${logged.length}×${logged[0].reps || '?'}${maxW ? ' @ ' + maxW + 'kg' : ''}`;
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  const name = session.routineName || session.exercises?.[0]?.name || 'Strength workout';
+  const dur  = session.duration || 0;
+  const durStr = dur > 3600
+    ? `${Math.floor(dur/3600)}h ${Math.floor((dur%3600)/60)}m`
+    : `${Math.floor(dur/60)}m`;
+
+  // Show a confirm-style prompt
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(7,8,12,0.92);z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 16px 40px;';
+  overlay.innerHTML = `
+    <div style="background:#151824;border:1px solid rgba(0,180,255,0.18);border-radius:16px;padding:24px 20px;width:100%;max-width:400px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#FC4C02"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:#fff;">Upload to Strava?</div>
+      </div>
+      <div style="font-size:12px;color:#4a5068;margin-bottom:16px;">${name} · ${durStr}</div>
+      <div style="font-size:11px;color:#6b7490;background:#0d0f17;border-radius:8px;padding:10px 12px;margin-bottom:16px;white-space:pre-line;max-height:120px;overflow-y:auto;">${exerciseSummary}</div>
+      <div style="display:flex;gap:10px;">
+        <button id="strava-upload-yes" style="flex:1;background:#FC4C02;color:#fff;border:none;border-radius:8px;padding:13px;font-family:'DM Mono',monospace;font-size:12px;font-weight:500;letter-spacing:1px;cursor:pointer;">UPLOAD</button>
+        <button id="strava-upload-no" style="flex:1;background:transparent;color:#4a5068;border:1px solid rgba(0,180,255,0.1);border-radius:8px;padding:13px;font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;">SKIP</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  document.getElementById('strava-upload-no').addEventListener('click', () => overlay.remove());
+  document.getElementById('strava-upload-yes').addEventListener('click', async () => {
+    const btn = document.getElementById('strava-upload-yes');
+    btn.textContent = 'UPLOADING…'; btn.disabled = true;
+    try {
+      await uploadToStrava(session, exerciseSummary);
+      overlay.remove();
+      showToast('Uploaded to Strava! 🧡');
+    } catch(e) {
+      btn.textContent = 'UPLOAD';  btn.disabled = false;
+      showToast('Upload failed: ' + e.message);
+    }
+  });
+}
+
+async function uploadToStrava(session, description) {
+  const token = await getStravaToken();
+  const name = session.routineName || session.exercises?.[0]?.name || 'Strength workout';
+  const startTime = new Date(session.startedAt).toISOString();
+  const duration = session.duration || 0;
+
+  const res = await fetch('https://www.strava.com/api/v3/activities', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name,
+      type: 'WeightTraining',
+      start_date_local: startTime,
+      elapsed_time: duration,
+      description: description + '\n\nLogged with Sterk Gutt 💪',
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Strava API error');
+  }
+  return res.json();
 }
 
 init();
