@@ -622,6 +622,45 @@ canvas.chart{width:100%!important;height:100%!important;}
   white-space: nowrap;
 }
 
+/* ROUTINE CARD COLLAPSE */
+.routine-card-body { display: none; }
+.routine-card.open .routine-card-body { display: block; }
+.routine-chevron { font-size:12px;color:var(--muted);transition:transform 0.2s;margin-left:auto; }
+.routine-card.open .routine-chevron { transform:rotate(90deg); }
+
+/* DRAG HANDLE in routine editor */
+.re-drag-handle {
+  color:var(--muted);font-size:16px;cursor:grab;
+  padding:4px 6px;touch-action:none;flex-shrink:0;
+}
+
+/* MUSCLE CHIP BUTTONS */
+.muscle-chip {
+  padding:8px 10px;border-radius:6px;font-size:11px;letter-spacing:1px;
+  border:1px solid var(--border);background:var(--surface2);
+  color:var(--muted2);cursor:pointer;font-family:'DM Mono',monospace;
+  text-align:center;transition:all 0.15s;
+}
+.muscle-chip.selected {
+  background:var(--neon-dim);border-color:var(--border2);color:var(--neon);
+}
+
+/* EXERCISE LIBRARY LIST */
+.ex-lib-item {
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;margin-bottom:8px;
+  display:flex;align-items:center;gap:10px;
+}
+.ex-lib-info { flex:1;min-width:0; }
+.ex-lib-name { font-size:13px;color:var(--text);font-weight:500; }
+.ex-lib-tags { display:flex;gap:6px;margin-top:4px;flex-wrap:wrap; }
+.ex-lib-actions { display:flex;gap:6px; }
+.ex-lib-actions button {
+  background:none;border:none;color:var(--muted2);
+  cursor:pointer;font-size:15px;padding:4px;transition:color 0.15s;
+}
+.ex-lib-actions button:hover { color:var(--neon); }
+
 /* Scrollbar */
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
@@ -657,7 +696,7 @@ canvas.chart{width:100%!important;height:100%!important;}
   <div class="logo">STERK<span>GUTT</span></div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
     <div class="header-right" id="header-date"></div>
-    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v1.2.0</div>
+    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v1.3.0</div>
     <div id="sync-status" style="font-size:9px;letter-spacing:1px;transition:color 0.3s;"></div>
   </div>
 </div>
@@ -715,6 +754,18 @@ canvas.chart{width:100%!important;height:100%!important;}
     </div>
   </div>
 
+  <!-- ══ EXERCISES PAGE ══ -->
+  <div class="page" id="page-exercises">
+    <div style="padding:20px 16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div class="section-title" style="margin-bottom:0;flex:1;">Exercise Library</div>
+        <button class="btn btn-ghost btn-sm" onclick="openExerciseLibEditor(null)">+ New</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;" id="lib-muscle-filters"></div>
+      <div id="exercises-list"></div>
+    </div>
+  </div>
+
   <!-- ══ STATS PAGE ══ -->
   <div class="page" id="page-stats">
     <div class="section-title">Stats</div>
@@ -767,7 +818,7 @@ canvas.chart{width:100%!important;height:100%!important;}
 </div>
 
 <!-- BOTTOM NAV -->
-<nav class="bottom-nav">
+<nav class="bottom-nav" style="grid-template-columns:repeat(5,1fr);">
   <button class="nav-btn active" onclick="showPage('home',this)" id="nav-home">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
     Home
@@ -779,6 +830,10 @@ canvas.chart{width:100%!important;height:100%!important;}
   <button class="nav-btn" onclick="showPage('routines',this)" id="nav-routines">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
     Routines
+  </button>
+  <button class="nav-btn" onclick="showPage('exercises',this)" id="nav-exercises">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+    Exercises
   </button>
   <button class="nav-btn" onclick="showPage('stats',this)" id="nav-stats">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
@@ -840,7 +895,9 @@ canvas.chart{width:100%!important;height:100%!important;}
   <div id="ex-picker-new-form" style="display:none;">
     <div class="form-group">
       <label>Muscle Group</label>
-      <input type="text" id="ex-picker-muscle" placeholder="e.g. Chest"/>
+      <div id="ex-picker-muscle-wrap">
+        <div id="ex-picker-muscle-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px;"></div>
+      </div>
     </div>
     <div class="form-group">
       <div class="checkbox-row">
@@ -852,6 +909,32 @@ canvas.chart{width:100%!important;height:100%!important;}
       <button class="btn btn-ghost" style="flex:1;" onclick="hideNewExForm()">Cancel</button>
       <button class="btn btn-primary" style="flex:1;box-shadow:none;" onclick="createAndAddExercise()">Create & Add</button>
     </div>
+  </div>
+</div>
+
+<!-- EXERCISE LIBRARY EDITOR MODAL -->
+<div class="modal-overlay" id="exercise-lib-editor">
+  <div class="modal-header">
+    <div class="modal-title" id="ex-lib-editor-title">NEW EXERCISE</div>
+    <div class="modal-close" onclick="closeModal('exercise-lib-editor')">✕</div>
+  </div>
+  <div class="form-group">
+    <label>Exercise Name</label>
+    <input type="text" id="ex-lib-name" placeholder="e.g. Bench Press"/>
+  </div>
+  <div class="form-group">
+    <label>Muscle Group</label>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px;" id="ex-lib-muscle-grid"></div>
+  </div>
+  <div class="form-group" style="margin-top:12px;">
+    <div class="checkbox-row">
+      <input type="checkbox" id="ex-lib-uni"/>
+      <label>Unilateral (single arm/leg)</label>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:16px;">
+    <button class="btn btn-ghost" style="flex:1;" onclick="closeModal('exercise-lib-editor')">Cancel</button>
+    <button class="btn btn-primary" style="flex:1;box-shadow:none;" onclick="saveExerciseLib()">Save</button>
   </div>
 </div>
 
@@ -1126,33 +1209,33 @@ const DEFAULT_ROUTINES = [
 
 // ── Default global exercise library from Dr. Swole's program ──
 const DEFAULT_EXERCISES = [
-  { id: 'e1',  name: 'Bench Press',            muscle: 'Chest',      unilateral: false },
-  { id: 'e2',  name: 'Bent Row',               muscle: 'Back',       unilateral: false },
-  { id: 'e3',  name: 'Flys',                   muscle: 'Chest',      unilateral: false },
-  { id: 'e4',  name: 'Pullovers',              muscle: 'Back',       unilateral: false },
-  { id: 'e5',  name: 'Upright Row',            muscle: 'Shoulders',  unilateral: false },
-  { id: 'e6',  name: 'Skullcrushers',          muscle: 'Triceps',    unilateral: false },
-  { id: 'e7',  name: 'Lateral Raises',         muscle: 'Shoulders',  unilateral: false },
-  { id: 'e8',  name: 'Goblet Squat',           muscle: 'Quads',      unilateral: false },
-  { id: 'e9',  name: 'Step-ups',               muscle: 'Quads',      unilateral: true  },
-  { id: 'e10', name: 'Walking Lunges',         muscle: 'Quads',      unilateral: false },
-  { id: 'e11', name: 'RDL',                    muscle: 'Hamstrings', unilateral: false },
-  { id: 'e12', name: 'Single Leg Calf Raise',  muscle: 'Calves',     unilateral: true  },
-  { id: 'e13', name: 'Hammer Curl',            muscle: 'Biceps',     unilateral: false },
-  { id: 'e14', name: 'Paused Lateral Raise',   muscle: 'Shoulders',  unilateral: false },
-  { id: 'e15', name: 'Dumbbell Curls',         muscle: 'Biceps',     unilateral: false },
-  { id: 'e16', name: 'Dumbbell OHP',           muscle: 'Shoulders',  unilateral: false },
-  { id: 'e17', name: 'Single Arm DB Row',      muscle: 'Back',       unilateral: true  },
-  { id: 'e18', name: 'Incline Bench Press',    muscle: 'Chest',      unilateral: false },
-  { id: 'e19', name: 'Chest-Supported Row',    muscle: 'Back',       unilateral: false },
-  { id: 'e20', name: 'Push Up',                muscle: 'Chest',      unilateral: false },
-  { id: 'e21', name: 'Incline Skullcrushers',  muscle: 'Triceps',    unilateral: false },
-  { id: 'e22', name: 'Lateral Raise',          muscle: 'Shoulders',  unilateral: false },
-  { id: 'e23', name: 'Bulgarian Split Squat',  muscle: 'Quads',      unilateral: true  },
-  { id: 'e24', name: 'Single Leg RDL',         muscle: 'Hamstrings', unilateral: true  },
-  { id: 'e25', name: 'Single Leg Hip Thrust',  muscle: 'Glutes',     unilateral: true  },
-  { id: 'e26', name: 'Lying Curl',             muscle: 'Hamstrings', unilateral: false },
-  { id: 'e27', name: 'Single Arm Preacher Curl', muscle: 'Biceps',   unilateral: true  },
+  { id: 'e1',  name: 'Bench Press',            muscle: 'Chest',     unilateral: false },
+  { id: 'e2',  name: 'Bent Row',               muscle: 'Back',      unilateral: false },
+  { id: 'e3',  name: 'Flys',                   muscle: 'Chest',     unilateral: false },
+  { id: 'e4',  name: 'Pullovers',              muscle: 'Back',      unilateral: false },
+  { id: 'e5',  name: 'Upright Row',            muscle: 'Shoulders', unilateral: false },
+  { id: 'e6',  name: 'Skullcrushers',          muscle: 'Triceps',   unilateral: false },
+  { id: 'e7',  name: 'Lateral Raises',         muscle: 'Shoulders', unilateral: false },
+  { id: 'e8',  name: 'Goblet Squat',           muscle: 'Legs',      unilateral: false },
+  { id: 'e9',  name: 'Step-ups',               muscle: 'Legs',      unilateral: true  },
+  { id: 'e10', name: 'Walking Lunges',         muscle: 'Legs',      unilateral: false },
+  { id: 'e11', name: 'RDL',                    muscle: 'Legs',      unilateral: false },
+  { id: 'e12', name: 'Single Leg Calf Raise',  muscle: 'Legs',      unilateral: true  },
+  { id: 'e13', name: 'Hammer Curl',            muscle: 'Biceps',    unilateral: false },
+  { id: 'e14', name: 'Paused Lateral Raise',   muscle: 'Shoulders', unilateral: false },
+  { id: 'e15', name: 'Dumbbell Curls',         muscle: 'Biceps',    unilateral: false },
+  { id: 'e16', name: 'Dumbbell OHP',           muscle: 'Shoulders', unilateral: false },
+  { id: 'e17', name: 'Single Arm DB Row',      muscle: 'Back',      unilateral: true  },
+  { id: 'e18', name: 'Incline Bench Press',    muscle: 'Chest',     unilateral: false },
+  { id: 'e19', name: 'Chest-Supported Row',    muscle: 'Back',      unilateral: false },
+  { id: 'e20', name: 'Push Up',                muscle: 'Chest',     unilateral: false },
+  { id: 'e21', name: 'Incline Skullcrushers',  muscle: 'Triceps',   unilateral: false },
+  { id: 'e22', name: 'Lateral Raise',          muscle: 'Shoulders', unilateral: false },
+  { id: 'e23', name: 'Bulgarian Split Squat',  muscle: 'Legs',      unilateral: true  },
+  { id: 'e24', name: 'Single Leg RDL',         muscle: 'Legs',      unilateral: true  },
+  { id: 'e25', name: 'Single Leg Hip Thrust',  muscle: 'Legs',      unilateral: true  },
+  { id: 'e26', name: 'Lying Curl',             muscle: 'Legs',      unilateral: false },
+  { id: 'e27', name: 'Single Arm Preacher Curl', muscle: 'Biceps',  unilateral: true  },
 ];
 
 function initData() {
@@ -1175,6 +1258,11 @@ function getLastPerformance(exName) {
 }
 
 // ═══════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════
+const MUSCLE_GROUPS = ['Abs','Back','Biceps','Chest','Legs','Shoulders','Triceps'];
+
+// ═══════════════════════════════════════════
 // NAV & PAGES
 // ═══════════════════════════════════════════
 function showPage(name, btn) {
@@ -1182,9 +1270,10 @@ function showPage(name, btn) {
   document.getElementById('page-' + name).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  if (name === 'home') renderHome();
-  if (name === 'routines') renderRoutines();
-  if (name === 'stats') renderStats();
+  if (name === 'home')      renderHome();
+  if (name === 'routines')  renderRoutines();
+  if (name === 'exercises') renderExerciseLibrary();
+  if (name === 'stats')     renderStats();
 }
 
 // ═══════════════════════════════════════════
@@ -1724,17 +1813,18 @@ function renderRoutines() {
   }
   list.innerHTML = routines.map(r => `
     <div class="routine-card">
-      <div class="routine-card-header">
-        <div>
+      <div class="routine-card-header" onclick="toggleRoutineCard(this.parentElement)">
+        <div style="flex:1;">
           <div class="routine-card-name">${r.name}</div>
           <div class="routine-card-meta">${r.exercises.length} exercises</div>
         </div>
-        <div class="routine-card-actions">
-          <button onclick="openRoutineEditor('${r.id}')" title="Edit">✏️</button>
-          <button onclick="deleteRoutine('${r.id}')" title="Delete">🗑</button>
+        <div class="routine-card-actions" onclick="event.stopPropagation()">
+          <button onclick="openRoutineEditor('${r.id}')">✏️</button>
+          <button onclick="deleteRoutine('${r.id}')">🗑</button>
         </div>
+        <span class="routine-chevron">›</span>
       </div>
-      <div style="padding:0 16px 14px;display:flex;flex-direction:column;gap:6px;">
+      <div class="routine-card-body">
         ${r.exercises.map(ex => `
           <div class="routine-ex-item">
             <div class="routine-ex-info">
@@ -1750,6 +1840,10 @@ function renderRoutines() {
       </div>
     </div>
   `).join('');
+}
+
+function toggleRoutineCard(card) {
+  card.classList.toggle('open');
 }
 
 function openRoutineEditor(routineId) {
@@ -1780,24 +1874,68 @@ function renderEditorExercises() {
     return;
   }
   container.innerHTML = editorExercises.map((ex, i) => `
-    <div class="routine-ex-item" style="flex-direction:column;align-items:stretch;gap:8px;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div style="flex:1;">
-          <div style="font-size:13px;font-weight:500;color:var(--text);">${ex.name}</div>
-          <div class="routine-ex-tags" style="margin-top:4px;">
-            <span class="tag">${ex.muscle}</span>
-            ${ex.unilateral ? '<span class="tag unilateral">Unilateral</span>' : ''}
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <input type="number" value="${ex.sets}" min="1" max="20" style="width:52px;text-align:center;padding:6px 4px;"
-            onchange="editorExercises[${i}].sets=+this.value"/>
-          <span style="font-size:10px;color:var(--muted2);">sets</span>
-          <button class="btn-icon" onclick="removeEditorEx(${i})" style="color:var(--red);border-color:var(--red-dim);">✕</button>
+    <div class="routine-ex-item" style="flex-direction:row;align-items:center;gap:8px;" id="re-ex-${i}" data-rei="${i}">
+      <span class="re-drag-handle" data-rei="${i}">⠿</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:500;color:var(--text);">${ex.name}</div>
+        <div class="routine-ex-tags" style="margin-top:4px;">
+          <span class="tag">${ex.muscle}</span>
+          ${ex.unilateral ? '<span class="tag unilateral">Unilateral</span>' : ''}
         </div>
       </div>
+      <input type="number" value="${ex.sets}" min="1" max="20"
+        style="width:46px;text-align:center;padding:6px 4px;flex-shrink:0;"
+        onchange="editorExercises[${i}].sets=Math.max(1,+this.value)"/>
+      <span style="font-size:10px;color:var(--muted2);flex-shrink:0;">sets</span>
+      <button class="btn-icon" onclick="removeEditorEx(${i})" style="color:var(--red);border-color:var(--red-dim);flex-shrink:0;">✕</button>
     </div>
   `).join('');
+
+  // Attach touch drag to reorder
+  attachEditorDragHandles();
+}
+
+// ── Drag to reorder exercises in routine editor ───────────
+let reDragSrc = null, reDragEl = null;
+
+function attachEditorDragHandles() {
+  document.querySelectorAll('.re-drag-handle').forEach(h => {
+    h.addEventListener('touchstart', onReDragStart, { passive: false });
+  });
+}
+
+function onReDragStart(e) {
+  e.preventDefault();
+  reDragSrc = +e.currentTarget.dataset.rei;
+  reDragEl = document.getElementById(`re-ex-${reDragSrc}`);
+  reDragEl.style.opacity = '0.4';
+  document.addEventListener('touchmove', onReDragMove, { passive: false });
+  document.addEventListener('touchend', onReDragEnd);
+}
+
+function onReDragMove(e) {
+  e.preventDefault();
+  const y = e.touches[0].clientY;
+  const items = [...document.querySelectorAll('[id^="re-ex-"]')];
+  items.forEach((item, i) => {
+    if (i === reDragSrc) return;
+    const rect = item.getBoundingClientRect();
+    if (y > rect.top && y < rect.bottom) {
+      const moved = editorExercises.splice(reDragSrc, 1)[0];
+      editorExercises.splice(i, 0, moved);
+      reDragSrc = i;
+      renderEditorExercises();
+      reDragEl = document.getElementById(`re-ex-${reDragSrc}`);
+      if (reDragEl) reDragEl.style.opacity = '0.4';
+    }
+  });
+}
+
+function onReDragEnd() {
+  document.removeEventListener('touchmove', onReDragMove);
+  document.removeEventListener('touchend', onReDragEnd);
+  if (reDragEl) { reDragEl.style.opacity = '1'; reDragEl = null; }
+  reDragSrc = null;
 }
 
 function addExerciseToEditor() {
@@ -1810,6 +1948,8 @@ function removeEditorEx(i) {
 }
 
 // ── Exercise Picker ───────────────────────────────────────
+let _pickerFiltered = []; // stored ref so onclick doesn't need JSON
+
 function openExercisePicker(idx) {
   pickerExIdx = idx;
   document.getElementById('ex-picker-search').value = '';
@@ -1823,20 +1963,20 @@ function openExercisePicker(idx) {
 function filterExPicker(query) {
   const allEx = load(SK.exercises) || [];
   const q = query.toLowerCase().trim();
-  const filtered = q ? allEx.filter(e => e.name.toLowerCase().includes(q)) : allEx;
+  _pickerFiltered = q ? allEx.filter(e => e.name.toLowerCase().includes(q)) : allEx;
   const results = document.getElementById('ex-picker-results');
 
-  let html = filtered.map((ex, i) => `
-    <div class="ex-search-item" onclick="selectExerciseFromPicker(${i}, ${JSON.stringify(filtered).replace(/</g,'\\u003c')})">
+  let html = _pickerFiltered.map((ex, i) => `
+    <div class="ex-search-item" onclick="selectExerciseFromPicker(${i})">
       <span class="ex-search-item-name">${ex.name}</span>
       <span class="ex-search-item-muscle">${ex.muscle}${ex.unilateral ? ' · Uni' : ''}</span>
     </div>
   `).join('');
 
-  // Always show "Create" option if query doesn't exactly match existing
   const exactMatch = allEx.find(e => e.name.toLowerCase() === q);
   if (q && !exactMatch) {
-    html += `<div class="ex-create-option" onclick="showNewExForm('${query.replace(/'/g,"\\'")}')">
+    const safe = query.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    html += `<div class="ex-create-option" onclick="showNewExForm('${safe}')">
       <span>+</span> Create "<strong>${query}</strong>"
     </div>`;
   }
@@ -1844,11 +1984,53 @@ function filterExPicker(query) {
   results.innerHTML = html || '<div style="padding:10px 14px;font-size:11px;color:var(--muted);">No exercises found</div>';
 }
 
-function selectExerciseFromPicker(idx, filteredArr) {
-  const ex = filteredArr[idx];
+function selectExerciseFromPicker(idx) {
+  const ex = _pickerFiltered[idx];
   if (!ex) return;
   const sets = parseInt(document.getElementById('ex-picker-sets').value) || 3;
   addExToRoutine({ ...ex, sets });
+}
+
+function showNewExForm(name) {
+  document.getElementById('ex-picker-new-form').style.display = 'block';
+  document.getElementById('ex-picker-search').value = name;
+  document.getElementById('ex-picker-muscle').value = '';
+  document.getElementById('ex-picker-uni').checked = false;
+  document.getElementById('ex-picker-results').innerHTML = '';
+}
+
+function hideNewExForm() {
+  document.getElementById('ex-picker-new-form').style.display = 'none';
+  filterExPicker(document.getElementById('ex-picker-search').value);
+}
+
+function createAndAddExercise() {
+  const name = document.getElementById('ex-picker-search').value.trim();
+  const muscle = document.getElementById('ex-picker-muscle').value.trim();
+  const unilateral = document.getElementById('ex-picker-uni').checked;
+  const sets = parseInt(document.getElementById('ex-picker-sets').value) || 3;
+
+  if (!name)   { showToast('Enter an exercise name'); return; }
+  if (!muscle) { showToast('Enter a muscle group'); return; }
+
+  const allEx = load(SK.exercises) || [];
+  const newEx = { id: 'ex_' + Date.now(), name, muscle, unilateral };
+  allEx.push(newEx);
+  save(SK.exercises, allEx);
+
+  addExToRoutine({ ...newEx, sets });
+}
+
+function addExToRoutine(ex) {
+  if (pickerExIdx !== null) {
+    editorExercises[pickerExIdx] = ex;
+  } else {
+    editorExercises.push(ex);
+  }
+  closeModal('exercise-picker');
+  renderEditorExercises();
+  const modal = document.getElementById('routine-editor');
+  setTimeout(() => modal.scrollTop = modal.scrollHeight, 50);
 }
 
 function showNewExForm(name) {
@@ -1923,6 +2105,131 @@ function saveRoutine() {
   showToast('Routine saved!');
 }
 
+// ═══════════════════════════════════════════
+// EXERCISE LIBRARY PAGE
+// ═══════════════════════════════════════════
+let libMuscleFilter = 'All';
+let editingExId = null;
+let selectedMuscle = '';
+
+function renderExerciseLibrary() {
+  const allEx = load(SK.exercises) || [];
+
+  // Muscle filter chips
+  const filterEl = document.getElementById('lib-muscle-filters');
+  const filters = ['All', ...MUSCLE_GROUPS];
+  filterEl.innerHTML = filters.map(m => `
+    <button class="filter-btn ${libMuscleFilter === m ? 'active' : ''}"
+      onclick="setLibFilter('${m}')">${m}</button>
+  `).join('');
+
+  // Exercise list
+  const filtered = libMuscleFilter === 'All' ? allEx : allEx.filter(e => e.muscle === libMuscleFilter);
+  const list = document.getElementById('exercises-list');
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏋️</div><div class="empty-state-text">No exercises yet</div></div>';
+    return;
+  }
+
+  // Group by muscle
+  const groups = {};
+  filtered.forEach(ex => {
+    if (!groups[ex.muscle]) groups[ex.muscle] = [];
+    groups[ex.muscle].push(ex);
+  });
+
+  list.innerHTML = Object.entries(groups).sort((a,b) => a[0].localeCompare(b[0])).map(([muscle, exs]) => `
+    <div style="margin-bottom:16px;">
+      <div class="section-title" style="margin-bottom:8px;">${muscle}</div>
+      ${exs.map(ex => `
+        <div class="ex-lib-item">
+          <div class="ex-lib-info">
+            <div class="ex-lib-name">${ex.name}</div>
+            <div class="ex-lib-tags">
+              ${ex.unilateral ? '<span class="tag unilateral">Unilateral</span>' : ''}
+            </div>
+          </div>
+          <div class="ex-lib-actions">
+            <button onclick="openExerciseLibEditor('${ex.id}')">✏️</button>
+            <button onclick="deleteExerciseLib('${ex.id}')" style="color:var(--red)!important;">🗑</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+function setLibFilter(muscle) {
+  libMuscleFilter = muscle;
+  renderExerciseLibrary();
+}
+
+function openExerciseLibEditor(exId) {
+  editingExId = exId;
+  selectedMuscle = '';
+
+  if (exId) {
+    const allEx = load(SK.exercises) || [];
+    const ex = allEx.find(e => e.id === exId);
+    if (ex) {
+      document.getElementById('ex-lib-name').value = ex.name;
+      document.getElementById('ex-lib-uni').checked = ex.unilateral;
+      selectedMuscle = ex.muscle;
+      document.getElementById('ex-lib-editor-title').textContent = 'EDIT EXERCISE';
+    }
+  } else {
+    document.getElementById('ex-lib-name').value = '';
+    document.getElementById('ex-lib-uni').checked = false;
+    document.getElementById('ex-lib-editor-title').textContent = 'NEW EXERCISE';
+  }
+
+  renderMusclePicker('ex-lib-muscle-grid');
+  openModal('exercise-lib-editor');
+}
+
+function renderMusclePicker(containerId) {
+  document.getElementById(containerId).innerHTML = MUSCLE_GROUPS.map(m => `
+    <button class="muscle-chip ${selectedMuscle === m ? 'selected' : ''}"
+      onclick="selectMuscle('${m}','${containerId}')">${m}</button>
+  `).join('');
+}
+
+function selectMuscle(muscle, containerId) {
+  selectedMuscle = muscle;
+  renderMusclePicker(containerId);
+}
+
+function saveExerciseLib() {
+  const name = document.getElementById('ex-lib-name').value.trim();
+  const unilateral = document.getElementById('ex-lib-uni').checked;
+
+  if (!name)           { showToast('Enter a name'); return; }
+  if (!selectedMuscle) { showToast('Select a muscle group'); return; }
+
+  const allEx = load(SK.exercises) || [];
+  if (editingExId) {
+    const idx = allEx.findIndex(e => e.id === editingExId);
+    if (idx >= 0) allEx[idx] = { ...allEx[idx], name, muscle: selectedMuscle, unilateral };
+  } else {
+    allEx.push({ id: 'ex_' + Date.now(), name, muscle: selectedMuscle, unilateral });
+  }
+  save(SK.exercises, allEx);
+  closeModal('exercise-lib-editor');
+  renderExerciseLibrary();
+  showToast(editingExId ? 'Exercise updated' : 'Exercise created');
+}
+
+function deleteExerciseLib(exId) {
+  showConfirm('Delete Exercise?', 'This removes it from the library. Existing sessions are unaffected.', () => {
+    let allEx = load(SK.exercises) || [];
+    allEx = allEx.filter(e => e.id !== exId);
+    save(SK.exercises, allEx);
+    renderExerciseLibrary();
+    showToast('Exercise deleted');
+  });
+}
+
 function deleteRoutine(id) {
   showConfirm('Delete Routine?', 'This cannot be undone.', () => {
     let routines = load(SK.routines) || [];
@@ -1932,6 +2239,40 @@ function deleteRoutine(id) {
     renderRoutines();
     showToast('Routine deleted');
   });
+}
+
+// Also use muscle chip picker in exercise picker modal new form
+function showNewExForm(name) {
+  selectedMuscle = '';
+  document.getElementById('ex-picker-new-form').style.display = 'block';
+  document.getElementById('ex-picker-search').value = name;
+  document.getElementById('ex-picker-uni').checked = false;
+  document.getElementById('ex-picker-results').innerHTML = '';
+  // Replace muscle text input with chip picker
+  const muscleWrap = document.getElementById('ex-picker-muscle-wrap');
+  if (muscleWrap) {
+    muscleWrap.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.id = 'ex-picker-muscle-grid';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px;';
+    muscleWrap.appendChild(grid);
+    renderMusclePicker('ex-picker-muscle-grid');
+  }
+}
+
+function createAndAddExercise() {
+  const name = document.getElementById('ex-picker-search').value.trim();
+  const unilateral = document.getElementById('ex-picker-uni').checked;
+  const sets = parseInt(document.getElementById('ex-picker-sets').value) || 3;
+
+  if (!name)           { showToast('Enter an exercise name'); return; }
+  if (!selectedMuscle) { showToast('Select a muscle group'); return; }
+
+  const allEx = load(SK.exercises) || [];
+  const newEx = { id: 'ex_' + Date.now(), name, muscle: selectedMuscle, unilateral };
+  allEx.push(newEx);
+  save(SK.exercises, allEx);
+  addExToRoutine({ ...newEx, sets });
 }
 
 // ═══════════════════════════════════════════
