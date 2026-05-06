@@ -657,6 +657,7 @@ canvas.chart{width:100%!important;height:100%!important;}
   <div class="logo">STERK<span>GUTT</span></div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
     <div class="header-right" id="header-date"></div>
+    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v1.2.0</div>
     <div id="sync-status" style="font-size:9px;letter-spacing:1px;transition:color 0.3s;"></div>
   </div>
 </div>
@@ -827,11 +828,15 @@ canvas.chart{width:100%!important;height:100%!important;}
     <div class="modal-close" onclick="closeModal('exercise-picker')">✕</div>
   </div>
   <div class="form-group">
-    <label>Search or create</label>
+    <label>Sets for this routine</label>
+    <input type="number" id="ex-picker-sets" value="3" min="1" max="20" style="margin-bottom:12px;"/>
+  </div>
+  <div class="form-group">
+    <label>Search or create exercise</label>
     <input type="text" id="ex-picker-search" placeholder="e.g. Bench Press"
       oninput="filterExPicker(this.value)" autocomplete="off"/>
-    <div class="ex-search-results" id="ex-picker-results"></div>
   </div>
+  <div id="ex-picker-results" style="border:1px solid var(--border2);border-radius:8px;overflow:hidden;margin-bottom:12px;max-height:240px;overflow-y:auto;"></div>
   <div id="ex-picker-new-form" style="display:none;">
     <div class="form-group">
       <label>Muscle Group</label>
@@ -848,10 +853,6 @@ canvas.chart{width:100%!important;height:100%!important;}
       <button class="btn btn-primary" style="flex:1;box-shadow:none;" onclick="createAndAddExercise()">Create & Add</button>
     </div>
   </div>
-  <div style="margin-top:8px;">
-    <label>Sets for this routine</label>
-    <input type="number" id="ex-picker-sets" value="3" min="1" max="20"/>
-  </div>
 </div>
 
 <!-- CONFIRM DIALOG -->
@@ -861,7 +862,7 @@ canvas.chart{width:100%!important;height:100%!important;}
     <div class="confirm-text" id="confirm-text"></div>
     <div class="confirm-actions">
       <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
-      <button class="btn btn-danger" id="confirm-ok">Confirm</button>
+      <button class="btn btn-danger" id="confirm-ok" onclick="confirmOk()">Confirm</button>
     </div>
   </div>
 </div>
@@ -936,10 +937,10 @@ async function dbSaveRoutine(routine) {
       created_at: new Date(routine.createdAt).toISOString(),
       updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
-    if (error) throw error;
+    if (error) { console.error('dbSaveRoutine error:', error); throw error; }
     setSyncStatus('ok');
   } catch(e) {
-    console.warn('Supabase routine sync failed (offline?):', e.message);
+    console.warn('Supabase routine sync failed:', e.message);
     setSyncStatus('offline');
   }
 }
@@ -948,7 +949,7 @@ async function dbDeleteRoutine(id) {
   try {
     setSyncStatus('syncing');
     const { error } = await sb.from('routines').delete().eq('id', id).eq('user_id', USER_ID);
-    if (error) throw error;
+    if (error) { console.error('dbDeleteRoutine error:', error); throw error; }
     setSyncStatus('ok');
   } catch(e) {
     console.warn('Supabase delete failed:', e.message);
@@ -962,7 +963,8 @@ async function dbLoadRoutines() {
       .select('*')
       .eq('user_id', USER_ID)
       .order('created_at', { ascending: true });
-    if (error) throw error;
+    if (error) { console.error('dbLoadRoutines error:', error); throw error; }
+    console.log('Loaded routines from Supabase:', data?.length ?? 0);
     if (!data || data.length === 0) return null;
     return data.map(r => ({
       id: r.id,
@@ -980,7 +982,7 @@ async function dbLoadRoutines() {
 async function dbSaveSession(session) {
   try {
     setSyncStatus('syncing');
-    const { error } = await sb.from('sessions').upsert({
+    const payload = {
       id: session.id,
       user_id: USER_ID,
       routine_id: session.routineId || null,
@@ -990,8 +992,9 @@ async function dbSaveSession(session) {
       duration: session.duration || null,
       exercises: session.exercises,
       is_active: !session.duration,
-    }, { onConflict: 'id' });
-    if (error) throw error;
+    };
+    const { error } = await sb.from('sessions').upsert(payload, { onConflict: 'id' });
+    if (error) { console.error('dbSaveSession error:', error); throw error; }
     setSyncStatus('ok');
   } catch(e) {
     console.warn('Supabase session sync failed:', e.message);
@@ -1006,7 +1009,8 @@ async function dbLoadSessions() {
       .eq('user_id', USER_ID)
       .eq('is_active', false)
       .order('started_at', { ascending: true });
-    if (error) throw error;
+    if (error) { console.error('dbLoadSessions error:', error); throw error; }
+    console.log('Loaded sessions from Supabase:', data?.length ?? 0, '| USER_ID:', USER_ID);
     if (!data || data.length === 0) return null;
     return data.map(s => ({
       id: s.id,
@@ -1022,30 +1026,46 @@ async function dbLoadSessions() {
   }
 }
 
+async function dbDeleteSession(id) {
+  try {
+    const { error } = await sb.from('sessions').delete().eq('id', id).eq('user_id', USER_ID);
+    if (error) { console.error('dbDeleteSession error:', error); throw error; }
+  } catch(e) {
+    console.warn('Supabase session delete failed:', e.message);
+  }
+}
+
 // ── Pull from Supabase into localStorage on startup ───────
 async function syncFromCloud() {
   setSyncStatus('syncing');
+  console.log('Syncing from cloud — USER_ID:', USER_ID);
 
-  // Routines
-  const cloudRoutines = await dbLoadRoutines();
-  if (cloudRoutines && cloudRoutines.length > 0) {
-    // Merge: cloud wins for existing IDs, keep local defaults if cloud is empty
-    const local = load(SK.routines) || [];
-    const merged = cloudRoutines;
-    // Add any local-only entries (created offline) that aren't in cloud yet
-    local.forEach(lr => {
-      if (!merged.find(cr => cr.id === lr.id)) merged.push(lr);
-    });
-    save(SK.routines, merged);
+  // Push any local-only routines up first
+  const localRoutines = load(SK.routines) || [];
+  for (const r of localRoutines) {
+    await dbSaveRoutine(r);
   }
 
-  // Sessions
+  // Then pull everything back (cloud is source of truth)
+  const cloudRoutines = await dbLoadRoutines();
+  if (cloudRoutines && cloudRoutines.length > 0) {
+    save(SK.routines, cloudRoutines);
+  }
+
+  // Push any local-only sessions up first
+  const localSessions = load(SK.sessions) || [];
+  for (const s of localSessions) {
+    if (s.duration) await dbSaveSession(s); // only finished sessions
+  }
+
+  // Pull all sessions
   const cloudSessions = await dbLoadSessions();
   if (cloudSessions && cloudSessions.length > 0) {
     save(SK.sessions, cloudSessions);
   }
 
   setSyncStatus('ok');
+  console.log('Sync complete');
 }
 
 // ═══════════════════════════════════════════
@@ -1196,10 +1216,10 @@ function showConfirm(title, text, cb) {
   document.getElementById('confirm-overlay').classList.add('open');
 }
 function closeConfirm() { document.getElementById('confirm-overlay').classList.remove('open'); }
-document.getElementById('confirm-ok').addEventListener('click', () => {
+function confirmOk() {
   closeConfirm();
   if (confirmCb) confirmCb();
-});
+}
 
 // ═══════════════════════════════════════════
 // HOME PAGE
@@ -1253,19 +1273,18 @@ function renderHome() {
         <span class="recent-sets">${totalSets}</span>
         <span style="font-size:9px;color:var(--muted);">sets</span>
       </div>
-      <button class="recent-delete" onclick="deleteSession(${s.id}, event)" title="Delete">✕</button>
+      <button class="recent-delete" data-sid="${s.id}" onclick="deleteSession(this)" title="Delete">✕</button>
     </div>`;
   }).join('');
 }
 
-function deleteSession(id, e) {
-  e.stopPropagation();
+function deleteSession(btn) {
+  const id = +btn.dataset.sid;
   showConfirm('Delete Session?', 'This will permanently remove this workout from your history.', async () => {
     let sessions = load(SK.sessions) || [];
     sessions = sessions.filter(s => s.id !== id);
     save(SK.sessions, sessions);
-    // Also delete from Supabase
-    try { await sb.from('sessions').delete().eq('id', id).eq('user_id', USER_ID); } catch(e) {}
+    await dbDeleteSession(id);
     renderHome();
     showToast('Session deleted');
   });
@@ -1807,17 +1826,17 @@ function filterExPicker(query) {
   const filtered = q ? allEx.filter(e => e.name.toLowerCase().includes(q)) : allEx;
   const results = document.getElementById('ex-picker-results');
 
-  let html = filtered.map(ex => `
-    <div class="ex-search-item" onclick="selectExerciseFromPicker('${ex.id}')">
+  let html = filtered.map((ex, i) => `
+    <div class="ex-search-item" onclick="selectExerciseFromPicker(${i}, ${JSON.stringify(filtered).replace(/</g,'\\u003c')})">
       <span class="ex-search-item-name">${ex.name}</span>
       <span class="ex-search-item-muscle">${ex.muscle}${ex.unilateral ? ' · Uni' : ''}</span>
     </div>
   `).join('');
 
-  // Always show "Create" option if query doesn't exactly match
+  // Always show "Create" option if query doesn't exactly match existing
   const exactMatch = allEx.find(e => e.name.toLowerCase() === q);
   if (q && !exactMatch) {
-    html += `<div class="ex-create-option" onclick="showNewExForm('${query}')">
+    html += `<div class="ex-create-option" onclick="showNewExForm('${query.replace(/'/g,"\\'")}')">
       <span>+</span> Create "<strong>${query}</strong>"
     </div>`;
   }
@@ -1825,9 +1844,8 @@ function filterExPicker(query) {
   results.innerHTML = html || '<div style="padding:10px 14px;font-size:11px;color:var(--muted);">No exercises found</div>';
 }
 
-function selectExerciseFromPicker(exId) {
-  const allEx = load(SK.exercises) || [];
-  const ex = allEx.find(e => e.id === exId);
+function selectExerciseFromPicker(idx, filteredArr) {
+  const ex = filteredArr[idx];
   if (!ex) return;
   const sets = parseInt(document.getElementById('ex-picker-sets').value) || 3;
   addExToRoutine({ ...ex, sets });
