@@ -433,9 +433,10 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
   transition:all 0.15s;
 }
 .set-start-btn.state-idle {
-  background:var(--surface2);color:var(--muted2);border:1px solid var(--border);
+  background:#0d2a3e;color:#00b4ff;border:1px solid rgba(0,180,255,0.35);
+  box-shadow:0 0 10px rgba(0,180,255,0.15);
 }
-.set-start-btn.state-idle:active { background:var(--neon-dim);color:var(--neon); }
+.set-start-btn.state-idle:active { background:#0a1f2e;color:#00cfff; }
 .set-start-btn.state-active {
   background:var(--red);color:#fff;
   box-shadow:0 0 14px rgba(255,68,102,0.4);
@@ -1013,49 +1014,88 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Anonymous device user ID ──────────────────────────────
-// A stable random ID stored in localStorage — no login needed.
-// All your data in Supabase is scoped to this ID.
-function getUserId() {
+// Stored in localStorage only as a bootstrap key — all actual data in Supabase.
+async function getUserId() {
   let id = localStorage.getItem('sg_user_id');
   if (!id) {
     id = 'sg_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
     localStorage.setItem('sg_user_id', id);
+    // Also store in Supabase for reference
+    await sb.from('user_config').upsert({ key: 'user_id', value: id }, { onConflict: 'key' });
   }
   return id;
 }
-const USER_ID = getUserId();
+let USER_ID = localStorage.getItem('sg_user_id') || 'pending';
 
 // ═══════════════════════════════════════════
-// LOCAL STORAGE (offline cache)
+// SUPABASE DATA LAYER (Supabase is source of truth)
 // ═══════════════════════════════════════════
-const SK = {
-  routines: 'sg_routines',
-  sessions: 'sg_sessions',
-  activeSession: 'sg_active',
-  exercises: 'sg_exercises', // global exercise library
-};
 
+// In-memory cache — loaded from Supabase on init
+let _exercises = [];
+let _routines  = [];
+let _sessions  = [];
+let _activeSession = null;
+
+// Shim for legacy load() calls that still exist
+const SK = { routines:'_r', sessions:'_s', activeSession:'_a', exercises:'_e' };
 function load(key) {
-  try { return JSON.parse(localStorage.getItem(key)) || null; } catch { return null; }
+  if (key === SK.exercises)     return _exercises.length ? _exercises : null;
+  if (key === SK.routines)      return _routines.length  ? _routines  : null;
+  if (key === SK.sessions)      return _sessions.length  ? _sessions  : null;
+  if (key === SK.activeSession) return _activeSession;
+  return null;
 }
 function save(key, val) {
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) { console.error(e); }
+  if (key === SK.exercises)     { _exercises = val || []; return; }
+  if (key === SK.routines)      { _routines  = val || []; return; }
+  if (key === SK.sessions)      { _sessions  = val || []; return; }
+  if (key === SK.activeSession) { _activeSession = val;   return; }
 }
 
-// ═══════════════════════════════════════════
-// SUPABASE SYNC LAYER
-// Offline-first: localStorage is the source of truth during a session.
-// Supabase syncs in the background — failures are silent, never block the UI.
-// ═══════════════════════════════════════════
-
-// Sync indicator in header
 function setSyncStatus(status) {
   const el = document.getElementById('sync-status');
   if (!el) return;
   if (status === 'syncing') { el.textContent = '⟳ syncing'; el.style.color = 'var(--muted2)'; }
-  else if (status === 'ok')  { el.textContent = '✓ synced';  el.style.color = 'var(--neon2)'; setTimeout(() => { el.textContent = ''; }, 3000); }
+  else if (status === 'ok') { el.textContent = '✓ synced'; el.style.color = 'var(--neon2)'; setTimeout(() => { el.textContent = ''; }, 3000); }
   else if (status === 'offline') { el.textContent = '○ offline'; el.style.color = 'var(--muted)'; }
   else { el.textContent = ''; }
+}
+
+// ── EXERCISES ────────────────────────────────────────────
+async function dbLoadExercises() {
+  try {
+    const { data, error } = await sb.from('exercises').select('*').eq('user_id', USER_ID).order('name');
+    if (error) throw error;
+    if (data && data.length) {
+      _exercises = data.map(e => ({ id:e.id, name:e.name, muscle:e.muscle, unilateral:e.unilateral }));
+    } else {
+      // First time — seed defaults
+      await dbSeedExercises();
+    }
+  } catch(e) { console.warn('Load exercises failed:', e.message); }
+}
+
+async function dbSeedExercises() {
+  const rows = DEFAULT_EXERCISES.map(e => ({ ...e, user_id: USER_ID }));
+  const { error } = await sb.from('exercises').upsert(rows, { onConflict: 'id' });
+  if (!error) _exercises = [...DEFAULT_EXERCISES];
+}
+
+async function dbSaveExercise(ex) {
+  try {
+    const { error } = await sb.from('exercises').upsert({ ...ex, user_id: USER_ID }, { onConflict: 'id' });
+    if (error) throw error;
+    const idx = _exercises.findIndex(e => e.id === ex.id);
+    if (idx >= 0) _exercises[idx] = ex; else _exercises.push(ex);
+  } catch(e) { console.warn('Save exercise failed:', e.message); }
+}
+
+async function dbDeleteExercise(id) {
+  try {
+    await sb.from('exercises').delete().eq('id', id).eq('user_id', USER_ID);
+    _exercises = _exercises.filter(e => e.id !== id);
+  } catch(e) { console.warn('Delete exercise failed:', e.message); }
 }
 
 // ── ROUTINES ─────────────────────────────────────────────
@@ -1063,61 +1103,47 @@ async function dbSaveRoutine(routine) {
   try {
     setSyncStatus('syncing');
     const { error } = await sb.from('routines').upsert({
-      id: routine.id,
-      user_id: USER_ID,
-      name: routine.name,
+      id: routine.id, user_id: USER_ID, name: routine.name,
       exercises: routine.exercises,
       created_at: new Date(routine.createdAt).toISOString(),
       updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
-    if (error) { console.error('dbSaveRoutine error:', error); throw error; }
+    if (error) throw error;
+    const idx = _routines.findIndex(r => r.id === routine.id);
+    if (idx >= 0) _routines[idx] = routine; else _routines.push(routine);
     setSyncStatus('ok');
-  } catch(e) {
-    console.warn('Supabase routine sync failed:', e.message);
-    setSyncStatus('offline');
-  }
+  } catch(e) { console.warn('Save routine failed:', e.message); setSyncStatus('offline'); }
 }
 
 async function dbDeleteRoutine(id) {
   try {
     setSyncStatus('syncing');
-    const { error } = await sb.from('routines').delete().eq('id', id).eq('user_id', USER_ID);
-    if (error) { console.error('dbDeleteRoutine error:', error); throw error; }
+    await sb.from('routines').delete().eq('id', id).eq('user_id', USER_ID);
+    _routines = _routines.filter(r => r.id !== id);
     setSyncStatus('ok');
-  } catch(e) {
-    console.warn('Supabase delete failed:', e.message);
-    setSyncStatus('offline');
-  }
+  } catch(e) { console.warn('Delete routine failed:', e.message); setSyncStatus('offline'); }
 }
 
 async function dbLoadRoutines() {
   try {
-    const { data, error } = await sb.from('routines')
-      .select('*')
-      .eq('user_id', USER_ID)
-      .order('created_at', { ascending: true });
-    if (error) { console.error('dbLoadRoutines error:', error); throw error; }
-    console.log('Loaded routines from Supabase:', data?.length ?? 0);
-    if (!data || data.length === 0) return null;
-    return data.map(r => ({
-      id: r.id,
-      name: r.name,
-      exercises: r.exercises,
-      createdAt: new Date(r.created_at).getTime(),
-    }));
-  } catch(e) {
-    console.warn('Supabase routines load failed:', e.message);
-    return null;
-  }
+    const { data, error } = await sb.from('routines').select('*').eq('user_id', USER_ID).order('created_at');
+    if (error) throw error;
+    if (data && data.length) {
+      _routines = data.map(r => ({ id:r.id, name:r.name, exercises:r.exercises, createdAt:new Date(r.created_at).getTime() }));
+    } else {
+      // Seed default routines on first use
+      for (const r of DEFAULT_ROUTINES) await dbSaveRoutine(r);
+    }
+    return _routines;
+  } catch(e) { console.warn('Load routines failed:', e.message); return []; }
 }
 
 // ── SESSIONS ─────────────────────────────────────────────
 async function dbSaveSession(session) {
   try {
     setSyncStatus('syncing');
-    const payload = {
-      id: session.id,
-      user_id: USER_ID,
+    const { error } = await sb.from('sessions').upsert({
+      id: session.id, user_id: USER_ID,
       routine_id: session.routineId || null,
       routine_name: session.routineName,
       started_at: new Date(session.startedAt).toISOString(),
@@ -1125,80 +1151,53 @@ async function dbSaveSession(session) {
       duration: session.duration || null,
       exercises: session.exercises,
       is_active: !session.duration,
-    };
-    const { error } = await sb.from('sessions').upsert(payload, { onConflict: 'id' });
-    if (error) { console.error('dbSaveSession error:', error); throw error; }
+    }, { onConflict: 'id' });
+    if (error) throw error;
     setSyncStatus('ok');
-  } catch(e) {
-    console.warn('Supabase session sync failed:', e.message);
-    setSyncStatus('offline');
-  }
+  } catch(e) { console.warn('Save session failed:', e.message); setSyncStatus('offline'); }
 }
 
 async function dbLoadSessions() {
   try {
-    const { data, error } = await sb.from('sessions')
-      .select('*')
-      .eq('user_id', USER_ID)
-      .eq('is_active', false)
-      .order('started_at', { ascending: true });
-    if (error) { console.error('dbLoadSessions error:', error); throw error; }
-    console.log('Loaded sessions from Supabase:', data?.length ?? 0, '| USER_ID:', USER_ID);
-    if (!data || data.length === 0) return null;
-    return data.map(s => ({
-      id: s.id,
-      routineId: s.routine_id,
-      routineName: s.routine_name,
-      startedAt: new Date(s.started_at).getTime(),
-      duration: s.duration,
-      exercises: s.exercises,
-    }));
-  } catch(e) {
-    console.warn('Supabase sessions load failed:', e.message);
-    return null;
-  }
+    const { data, error } = await sb.from('sessions').select('*').eq('user_id', USER_ID).eq('is_active', false).order('started_at');
+    if (error) throw error;
+    if (data) {
+      _sessions = data.map(s => ({
+        id:s.id, routineId:s.routine_id, routineName:s.routine_name,
+        startedAt:new Date(s.started_at).getTime(), duration:s.duration, exercises:s.exercises,
+      }));
+    }
+    return _sessions;
+  } catch(e) { console.warn('Load sessions failed:', e.message); return []; }
 }
 
 async function dbDeleteSession(id) {
   try {
-    const { error } = await sb.from('sessions').delete().eq('id', id).eq('user_id', USER_ID);
-    if (error) { console.error('dbDeleteSession error:', error); throw error; }
-  } catch(e) {
-    console.warn('Supabase session delete failed:', e.message);
-  }
+    await sb.from('sessions').delete().eq('id', id).eq('user_id', USER_ID);
+    _sessions = _sessions.filter(s => s.id !== id);
+  } catch(e) { console.warn('Delete session failed:', e.message); }
 }
 
-// ── Pull from Supabase into localStorage on startup ───────
+async function dbLoadActiveSession() {
+  try {
+    const { data } = await sb.from('sessions').select('*').eq('user_id', USER_ID).eq('is_active', true).order('started_at', { ascending: false }).limit(1);
+    if (data && data.length) {
+      _activeSession = {
+        id:data[0].id, routineId:data[0].routine_id, routineName:data[0].routine_name,
+        startedAt:new Date(data[0].started_at).getTime(), exercises:data[0].exercises,
+      };
+    }
+    return _activeSession;
+  } catch(e) { console.warn('Load active session failed:', e.message); return null; }
+}
+
+// ── Main init sync ────────────────────────────────────────
 async function syncFromCloud() {
   setSyncStatus('syncing');
-  console.log('Syncing from cloud — USER_ID:', USER_ID);
-
-  // Push any local-only routines up first
-  const localRoutines = load(SK.routines) || [];
-  for (const r of localRoutines) {
-    await dbSaveRoutine(r);
-  }
-
-  // Then pull everything back (cloud is source of truth)
-  const cloudRoutines = await dbLoadRoutines();
-  if (cloudRoutines && cloudRoutines.length > 0) {
-    save(SK.routines, cloudRoutines);
-  }
-
-  // Push any local-only sessions up first
-  const localSessions = load(SK.sessions) || [];
-  for (const s of localSessions) {
-    if (s.duration) await dbSaveSession(s); // only finished sessions
-  }
-
-  // Pull all sessions
-  const cloudSessions = await dbLoadSessions();
-  if (cloudSessions && cloudSessions.length > 0) {
-    save(SK.sessions, cloudSessions);
-  }
-
+  USER_ID = await getUserId();
+  await Promise.all([dbLoadExercises(), dbLoadRoutines(), dbLoadSessions()]);
   setSyncStatus('ok');
-  console.log('Sync complete');
+  console.log('Loaded from Supabase — exercises:', _exercises.length, 'routines:', _routines.length, 'sessions:', _sessions.length);
 }
 
 // ═══════════════════════════════════════════
@@ -1289,20 +1288,15 @@ const DEFAULT_EXERCISES = [
 ];
 
 function initData() {
-  if (!load(SK.exercises)) save(SK.exercises, DEFAULT_EXERCISES);
-  if (!load(SK.routines))  save(SK.routines,  DEFAULT_ROUTINES);
+  // No-op — data is loaded from Supabase in syncFromCloud()
 }
 
 // ── Get last performance for an exercise across ALL sessions ──
 function getLastPerformance(exName) {
-  const sessions = load(SK.sessions) || [];
-  // Search newest first
-  for (let i = sessions.length - 1; i >= 0; i--) {
-    const s = sessions[i];
+  for (let i = _sessions.length - 1; i >= 0; i--) {
+    const s = _sessions[i];
     const ex = (s.exercises || []).find(e => e.name === exName);
-    if (ex && ex.sets && ex.sets.some(st => st.logged)) {
-      return ex.sets.filter(st => st.logged);
-    }
+    if (ex && ex.sets && ex.sets.some(st => st.logged)) return ex.sets.filter(st => st.logged);
   }
   return null;
 }
@@ -1599,10 +1593,9 @@ function buildSetRow(s, si, ei, isUni) {
     return fb;
   }
 
-  // Inputs: disabled while idle or active (fill in after stopping)
-  // Editable only when state is 'stopped' (we use a separate state for that) or logged
-  const inputDisabled = (s.state === 'idle' || s.state === 'active') ? 'readonly' : '';
-  const inputOpacity  = (s.state === 'idle' || s.state === 'active') ? 'opacity:0.4;' : '';
+  // Inputs always editable
+  const inputDisabled = isLogged ? '' : '';
+  const inputOpacity  = '';
 
   let btnLabel, btnClass;
   if (s.state === 'idle')   { btnLabel = 'START'; btnClass = 'state-idle'; }
@@ -1649,73 +1642,46 @@ function buildSetRow(s, si, ei, isUni) {
   </div>`;
 }
 
-// ── Set button handler: START → STOP → fills in inputs → mark as logged ──
+// ── Set button handler: START → STOP (logged), next START clears rest ──
 function handleSetBtn(ei, si) {
   if (!activeSession) return;
   const ex  = activeSession.exercises[ei];
   const set = ex.sets[si];
 
   if (set.state === 'idle') {
-    // ── START ──
-    // Clear any running rest timer
+    // ── START ── clear rest timer, start set
     clearRestBanner();
 
-    // Start exercise timer on first set
     if (!ex.startedAt) ex.startedAt = Date.now();
-
     set.state = 'active';
     set.setStartTime = Date.now();
-
-    // Start the set timer display
     startSetTimerDisplay(ei, si, set.setStartTime);
 
-    autoSaveSession();
+    dbSaveSession(activeSession);
     refreshSetRow(ei, si);
 
   } else if (set.state === 'active') {
-    // ── STOP → inputs now unlocked, rest timer starts ──
+    // ── STOP → immediately mark as logged, start rest timer ──
     const elapsed = Math.floor((Date.now() - set.setStartTime) / 1000);
     set.setDuration = elapsed;
-    set.state = 'stopped'; // intermediate: inputs editable
-
-    // Stop set timer
-    stopSetTimerDisplay(ei, si);
-
-    // Start rest timer
-    showRestBanner(ei, si, Date.now());
-
-    autoSaveSession();
-    refreshSetRow(ei, si);
-
-    // Unlock inputs — re-render the row to make them editable
-    // Then move focus to weight input
-    setTimeout(() => {
-      const weightInput = document.querySelector(`#set-row-${ei}-${si} .set-input`);
-      if (weightInput) weightInput.focus();
-    }, 50);
-
-  } else if (set.state === 'stopped') {
-    // ── DONE — mark as logged ──
     set.state  = 'logged';
     set.logged = true;
 
-    // Record rest duration
-    if (restTimer.startTime) {
-      set.restDuration = Math.floor((Date.now() - restTimer.startTime) / 1000);
-    }
+    stopSetTimerDisplay(ei, si);
+    showRestBanner(ei, si, Date.now());
 
-    autoSaveSession();
+    dbSaveSession(activeSession);
     refreshSetRow(ei, si);
     updateExMeta(ei);
 
   } else if (set.state === 'logged') {
-    // Allow un-logging by tapping again
+    // Tap again to un-log
     set.state  = 'idle';
     set.logged = false;
     set.setStartTime = null;
     set.setDuration  = null;
     stopSetTimerDisplay(ei, si);
-    autoSaveSession();
+    dbSaveSession(activeSession);
     refreshSetRow(ei, si);
     updateExMeta(ei);
   }
@@ -1895,11 +1861,8 @@ function finishWorkout() {
       }
     });
 
-    const sessions = load(SK.sessions) || [];
-    sessions.push(activeSession);
-    save(SK.sessions, sessions);
     await dbSaveSession(activeSession);
-    save(SK.activeSession, null);
+    _activeSession = null;
 
     const completedSession = { ...activeSession };
     activeSession = null;
@@ -1916,8 +1879,7 @@ function finishWorkout() {
 
 function autoSaveSession() {
   if (activeSession) {
-    save(SK.activeSession, activeSession);
-    dbSaveSession(activeSession); // background sync
+    dbSaveSession(activeSession); // Supabase only
   }
 }
 
@@ -2760,29 +2722,26 @@ function formatDuration(secs) {
 function init() {
   initData();
 
-  // Date in header
   const now = new Date();
   document.getElementById('header-date').textContent = now.toLocaleDateString('no-NO', { weekday:'short', day:'numeric', month:'short' }).toUpperCase();
 
-  // Restore active session if browser was closed mid-workout
-  const saved = load(SK.activeSession);
-  if (saved) {
-    activeSession = saved;
-    renderWorkoutPage();
-    startGlobalTimer();
-  }
-
   renderHome();
 
-  // Pull latest data from Supabase in background
-  syncFromCloud().then(() => {
+  // Load everything from Supabase
+  syncFromCloud().then(async () => {
+    // Check for an active session in Supabase
+    const active = await dbLoadActiveSession();
+    if (active) {
+      activeSession = active;
+      renderWorkoutPage();
+      startGlobalTimer();
+    }
     renderHome();
     const activePage = document.querySelector('.page.active');
     if (activePage && activePage.id === 'page-routines') renderRoutines();
     if (activePage && activePage.id === 'page-stats') renderStats();
   });
 
-  // Init Strava
   initStrava();
 }
 
