@@ -368,87 +368,128 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
 .ex-card-body{padding:10px 14px 14px;}
 .ex-card.collapsed .ex-card-body{display:none;}
 
-/* Set rows */
+/* Set rows — simplified, no log button column */
 .set-header-row{
   display:grid;
   font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);
   margin-bottom:6px;padding:0 4px;
 }
-.set-header-row.bilateral{grid-template-columns:28px 1fr 1fr 80px 24px;}
-.set-header-row.unilateral{grid-template-columns:28px 1fr 1fr 1fr 80px 24px;}
+.set-header-row.bilateral  { grid-template-columns:24px 1fr 1fr 1fr; }
+.set-header-row.unilateral { grid-template-columns:24px 1fr 1fr 1fr 1fr; }
 
-.set-row{
+.set-row {
+  border-radius:8px;
+  margin-bottom:6px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  transition:border-color 0.2s;
+}
+.set-row.set-active  { border-color:var(--neon);  box-shadow:0 0 10px rgba(0,180,255,0.1); }
+.set-row.set-logged  { border-color:rgba(0,255,204,0.25); }
+
+.set-row-top {
   display:grid;
   gap:6px;align-items:center;
-  padding:6px 4px;
-  border-radius:6px;
-  margin-bottom:4px;
-  transition:background 0.15s;
+  padding:8px 8px 0;
 }
-.set-row.bilateral{grid-template-columns:28px 1fr 1fr 80px 24px;}
-.set-row.unilateral{grid-template-columns:28px 1fr 1fr 1fr 80px 24px;}
-.set-row:last-child{margin-bottom:0;}
+.set-row-top.bilateral  { grid-template-columns:24px 1fr 1fr 1fr; }
+.set-row-top.unilateral { grid-template-columns:24px 1fr 1fr 1fr 1fr; }
 
-.set-num{
+.set-num {
   font-family:'Bebas Neue',sans-serif;font-size:14px;
   color:var(--muted);text-align:center;
 }
-.set-input{
+.set-input {
   background:var(--surface2);border:1px solid var(--border);
-  border-radius:6px;padding:7px 8px;
+  border-radius:6px;padding:7px 4px;
   font-size:13px;text-align:center;
-  color:var(--text);
-  -webkit-appearance:none;
+  color:var(--text);-webkit-appearance:none;
   font-family:'DM Mono',monospace;
 }
 .set-input:focus{border-color:var(--neon);box-shadow:0 0 0 1px var(--neon-dim);}
 .set-input.logged{border-color:rgba(0,255,204,0.3);background:rgba(0,255,204,0.05);}
 .set-input::placeholder{color:var(--muted);}
+.set-input.ghost-only{color:rgba(0,180,255,0.3)!important;font-style:italic;}
+.set-input:disabled{opacity:0.5;cursor:not-allowed;}
 
-.set-note{
+.set-note-row { padding:6px 8px 0; }
+.set-note {
   background:var(--surface2);border:1px solid var(--border);
-  border-radius:6px;padding:6px 8px;
+  border-radius:6px;padding:6px 8px;width:100%;
   font-size:11px;color:var(--muted2);
   font-family:'DM Mono',monospace;
-  resize:none;height:30px;
-  overflow:hidden;
+  resize:none;height:30px;overflow:hidden;
 }
 .set-note:focus{border-color:var(--neon);box-shadow:0 0 0 1px var(--neon-dim);color:var(--text);}
 
-.set-log-btn{
-  width:24px;height:24px;border-radius:50%;
-  background:var(--surface2);border:1px solid var(--border);
-  color:var(--muted2);font-size:12px;
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;transition:all 0.15s;flex-shrink:0;
+/* START / STOP button row */
+.set-btn-row {
+  padding:8px;display:flex;gap:6px;align-items:center;
 }
-.set-log-btn.logged{
-  background:var(--green-dim);border-color:rgba(0,255,204,0.4);color:var(--green);
-  box-shadow:0 0 6px rgba(0,255,204,0.3);
+.set-start-btn {
+  flex:1;border:none;border-radius:6px;
+  padding:10px;cursor:pointer;
+  font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;
+  transition:all 0.15s;
+}
+.set-start-btn.state-idle {
+  background:var(--surface2);color:var(--muted2);border:1px solid var(--border);
+}
+.set-start-btn.state-idle:active { background:var(--neon-dim);color:var(--neon); }
+.set-start-btn.state-active {
+  background:var(--red);color:#fff;
+  box-shadow:0 0 14px rgba(255,68,102,0.4);
+  animation:pulse-red 1.5s infinite;
+}
+.set-start-btn.state-logged {
+  background:var(--green-dim);color:var(--green);
+  border:1px solid rgba(0,255,204,0.3);
+  font-size:13px;letter-spacing:1px;
 }
 
-/* Rest timer */
-.rest-timer{
-  display:flex;align-items:center;gap:8px;
-  padding:6px 10px;
-  background:var(--neon-dim);border:1px solid var(--border2);
-  border-radius:6px;margin:6px 0;
-  font-size:11px;color:var(--neon);
+@keyframes pulse-red {
+  0%,100%{box-shadow:0 0 14px rgba(255,68,102,0.4);}
+  50%{box-shadow:0 0 22px rgba(255,68,102,0.7);}
 }
-.rest-timer-label{letter-spacing:1px;opacity:0.7;}
-.rest-timer-val{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;}
+
+/* REST TIMER — prominent banner between sets */
+.rest-banner {
+  margin:6px 0;
+  border-radius:10px;
+  background:linear-gradient(135deg,rgba(0,180,255,0.12),rgba(0,255,204,0.08));
+  border:1px solid var(--border2);
+  padding:14px 16px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.rest-banner-label {
+  font-size:10px;letter-spacing:3px;text-transform:uppercase;
+  color:var(--muted2);margin-bottom:2px;
+}
+.rest-banner-time {
+  font-family:'Bebas Neue',sans-serif;
+  font-size:42px;letter-spacing:4px;
+  color:var(--neon);
+  text-shadow:0 0 20px var(--neon-glow);
+  line-height:1;
+}
+.rest-banner-sub {
+  font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:1px;
+}
 
 /* Set actions */
 .ex-actions{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
 
-/* Previous performance hint */
-.prev-hint{
-  font-size:10px;color:var(--muted);
-  background:var(--bg3);border-radius:4px;
-  padding:3px 7px;
-  margin-bottom:2px;
-  display:inline-block;
+/* Save routine changes button */
+.save-routine-btn {
+  display:flex;align-items:center;gap:6px;
+  margin-top:8px;width:100%;
+  background:rgba(255,159,67,0.1);border:1px solid rgba(255,159,67,0.3);
+  border-radius:8px;padding:10px 14px;
+  color:var(--orange);font-family:'DM Mono',monospace;
+  font-size:11px;letter-spacing:1px;cursor:pointer;
+  transition:background 0.15s;
 }
+.save-routine-btn:active{background:rgba(255,159,67,0.2);}
 
 /* ═══════════════════════════════════════
    ROUTINES PAGE
@@ -696,7 +737,7 @@ canvas.chart{width:100%!important;height:100%!important;}
   <div class="logo">STERK<span>GUTT</span></div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
     <div class="header-right" id="header-date"></div>
-    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v1.3.0</div>
+    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v1.4.0</div>
     <div id="sync-status" style="font-size:9px;letter-spacing:1px;transition:color 0.3s;"></div>
   </div>
 </div>
@@ -739,6 +780,9 @@ canvas.chart{width:100%!important;height:100%!important;}
           <button class="workout-finish-btn" onclick="finishWorkout()">FINISH</button>
         </div>
       </div>
+      <button class="save-routine-btn" onclick="saveRoutineChanges()">
+        💾 Save exercise changes to routine
+      </button>
     </div>
     <div class="workout-body" id="workout-body"></div>
   </div>
@@ -1418,9 +1462,10 @@ function openWorkoutPicker() {
 // ═══════════════════════════════════════════
 let activeSession = null;
 let globalTimerInterval = null;
-let restTimerInterval = null;
-let restStart = null;
-let currentRestEl = null;
+// Per-set timers: keyed by "ei-si"
+let setTimers = {}; // { "ei-si": { interval, startTime } }
+// Active rest timer
+let restTimer = { interval: null, startTime: null, el: null };
 
 function startWorkout(routineId) {
   closeModal('workout-picker');
@@ -1435,7 +1480,6 @@ function startWorkout(routineId) {
     startedAt: Date.now(),
     duration: null,
     exercises: routine.exercises.map(ex => {
-      // Look up last performance globally across ALL sessions for this exercise
       const prevSets = getLastPerformance(ex.name) || [];
       return {
         id: ex.id,
@@ -1447,14 +1491,11 @@ function startWorkout(routineId) {
         collapsed: false,
         sets: Array.from({ length: ex.sets }, (_, i) => ({
           num: i + 1,
-          weight: '',
-          reps: '',
-          repsL: '',
-          repsR: '',
-          note: '',
-          logged: false,
-          restDuration: null,
-          // Ghost values from last session — shown translucent in the input
+          weight: '', reps: '', repsL: '', repsR: '',
+          note: '', logged: false, restDuration: null,
+          setStartTime: null, setDuration: null,
+          // state: 'idle' | 'active' | 'logged'
+          state: 'idle',
           ghostWeight: prevSets[i] ? (prevSets[i].weight || '') : '',
           ghostReps:   prevSets[i] ? (prevSets[i].reps   || '') : '',
           ghostRepsL:  prevSets[i] ? (prevSets[i].repsL  || '') : '',
@@ -1464,6 +1505,7 @@ function startWorkout(routineId) {
     })
   };
 
+  setTimers = {};
   autoSaveSession();
   renderWorkoutPage();
   showPage('workout', document.getElementById('nav-workout'));
@@ -1473,30 +1515,43 @@ function startWorkout(routineId) {
 function renderWorkoutPage() {
   if (!activeSession) return;
   document.getElementById('active-workout-name').textContent = activeSession.routineName;
-  document.getElementById('active-workout-date').textContent = new Date(activeSession.startedAt).toLocaleDateString('no-NO', { weekday:'long', day:'numeric', month:'long' });
+  document.getElementById('active-workout-date').textContent =
+    new Date(activeSession.startedAt).toLocaleDateString('no-NO', { weekday:'long', day:'numeric', month:'long' });
   renderWorkoutBody();
 }
 
 function renderWorkoutBody() {
   const body = document.getElementById('workout-body');
   body.innerHTML = activeSession.exercises.map((ex, ei) => buildExCard(ex, ei)).join('');
-  // Re-attach drag events
   attachDragHandles();
+  // Restore any running set timers after re-render
+  activeSession.exercises.forEach((ex, ei) => {
+    ex.sets.forEach((s, si) => {
+      if (s.state === 'active' && s.setStartTime) {
+        startSetTimerDisplay(ei, si, s.setStartTime);
+      }
+    });
+  });
+  // Restore rest timer display if running
+  if (restTimer.interval && restTimer.el) {
+    // Re-render will have cleared the DOM rest banner — restart it
+    const { ei, si } = restTimer;
+    if (ei !== undefined) showRestBanner(ei, si, restTimer.startTime);
+  }
 }
 
 function buildExCard(ex, ei) {
-  const logged = ex.sets.filter(s => s.logged).length;
-  const total = ex.sets.length;
-  const dur = ex.startedAt ? formatDuration(ex.duration || Math.floor((Date.now() - ex.startedAt) / 1000)) : null;
-  const isUni = ex.unilateral;
+  const logged = ex.sets.filter(s => s.state === 'logged').length;
+  const total  = ex.sets.length;
+  const isUni  = ex.unilateral;
 
   const headerCols = isUni
-    ? 'grid-template-columns:28px 1fr 1fr 1fr 80px 24px;'
-    : 'grid-template-columns:28px 1fr 1fr 80px 24px;';
+    ? 'KG · REPS L · REPS R · NOTE'
+    : 'KG · REPS · NOTE';
 
   let setHeaderHTML = isUni
-    ? `<div class="set-header-row unilateral"><span>#</span><span style="text-align:center;">KG</span><span style="text-align:center;">REPS L</span><span style="text-align:center;">REPS R</span><span style="text-align:center;">NOTE</span><span></span></div>`
-    : `<div class="set-header-row bilateral"><span>#</span><span style="text-align:center;">KG</span><span style="text-align:center;">REPS</span><span style="text-align:center;">NOTE</span><span></span></div>`;
+    ? `<div class="set-header-row unilateral"><span>#</span><span style="text-align:center">KG</span><span style="text-align:center">L</span><span style="text-align:center">R</span><span style="text-align:center">NOTE</span></div>`
+    : `<div class="set-header-row bilateral"><span>#</span><span style="text-align:center">KG</span><span style="text-align:center">REPS</span><span style="text-align:center">NOTE</span></div>`;
 
   const setsHTML = ex.sets.map((s, si) => buildSetRow(s, si, ei, isUni)).join('');
 
@@ -1505,9 +1560,8 @@ function buildExCard(ex, ei) {
       <span class="ex-drag-handle" data-ei="${ei}">⠿</span>
       <div class="ex-card-title" onclick="toggleExCollapse(${ei})">
         <div class="ex-card-name">${ex.name}</div>
-        <div class="ex-card-meta">${ex.muscle}${ex.unilateral ? ' · Unilateral' : ''} · ${logged}/${total} sets</div>
+        <div class="ex-card-meta" id="ex-meta-${ei}">${ex.muscle}${ex.unilateral?' · Uni':''} · ${logged}/${total} sets</div>
       </div>
-      ${dur ? `<div class="ex-duration">${dur}</div>` : ''}
       <span class="ex-collapse-btn" onclick="toggleExCollapse(${ei})">▾</span>
     </div>
     <div class="ex-card-body">
@@ -1522,64 +1576,216 @@ function buildExCard(ex, ei) {
 }
 
 function buildSetRow(s, si, ei, isUni) {
-  const loggedClass = s.logged ? 'logged' : '';
+  const stateClass = s.state === 'active' ? 'set-active' : s.state === 'logged' ? 'set-logged' : '';
+  const disabled   = s.state !== 'logged' ? '' : 'disabled'; // inputs editable after stop, locked after logged
+  const isLogged   = s.state === 'logged';
+  const isActive   = s.state === 'active';
 
-  // Ghost logic: if no current value entered, show ghost as placeholder-style
-  // If value entered, show normally. Ghost values display dimly until replaced.
-  function ghostClass(val, ghost) {
-    if (s.logged) return 'logged';
+  function gClass(val, ghost) {
+    if (isLogged) return 'logged';
     if (val !== '' && val !== null && val !== undefined) return '';
     if (ghost !== '' && ghost !== null && ghost !== undefined) return 'ghost-only';
     return '';
   }
-  function ghostPlaceholder(val, ghost, fallback) {
-    if (val !== '' && val !== null && val !== undefined) return '';
+  function gPH(val, ghost, fb) {
+    if (val !== '' && val !== null && val !== undefined) return val; // show value
     if (ghost !== '' && ghost !== null && ghost !== undefined) return ghost;
-    return fallback;
+    return fb;
   }
 
-  if (isUni) {
-    return `<div class="set-row unilateral ${loggedClass}" id="set-row-${ei}-${si}">
+  // Inputs: disabled while idle or active (fill in after stopping)
+  // Editable only when state is 'stopped' (we use a separate state for that) or logged
+  const inputDisabled = (s.state === 'idle' || s.state === 'active') ? 'readonly' : '';
+  const inputOpacity  = (s.state === 'idle' || s.state === 'active') ? 'opacity:0.4;' : '';
+
+  let btnLabel, btnClass;
+  if (s.state === 'idle')   { btnLabel = 'START'; btnClass = 'state-idle'; }
+  if (s.state === 'active') { btnLabel = 'STOP';  btnClass = 'state-active'; }
+  if (s.state === 'logged') { btnLabel = '✓ DONE'; btnClass = 'state-logged'; }
+
+  // Set duration badge
+  const durBadge = s.setDuration
+    ? `<span style="font-size:10px;color:var(--muted2);letter-spacing:1px;">${formatMMSS(s.setDuration)}</span>`
+    : s.state === 'active'
+    ? `<span id="set-timer-${ei}-${si}" style="font-size:10px;color:var(--neon);letter-spacing:1px;font-family:'Bebas Neue',sans-serif;">0:00</span>`
+    : '';
+
+  const inputs = isUni ? `
+    <input class="set-input ${gClass(s.weight,s.ghostWeight)}" type="number" inputmode="decimal" min="0" step="0.5"
+      value="${s.weight}" placeholder="${gPH(s.weight,s.ghostWeight,'kg')}" style="${inputOpacity}"
+      ${inputDisabled} oninput="updateSet(${ei},${si},'weight',this.value)" onchange="updateSet(${ei},${si},'weight',this.value)"/>
+    <input class="set-input ${gClass(s.repsL,s.ghostRepsL)}" type="number" inputmode="numeric" min="0"
+      value="${s.repsL}" placeholder="${gPH(s.repsL,s.ghostRepsL,'L')}" style="${inputOpacity}"
+      ${inputDisabled} oninput="updateSet(${ei},${si},'repsL',this.value)" onchange="updateSet(${ei},${si},'repsL',this.value)"/>
+    <input class="set-input ${gClass(s.repsR,s.ghostRepsR)}" type="number" inputmode="numeric" min="0"
+      value="${s.repsR}" placeholder="${gPH(s.repsR,s.ghostRepsR,'R')}" style="${inputOpacity}"
+      ${inputDisabled} oninput="updateSet(${ei},${si},'repsR',this.value)" onchange="updateSet(${ei},${si},'repsR',this.value)"/>` : `
+    <input class="set-input ${gClass(s.weight,s.ghostWeight)}" type="number" inputmode="decimal" min="0" step="0.5"
+      value="${s.weight}" placeholder="${gPH(s.weight,s.ghostWeight,'kg')}" style="${inputOpacity}"
+      ${inputDisabled} oninput="updateSet(${ei},${si},'weight',this.value)" onchange="updateSet(${ei},${si},'weight',this.value)"/>
+    <input class="set-input ${gClass(s.reps,s.ghostReps)}" type="number" inputmode="numeric" min="0"
+      value="${s.reps}" placeholder="${gPH(s.reps,s.ghostReps,'reps')}" style="${inputOpacity}"
+      ${inputDisabled} oninput="updateSet(${ei},${si},'reps',this.value)" onchange="updateSet(${ei},${si},'reps',this.value)"/>`;
+
+  return `<div class="set-row ${stateClass}" id="set-row-${ei}-${si}">
+    <div class="set-row-top ${isUni?'unilateral':'bilateral'}">
       <div class="set-num">${si+1}</div>
-      <input class="set-input ${ghostClass(s.weight, s.ghostWeight)}" type="number" inputmode="decimal" min="0" step="0.5"
-        value="${s.weight}"
-        placeholder="${ghostPlaceholder(s.weight, s.ghostWeight, 'kg')}"
-        oninput="updateSet(${ei},${si},'weight',this.value);this.classList.remove('ghost-only')"
-        onchange="updateSet(${ei},${si},'weight',this.value)"/>
-      <input class="set-input ${ghostClass(s.repsL, s.ghostRepsL)}" type="number" inputmode="numeric" min="0"
-        value="${s.repsL}"
-        placeholder="${ghostPlaceholder(s.repsL, s.ghostRepsL, 'L')}"
-        oninput="updateSet(${ei},${si},'repsL',this.value);this.classList.remove('ghost-only')"
-        onchange="updateSet(${ei},${si},'repsL',this.value)"/>
-      <input class="set-input ${ghostClass(s.repsR, s.ghostRepsR)}" type="number" inputmode="numeric" min="0"
-        value="${s.repsR}"
-        placeholder="${ghostPlaceholder(s.repsR, s.ghostRepsR, 'R')}"
-        oninput="updateSet(${ei},${si},'repsR',this.value);this.classList.remove('ghost-only')"
-        onchange="updateSet(${ei},${si},'repsR',this.value)"/>
-      <input class="set-note" placeholder="note..."
-        value="${s.note}"
-        onchange="updateSet(${ei},${si},'note',this.value)"/>
-      <div class="set-log-btn ${s.logged ? 'logged' : ''}" onclick="logSet(${ei},${si})">✓</div>
-    </div>`;
-  } else {
-    return `<div class="set-row bilateral ${loggedClass}" id="set-row-${ei}-${si}">
-      <div class="set-num">${si+1}</div>
-      <input class="set-input ${ghostClass(s.weight, s.ghostWeight)}" type="number" inputmode="decimal" min="0" step="0.5"
-        value="${s.weight}"
-        placeholder="${ghostPlaceholder(s.weight, s.ghostWeight, 'kg')}"
-        oninput="updateSet(${ei},${si},'weight',this.value);this.classList.remove('ghost-only')"
-        onchange="updateSet(${ei},${si},'weight',this.value)"/>
-      <input class="set-input ${ghostClass(s.reps, s.ghostReps)}" type="number" inputmode="numeric" min="0"
-        value="${s.reps}"
-        placeholder="${ghostPlaceholder(s.reps, s.ghostReps, 'reps')}"
-        oninput="updateSet(${ei},${si},'reps',this.value);this.classList.remove('ghost-only')"
-        onchange="updateSet(${ei},${si},'reps',this.value)"/>
-      <input class="set-note" placeholder="note..."
-        value="${s.note}"
-        onchange="updateSet(${ei},${si},'note',this.value)"/>
-      <div class="set-log-btn ${s.logged ? 'logged' : ''}" onclick="logSet(${ei},${si})">✓</div>
-    </div>`;
+      ${inputs}
+    </div>
+    <div class="set-note-row">
+      <input class="set-note" placeholder="note..." value="${s.note||''}"
+        ${inputDisabled} onchange="updateSet(${ei},${si},'note',this.value)"/>
+    </div>
+    <div class="set-btn-row">
+      <button class="set-start-btn ${btnClass}" onclick="handleSetBtn(${ei},${si})">${btnLabel}</button>
+      ${durBadge}
+    </div>
+  </div>`;
+}
+
+// ── Set button handler: START → STOP → fills in inputs → mark as logged ──
+function handleSetBtn(ei, si) {
+  if (!activeSession) return;
+  const ex  = activeSession.exercises[ei];
+  const set = ex.sets[si];
+
+  if (set.state === 'idle') {
+    // ── START ──
+    // Clear any running rest timer
+    clearRestBanner();
+
+    // Start exercise timer on first set
+    if (!ex.startedAt) ex.startedAt = Date.now();
+
+    set.state = 'active';
+    set.setStartTime = Date.now();
+
+    // Start the set timer display
+    startSetTimerDisplay(ei, si, set.setStartTime);
+
+    autoSaveSession();
+    refreshSetRow(ei, si);
+
+  } else if (set.state === 'active') {
+    // ── STOP → inputs now unlocked, rest timer starts ──
+    const elapsed = Math.floor((Date.now() - set.setStartTime) / 1000);
+    set.setDuration = elapsed;
+    set.state = 'stopped'; // intermediate: inputs editable
+
+    // Stop set timer
+    stopSetTimerDisplay(ei, si);
+
+    // Start rest timer
+    showRestBanner(ei, si, Date.now());
+
+    autoSaveSession();
+    refreshSetRow(ei, si);
+
+    // Unlock inputs — re-render the row to make them editable
+    // Then move focus to weight input
+    setTimeout(() => {
+      const weightInput = document.querySelector(`#set-row-${ei}-${si} .set-input`);
+      if (weightInput) weightInput.focus();
+    }, 50);
+
+  } else if (set.state === 'stopped') {
+    // ── DONE — mark as logged ──
+    set.state  = 'logged';
+    set.logged = true;
+
+    // Record rest duration
+    if (restTimer.startTime) {
+      set.restDuration = Math.floor((Date.now() - restTimer.startTime) / 1000);
+    }
+
+    autoSaveSession();
+    refreshSetRow(ei, si);
+    updateExMeta(ei);
+
+  } else if (set.state === 'logged') {
+    // Allow un-logging by tapping again
+    set.state  = 'idle';
+    set.logged = false;
+    set.setStartTime = null;
+    set.setDuration  = null;
+    stopSetTimerDisplay(ei, si);
+    autoSaveSession();
+    refreshSetRow(ei, si);
+    updateExMeta(ei);
   }
+}
+
+// ── Set timer display ──────────────────────────────────────
+function startSetTimerDisplay(ei, si, startTime) {
+  const key = `${ei}-${si}`;
+  if (setTimers[key]) clearInterval(setTimers[key].interval);
+  setTimers[key] = {
+    startTime,
+    interval: setInterval(() => {
+      const el = document.getElementById(`set-timer-${ei}-${si}`);
+      if (!el) { clearInterval(setTimers[key]?.interval); return; }
+      el.textContent = formatMMSS(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000)
+  };
+}
+
+function stopSetTimerDisplay(ei, si) {
+  const key = `${ei}-${si}`;
+  if (setTimers[key]) { clearInterval(setTimers[key].interval); delete setTimers[key]; }
+}
+
+// ── Rest banner ───────────────────────────────────────────
+function showRestBanner(ei, si, startTime) {
+  clearRestBanner();
+  restTimer.startTime = startTime;
+  restTimer.ei = ei; restTimer.si = si;
+
+  // Insert banner after the set row that just stopped
+  const setRow = document.getElementById(`set-row-${ei}-${si}`);
+  if (!setRow) return;
+
+  const banner = document.createElement('div');
+  banner.className = 'rest-banner';
+  banner.id = 'rest-banner';
+  banner.innerHTML = `
+    <div>
+      <div class="rest-banner-label">Rest</div>
+      <div class="rest-banner-time" id="rest-banner-time">0:00</div>
+      <div class="rest-banner-sub">Fill in your reps &amp; weight above, then tap DONE</div>
+    </div>
+    <div style="font-size:28px;opacity:0.3;">☕</div>
+  `;
+  setRow.after(banner);
+  restTimer.el = banner;
+
+  restTimer.interval = setInterval(() => {
+    const el = document.getElementById('rest-banner-time');
+    if (el) el.textContent = formatMMSS(Math.floor((Date.now() - startTime) / 1000));
+  }, 1000);
+}
+
+function clearRestBanner() {
+  if (restTimer.interval) { clearInterval(restTimer.interval); restTimer.interval = null; }
+  const banner = document.getElementById('rest-banner');
+  if (banner) banner.remove();
+  restTimer.el = null; restTimer.startTime = null;
+  restTimer.ei = undefined; restTimer.si = undefined;
+}
+
+// ── Refresh a single set row without re-rendering all ─────
+function refreshSetRow(ei, si) {
+  const ex  = activeSession.exercises[ei];
+  const set = ex.sets[si];
+  const rowEl = document.getElementById(`set-row-${ei}-${si}`);
+  if (rowEl) rowEl.outerHTML = buildSetRow(set, si, ei, ex.unilateral);
+  // If set just became active, start its timer
+  if (set.state === 'active') startSetTimerDisplay(ei, si, set.setStartTime);
+}
+
+function updateExMeta(ei) {
+  const ex  = activeSession.exercises[ei];
+  const el  = document.getElementById(`ex-meta-${ei}`);
+  if (el) el.textContent = `${ex.muscle}${ex.unilateral?' · Uni':''} · ${ex.sets.filter(s=>s.state==='logged').length}/${ex.sets.length} sets`;
 }
 
 function updateSet(ei, si, field, val) {
@@ -1588,102 +1794,39 @@ function updateSet(ei, si, field, val) {
   autoSaveSession();
 }
 
-function logSet(ei, si) {
-  if (!activeSession) return;
-  const ex = activeSession.exercises[ei];
-  const set = ex.sets[si];
-
-  // Start exercise timer on first set
-  if (!ex.startedAt) {
-    ex.startedAt = Date.now();
-  }
-
-  // Stop rest timer, record rest duration
-  if (restTimerInterval) {
-    clearInterval(restTimerInterval);
-    restTimerInterval = null;
-    if (restStart && si > 0) {
-      ex.sets[si - 1].restDuration = Math.floor((Date.now() - restStart) / 1000);
-    }
-    if (currentRestEl) { currentRestEl.remove(); currentRestEl = null; }
-    restStart = null;
-  }
-
-  // Toggle logged
-  set.logged = !set.logged;
-
-  if (set.logged) {
-    // Start rest timer for next set
-    const setsContainer = document.getElementById('sets-' + ei);
-    const nextRow = document.getElementById(`set-row-${ei}-${si+1}`);
-
-    if (nextRow) {
-      restStart = Date.now();
-      const timerEl = document.createElement('div');
-      timerEl.className = 'rest-timer';
-      timerEl.id = `rest-${ei}-${si}`;
-      timerEl.innerHTML = `<span class="rest-timer-label">REST</span><span class="rest-timer-val" id="rest-val-${ei}-${si}">0:00</span>`;
-      nextRow.parentNode.insertBefore(timerEl, nextRow);
-      currentRestEl = timerEl;
-
-      restTimerInterval = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - restStart) / 1000);
-        const el = document.getElementById(`rest-val-${ei}-${si}`);
-        if (el) el.textContent = formatMMSS(elapsed);
-      }, 1000);
-    }
-  }
-
-  autoSaveSession();
-  // Refresh just the set row
-  const rowEl = document.getElementById(`set-row-${ei}-${si}`);
-  if (rowEl) {
-    rowEl.outerHTML = buildSetRow(set, si, ei, ex.unilateral);
-  }
-  // Update header meta
-  const card = document.getElementById(`ex-card-${ei}`);
-  if (card) {
-    const logged = ex.sets.filter(s => s.logged).length;
-    const metaEl = card.querySelector('.ex-card-meta');
-    if (metaEl) metaEl.textContent = `${ex.muscle}${ex.unilateral?' · Unilateral':''} · ${logged}/${ex.sets.length} sets`;
-  }
-}
-
 function addSet(ei) {
   if (!activeSession) return;
-  const ex = activeSession.exercises[ei];
+  const ex   = activeSession.exercises[ei];
   const prev = ex.sets[ex.sets.length - 1] || {};
-  ex.sets.push({ num: ex.sets.length + 1, weight: prev.weight || '', reps: prev.reps || '', repsL: prev.repsL || '', repsR: prev.repsR || '', note: '', logged: false, restDuration: null });
+  ex.sets.push({
+    num: ex.sets.length + 1,
+    weight: '', reps: '', repsL: '', repsR: '', note: '',
+    logged: false, restDuration: null,
+    setStartTime: null, setDuration: null, state: 'idle',
+    ghostWeight: prev.weight || '', ghostReps: prev.reps || '',
+    ghostRepsL: prev.repsL || '', ghostRepsR: prev.repsR || '',
+  });
   autoSaveSession();
-  const container = document.getElementById('sets-' + ei);
+  const container = document.getElementById(`sets-${ei}`);
   if (container) {
-    const si = ex.sets.length - 1;
+    const si  = ex.sets.length - 1;
     const div = document.createElement('div');
     div.innerHTML = buildSetRow(ex.sets[si], si, ei, ex.unilateral);
     container.appendChild(div.firstChild);
   }
-  const card = document.getElementById(`ex-card-${ei}`);
-  if (card) {
-    const logged = ex.sets.filter(s => s.logged).length;
-    const metaEl = card.querySelector('.ex-card-meta');
-    if (metaEl) metaEl.textContent = `${ex.muscle}${ex.unilateral?' · Unilateral':''} · ${logged}/${ex.sets.length} sets`;
-  }
+  updateExMeta(ei);
 }
 
 function removeLastSet(ei) {
   if (!activeSession) return;
   const ex = activeSession.exercises[ei];
   if (ex.sets.length <= 1) return;
-  ex.sets.pop();
+  const last = ex.sets.pop();
+  stopSetTimerDisplay(ei, ex.sets.length);
   autoSaveSession();
-  const container = document.getElementById('sets-' + ei);
+  const container = document.getElementById(`sets-${ei}`);
   if (container && container.lastChild) container.removeChild(container.lastChild);
-  const card = document.getElementById(`ex-card-${ei}`);
-  if (card) {
-    const logged = ex.sets.filter(s => s.logged).length;
-    const metaEl = card.querySelector('.ex-card-meta');
-    if (metaEl) metaEl.textContent = `${ex.muscle}${ex.unilateral?' · Unilateral':''} · ${logged}/${ex.sets.length} sets`;
-  }
+  updateExMeta(ei);
 }
 
 function toggleExCollapse(ei) {
@@ -1691,6 +1834,33 @@ function toggleExCollapse(ei) {
   activeSession.exercises[ei].collapsed = !activeSession.exercises[ei].collapsed;
   const card = document.getElementById(`ex-card-${ei}`);
   if (card) card.classList.toggle('collapsed');
+}
+
+// ── Save current exercise list back to the routine ─────────
+function saveRoutineChanges() {
+  if (!activeSession || !activeSession.routineId) return;
+  showConfirm(
+    'Save Routine Changes?',
+    'This will update the exercise list and order in the saved routine.',
+    () => {
+      const routines = load(SK.routines) || [];
+      const idx = routines.findIndex(r => r.id === activeSession.routineId);
+      if (idx < 0) { showToast('Routine not found'); return; }
+
+      // Update exercises — keep original set counts from routine, just sync order/names
+      routines[idx].exercises = activeSession.exercises.map(ex => ({
+        id:         ex.id,
+        name:       ex.name,
+        muscle:     ex.muscle,
+        unilateral: ex.unilateral,
+        sets:       ex.sets.length,
+      }));
+
+      save(SK.routines, routines);
+      dbSaveRoutine(routines[idx]);
+      showToast('Routine updated ✓');
+    }
+  );
 }
 
 // ─── Global workout timer ───
@@ -1708,7 +1878,9 @@ function finishWorkout() {
     if (!activeSession) return;
     activeSession.duration = Math.floor((Date.now() - activeSession.startedAt) / 1000);
     clearInterval(globalTimerInterval);
-    clearInterval(restTimerInterval);
+    clearRestBanner();
+    Object.values(setTimers).forEach(t => clearInterval(t.interval));
+    setTimers = {};
 
     // Finish exercise durations
     activeSession.exercises.forEach(ex => {
