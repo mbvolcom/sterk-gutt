@@ -575,6 +575,31 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
 
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
 
+/* Stats filter */
+.stats-filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:4px;}
+.stats-filter-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted2);margin-bottom:10px;}
+.stats-filter-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.stats-date-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);font-family:inherit;outline:none;}
+.stats-date-input:focus{border-color:var(--neon);}
+.stats-filter-sep{color:var(--muted2);font-size:14px;flex-shrink:0;}
+.stats-apply-btn{width:100%;background:var(--neon-dim);color:var(--neon);border:1px solid rgba(0,180,255,0.3);border-radius:8px;padding:9px;font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:2px;cursor:pointer;}
+.stats-apply-btn:active{background:rgba(0,180,255,0.2);}
+.stats-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.stats-kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.stats-kpi-val{font-family:'Bebas Neue',sans-serif;font-size:32px;line-height:1;margin-bottom:3px;}
+.stats-kpi-lbl{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);}
+.stats-kpi-sub{font-size:10px;color:var(--muted);margin-top:3px;}
+.ex-progress-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.ex-kpi{background:var(--surface2);border-radius:8px;padding:10px 8px;text-align:center;}
+.ex-kpi-val{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--neon);}
+.ex-kpi-lbl{font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+.ex-trend-badge{display:inline-flex;align-items:center;gap:4px;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;margin-bottom:12px;}
+.ex-trend-badge.up{background:rgba(0,255,150,0.12);color:#00ff96;}
+.ex-trend-badge.down{background:rgba(255,68,102,0.12);color:#ff4466;}
+.ex-trend-badge.flat{background:rgba(255,255,255,0.06);color:var(--muted2);}
+.ex-chart-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);margin:12px 0 6px;}
+.ex-no-data{font-size:12px;color:var(--muted2);padding:20px 0;text-align:center;}
+
 /* Charts */
 .chart-wrap{position:relative;width:100%;height:160px;margin-top:8px;}
 canvas.chart{width:100%!important;height:100%!important;}
@@ -749,7 +774,7 @@ canvas.chart{width:100%!important;height:100%!important;}
   <div class="logo">STERK<span>GUTT</span></div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
     <div class="header-right" id="header-date"></div>
-    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v2.0.0</div>
+    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v2.1.0</div>
     <div id="sync-status" style="font-size:9px;letter-spacing:1px;transition:color 0.3s;"></div>
   </div>
 </div>
@@ -830,69 +855,45 @@ canvas.chart{width:100%!important;height:100%!important;}
 
   <!-- ══ STATS PAGE ══ -->
   <div class="page" id="page-stats">
-    <div class="section-title">Stats</div>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-card-title">Total Sessions</div>
-        <div class="stat-value" id="stat-sessions">0</div>
+    <!-- DATE FILTER -->
+    <div class="stats-filter-bar">
+      <div class="stats-filter-title">Report period</div>
+      <div class="stats-filter-row">
+        <input type="date" id="stats-from" class="stats-date-input"/>
+        <span class="stats-filter-sep">→</span>
+        <input type="date" id="stats-to" class="stats-date-input"/>
       </div>
-      <div class="stat-card">
-        <div class="stat-card-title">Total Sets</div>
-        <div class="stat-value" id="stat-sets">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-card-title">This Week</div>
-        <div class="stat-value" id="stat-week">0</div>
-        <div class="stat-label">sessions</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-card-title">Total Volume</div>
-        <div class="stat-value" id="stat-volume">0</div>
-        <div class="stat-label">kg lifted</div>
-      </div>
+      <button class="stats-apply-btn" onclick="renderStats()">Apply</button>
     </div>
 
-    <div class="stat-card" style="margin-bottom:12px;">
-      <div class="stat-card-title">Weekly Volume (kg)</div>
-      <div class="chart-wrap"><canvas id="chart-volume"></canvas></div>
-    </div>
+    <!-- OVERVIEW KPIS -->
+    <div class="section-title" style="margin-top:16px;">Overview</div>
+    <div class="stats-grid" id="stats-kpi-grid"></div>
 
+    <!-- MUSCLE VOLUME BAR -->
     <div class="stat-card" style="margin-bottom:12px;">
-      <div class="stat-card-title">Exercise Progress</div>
-      <div class="exercise-select-wrap">
-        <select id="ex-select" onchange="renderExerciseChart()"><option value="">— Select exercise —</option></select>
-      </div>
-      <div class="chart-wrap"><canvas id="chart-exercise"></canvas></div>
-    </div>
-
-    <div class="stat-card" style="margin-bottom:12px;">
-      <div class="stat-card-title">Personal Records</div>
-      <div id="pr-list"><div class="empty-state" style="padding:20px;"><div class="empty-state-text">No data yet</div></div></div>
-    </div>
-
-    <div class="stat-card" style="margin-bottom:12px;">
-      <div class="stat-card-title">Muscle Group Volume</div>
+      <div class="stat-card-title">Volume by muscle group</div>
       <div id="muscle-bars"></div>
     </div>
 
+    <!-- WEEKLY FREQUENCY -->
     <div class="stat-card" style="margin-bottom:12px;">
-      <div class="stat-card-title">Version History</div>
-      <div style="font-size:12px;color:var(--muted2);line-height:1.8;padding-top:6px;">
-        <div style="color:var(--neon);font-weight:600;margin-bottom:4px;">v2.0.0 — May 2026</div>
-        <div>• Strava integration — connect &amp; upload workouts</div>
-        <div>• Supabase-only data — removed localStorage dependency</div>
-        <div>• Set flow: START → STOP (instant log, rest timer begins)</div>
-        <div>• Inputs always editable during workout</div>
-        <div>• Full session history — no display limit</div>
-        <div>• PWA support — install as app with icon</div>
-        <div>• Blue START button styling</div>
-        <div style="color:var(--muted);font-weight:600;margin-top:10px;margin-bottom:4px;">v1.4.0 and earlier</div>
-        <div>• Core workout tracking with localStorage</div>
-        <div>• Routines, exercises, sets &amp; reps</div>
-        <div>• Stats, PRs, muscle group volume</div>
-      </div>
+      <div class="stat-card-title">Weekly sessions</div>
+      <div class="chart-wrap"><canvas id="chart-volume"></canvas></div>
     </div>
+
+    <!-- EXERCISE PROGRESS -->
+    <div class="section-title">Exercise progress</div>
+    <div class="stat-card" style="margin-bottom:12px;">
+      <div class="exercise-select-wrap">
+        <select id="ex-select" onchange="renderExerciseSection()">
+          <option value="">— Select exercise —</option>
+        </select>
+      </div>
+      <div id="exercise-progress-body"></div>
+    </div>
+
   </div>
 
 </div>
@@ -2459,148 +2460,215 @@ let volumeChartInstance = null;
 let exerciseChartInstance = null;
 
 function renderStats() {
-  const sessions = load(SK.sessions) || [];
+  // Set default date range if not set (last 3 months)
+  const fromEl = document.getElementById('stats-from');
+  const toEl   = document.getElementById('stats-to');
+  if (!fromEl.value) {
+    const d = new Date(); d.setMonth(d.getMonth()-3);
+    fromEl.value = d.toISOString().slice(0,10);
+  }
+  if (!toEl.value) {
+    toEl.value = new Date().toISOString().slice(0,10);
+  }
 
-  // Summary stats
-  const totalSets = sessions.reduce((a, s) => a + (s.exercises || []).reduce((b, ex) => b + (ex.sets || []).filter(st => st.logged).length, 0), 0);
-  document.getElementById('stat-sessions').textContent = sessions.length;
-  document.getElementById('stat-sets').textContent = totalSets;
+  const fromDate = new Date(fromEl.value + 'T00:00:00');
+  const toDate   = new Date(toEl.value   + 'T23:59:59');
 
-  const now = new Date();
-  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
-  const thisWeek = sessions.filter(s => new Date(s.startedAt) >= weekStart).length;
-  document.getElementById('stat-week').textContent = thisWeek;
+  const allSessions = load(SK.sessions) || [];
+  const sessions = allSessions.filter(s => {
+    const d = new Date(s.startedAt);
+    return d >= fromDate && d <= toDate;
+  });
 
-  const totalVol = sessions.reduce((a, s) => a + calcSessionVolume(s), 0);
-  document.getElementById('stat-volume').textContent = Math.round(totalVol).toLocaleString();
-
-  renderVolumeChart(sessions);
-  renderPRs(sessions);
+  renderKPIs(sessions, fromDate, toDate);
   renderMuscleBars(sessions);
-  populateExSelect(sessions);
+  renderWeeklyFreqChart(sessions, fromDate, toDate);
+  populateExSelect();
+  renderExerciseSection();
+}
+
+function renderKPIs(sessions, fromDate, toDate) {
+  const totalSessions = sessions.length;
+  const allSets = sessions.reduce((a,s) => a + (s.exercises||[]).reduce((b,ex) => b+(ex.sets||[]).filter(st=>st.logged).length, 0), 0);
+  const avgSets = totalSessions ? (allSets/totalSessions).toFixed(1) : 0;
+  const totalVol = Math.round(sessions.reduce((a,s) => a+calcSessionVolume(s), 0));
+  const days = Math.max(1, (toDate-fromDate)/(1000*60*60*24*7));
+  const freq = (totalSessions/days).toFixed(1);
+  const totalDur = sessions.reduce((a,s) => a+(s.duration||0), 0);
+  const avgDur = totalSessions ? Math.round(totalDur/totalSessions/60) : 0;
+
+  const kpis = [
+    {val: totalSessions, lbl:'Sessions', sub:'in period', color:'#00b4ff'},
+    {val: avgSets, lbl:'Avg sets', sub:'per session', color:'#00ffcc'},
+    {val: freq, lbl:'Sessions/week', sub:'frequency', color:'#f0a96e'},
+    {val: avgDur+'m', lbl:'Avg duration', sub:'per session', color:'#7c6aff'},
+    {val: totalVol.toLocaleString()+'kg', lbl:'Total volume', sub:'sets×reps×kg', color:'#00ffcc'},
+    {val: allSets, lbl:'Total sets', sub:'logged', color:'#00b4ff'},
+  ];
+
+  const grid = document.getElementById('stats-kpi-grid');
+  grid.innerHTML = kpis.map(k => `
+    <div class="stats-kpi-card">
+      <div class="stats-kpi-val" style="color:${k.color}">${k.val}</div>
+      <div class="stats-kpi-lbl">${k.lbl}</div>
+      <div class="stats-kpi-sub">${k.sub}</div>
+    </div>`).join('');
 }
 
 function calcSessionVolume(s) {
-  return (s.exercises || []).reduce((a, ex) => {
-    return a + (ex.sets || []).reduce((b, st) => {
-      if (!st.logged) return b;
-      const w = parseFloat(st.weight) || 0;
-      const r = ex.unilateral
-        ? ((parseFloat(st.repsL) || 0) + (parseFloat(st.repsR) || 0))
-        : (parseFloat(st.reps) || 0);
-      return b + w * r;
-    }, 0);
-  }, 0);
+  return (s.exercises||[]).reduce((a,ex) => a+(ex.sets||[]).reduce((b,st) => {
+    if (!st.logged) return b;
+    const w = parseFloat(st.weight)||0;
+    const r = ex.unilateral ? ((parseFloat(st.repsL)||0)+(parseFloat(st.repsR)||0)) : (parseFloat(st.reps)||0);
+    return b+w*r;
+  },0),0);
 }
 
-function renderVolumeChart(sessions) {
-  const canvas = document.getElementById('chart-volume');
-  const ctx = canvas.getContext('2d');
-  if (volumeChartInstance) { volumeChartInstance = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
-
-  // Group by week
+function renderWeeklyFreqChart(sessions, fromDate, toDate) {
   const weeks = {};
   sessions.forEach(s => {
     const d = new Date(s.startedAt);
-    const monday = new Date(d); monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-    const key = monday.toISOString().slice(0, 10);
-    weeks[key] = (weeks[key] || 0) + calcSessionVolume(s);
+    const mon = new Date(d); mon.setDate(d.getDate()-((d.getDay()+6)%7));
+    const key = mon.toISOString().slice(0,10);
+    weeks[key] = (weeks[key]||0)+1;
   });
-
-  const labels = Object.keys(weeks).slice(-8);
-  const data = labels.map(k => Math.round(weeks[k]));
-  drawBarChart(ctx, canvas, labels.map(l => l.slice(5)), data, '#00b4ff');
-}
-
-function renderExerciseChart() {
-  const exName = document.getElementById('ex-select').value;
-  if (!exName) return;
-  const sessions = load(SK.sessions) || [];
-  const points = [];
-
-  sessions.forEach(s => {
-    s.exercises?.forEach(ex => {
-      if (ex.name === exName) {
-        const loggedSets = ex.sets?.filter(st => st.logged) || [];
-        if (loggedSets.length === 0) return;
-        const maxW = Math.max(...loggedSets.map(st => parseFloat(st.weight) || 0));
-        const totalReps = loggedSets.reduce((a, st) => {
-          return a + (ex.unilateral ? ((parseFloat(st.repsL)||0)+(parseFloat(st.repsR)||0)) : (parseFloat(st.reps)||0));
-        }, 0);
-        points.push({ date: new Date(s.startedAt).toISOString().slice(5,10), weight: maxW, reps: totalReps });
-      }
-    });
-  });
-
-  const canvas = document.getElementById('chart-exercise');
+  const canvas = document.getElementById('chart-volume');
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (points.length === 0) return;
-
-  drawLineChart(ctx, canvas, points.map(p => p.date), points.map(p => p.weight), '#00ffcc');
+  const labels = Object.keys(weeks).sort();
+  const data = labels.map(k => weeks[k]);
+  drawBarChart(ctx, canvas, labels.map(l=>l.slice(5)), data, '#00b4ff');
 }
 
-function populateExSelect(sessions) {
-  const names = new Set();
-  sessions.forEach(s => s.exercises?.forEach(ex => names.add(ex.name)));
+function populateExSelect() {
+  const allEx = load(SK.exercises) || [];
   const sel = document.getElementById('ex-select');
+  const current = sel.value;
   sel.innerHTML = '<option value="">— Select exercise —</option>' +
-    [...names].sort().map(n => `<option value="${n}">${n}</option>`).join('');
+    allEx.sort((a,b)=>a.name.localeCompare(b.name)).map(e=>`<option value="${e.name}">${e.name}</option>`).join('');
+  if (current) sel.value = current;
 }
 
-function renderPRs(sessions) {
-  const prs = {}; // exName -> { weight, reps }
+function renderExerciseSection() {
+  const exName = document.getElementById('ex-select').value;
+  const body   = document.getElementById('exercise-progress-body');
+  if (!exName) { body.innerHTML = ''; return; }
+
+  const fromEl = document.getElementById('stats-from');
+  const toEl   = document.getElementById('stats-to');
+  const fromDate = new Date(fromEl.value + 'T00:00:00');
+  const toDate   = new Date(toEl.value   + 'T23:59:59');
+
+  const allSessions = load(SK.sessions) || [];
+  const sessions = allSessions.filter(s => {
+    const d = new Date(s.startedAt);
+    return d >= fromDate && d <= toDate;
+  });
+
+  // Collect data points per session
+  const points = [];
   sessions.forEach(s => {
-    s.exercises?.forEach(ex => {
-      ex.sets?.filter(st => st.logged).forEach(st => {
-        const w = parseFloat(st.weight) || 0;
-        if (!prs[ex.name] || w > prs[ex.name].weight) {
-          prs[ex.name] = { weight: w, reps: st.reps || '' };
-        }
+    (s.exercises||[]).forEach(ex => {
+      if (ex.name !== exName) return;
+      const logged = (ex.sets||[]).filter(st=>st.logged);
+      if (!logged.length) return;
+
+      const totalVol = logged.reduce((a,st) => {
+        const w = parseFloat(st.weight)||0;
+        const r = ex.unilateral
+          ? ((parseFloat(st.repsL)||0)+(parseFloat(st.repsR)||0))
+          : (parseFloat(st.reps)||0);
+        return a+w*r;
+      }, 0);
+
+      const maxWeight = Math.max(...logged.map(st=>parseFloat(st.weight)||0));
+      const totalReps = logged.reduce((a,st)=>a+(ex.unilateral?((parseFloat(st.repsL)||0)+(parseFloat(st.repsR)||0)):(parseFloat(st.reps)||0)),0);
+
+      // Epley 1RM: weight × (1 + reps/30), use best single set
+      let best1RM = 0;
+      logged.forEach(st => {
+        const w = parseFloat(st.weight)||0;
+        const r = ex.unilateral
+          ? Math.max(parseFloat(st.repsL)||0, parseFloat(st.repsR)||0)
+          : parseFloat(st.reps)||0;
+        if (r > 0) best1RM = Math.max(best1RM, w*(1+r/30));
+      });
+
+      points.push({
+        date: new Date(s.startedAt),
+        dateStr: new Date(s.startedAt).toLocaleDateString('no-NO',{day:'numeric',month:'short'}),
+        volumeLoad: Math.round(totalVol),
+        maxWeight,
+        totalReps,
+        sets: logged.length,
+        est1RM: Math.round(best1RM*10)/10,
       });
     });
   });
 
-  const list = document.getElementById('pr-list');
-  const entries = Object.entries(prs).sort((a,b) => b[1].weight - a[1].weight);
-  if (entries.length === 0) {
-    list.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="empty-state-text">No data yet</div></div>';
+  if (!points.length) {
+    body.innerHTML = `<div class="ex-no-data">No data for ${exName} in this period.</div>`;
     return;
   }
-  list.innerHTML = entries.slice(0, 10).map(([name, pr]) => `
-    <div class="pr-item">
-      <div>
-        <div class="pr-name">${name}</div>
-        <div style="font-size:10px;color:var(--muted2);">Best set</div>
-      </div>
-      <div class="pr-val">${pr.weight} kg</div>
+
+  // KPIs
+  const first = points[0], last = points[points.length-1];
+  const volChange = first.volumeLoad > 0 ? ((last.volumeLoad-first.volumeLoad)/first.volumeLoad*100).toFixed(1) : null;
+  const wChange   = first.maxWeight  > 0 ? ((last.maxWeight -first.maxWeight )/first.maxWeight *100).toFixed(1) : null;
+  const trendDir  = volChange > 2 ? 'up' : volChange < -2 ? 'down' : 'flat';
+  const trendIcon = trendDir==='up'?'↑':trendDir==='down'?'↓':'→';
+  const trendText = trendDir==='up'?`Progressing +${volChange}% volume load`:trendDir==='down'?`Volume load -${Math.abs(volChange)}%`:'Maintaining — stable load';
+
+  const maxVol  = Math.max(...points.map(p=>p.volumeLoad));
+  const maxW    = Math.max(...points.map(p=>p.maxWeight));
+  const max1RM  = Math.max(...points.map(p=>p.est1RM));
+
+  body.innerHTML = `
+    <div class="ex-progress-kpis">
+      <div class="ex-kpi"><div class="ex-kpi-val">${last.volumeLoad}kg</div><div class="ex-kpi-lbl">Last vol load</div></div>
+      <div class="ex-kpi"><div class="ex-kpi-val">${last.maxWeight}kg</div><div class="ex-kpi-lbl">Last top weight</div></div>
+      <div class="ex-kpi"><div class="ex-kpi-val">${last.est1RM}kg</div><div class="ex-kpi-lbl">Est. 1RM</div></div>
     </div>
-  `).join('');
+    <div class="ex-trend-badge ${trendDir}">${trendIcon} ${trendText}</div>
+    ${wChange !== null ? `<div style="font-size:11px;color:var(--muted2);margin-bottom:12px;">Top weight: ${first.maxWeight}kg → ${last.maxWeight}kg (${wChange>0?'+':''}${wChange}%) · ${points.length} sessions</div>` : ''}
+    <div class="ex-chart-title">Volume load per session (sets × reps × kg)</div>
+    <div class="chart-wrap"><canvas id="chart-vol-load"></canvas></div>
+    <div class="ex-chart-title">Top weight per session (kg)</div>
+    <div class="chart-wrap"><canvas id="chart-top-weight"></canvas></div>
+    <div class="ex-chart-title">Estimated 1RM per session (Epley formula)</div>
+    <div class="chart-wrap"><canvas id="chart-1rm"></canvas></div>`;
+
+  // Draw charts after DOM update
+  setTimeout(() => {
+    const labels = points.map(p=>p.dateStr);
+    const c1 = document.getElementById('chart-vol-load');
+    if (c1) drawLineChart(c1.getContext('2d'), c1, labels, points.map(p=>p.volumeLoad), '#00b4ff');
+    const c2 = document.getElementById('chart-top-weight');
+    if (c2) drawLineChart(c2.getContext('2d'), c2, labels, points.map(p=>p.maxWeight), '#00ffcc');
+    const c3 = document.getElementById('chart-1rm');
+    if (c3) drawLineChart(c3.getContext('2d'), c3, labels, points.map(p=>p.est1RM), '#7c6aff');
+  }, 50);
 }
+
+function renderPRs(sessions) {} // kept for compatibility
 
 function renderMuscleBars(sessions) {
   const muscles = {};
   sessions.forEach(s => {
     s.exercises?.forEach(ex => {
-      const sets = (ex.sets || []).filter(st => st.logged).length;
-      muscles[ex.muscle] = (muscles[ex.muscle] || 0) + sets;
+      const sets = (ex.sets||[]).filter(st=>st.logged).length;
+      muscles[ex.muscle] = (muscles[ex.muscle]||0)+sets;
     });
   });
-
   const container = document.getElementById('muscle-bars');
-  const entries = Object.entries(muscles).sort((a,b) => b[1]-a[1]);
-  if (entries.length === 0) {
-    container.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:10px 0;">No data yet</div>';
-    return;
-  }
-  const max = Math.max(...entries.map(e => e[1]));
-  container.innerHTML = entries.map(([m, v]) => `
+  const entries = Object.entries(muscles).sort((a,b)=>b[1]-a[1]);
+  if (!entries.length) { container.innerHTML='<div style="color:var(--muted);font-size:11px;padding:10px 0;">No data yet</div>'; return; }
+  const max = Math.max(...entries.map(e=>e[1]));
+  container.innerHTML = entries.map(([m,v])=>`
     <div class="muscle-bar-row">
       <span class="muscle-bar-label">${m}</span>
       <div class="muscle-bar-track"><div class="muscle-bar-fill" style="width:${Math.round(v/max*100)}%"></div></div>
       <span class="muscle-bar-val">${v}</span>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
 // ─── Canvas Charts ───
