@@ -819,6 +819,7 @@ canvas.chart{width:100%!important;height:100%!important;}
           <div style="font-size:10px;color:var(--muted2);margin-top:2px;" id="active-workout-date"></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
+          <div id="rest-timer-badge" style="display:none;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;color:#00b4ff;background:rgba(0,180,255,0.1);border:1px solid rgba(0,180,255,0.2);border-radius:8px;padding:4px 10px;">REST <span id="rest-timer-badge-time">0:00</span></div>
           <div class="workout-timer-badge" id="workout-global-timer">00:00</div>
           <button class="workout-finish-btn" onclick="finishWorkout()">FINISH</button>
         </div>
@@ -1518,7 +1519,7 @@ function startWorkout(routineId) {
         unilateral: ex.unilateral,
         startedAt: null,
         duration: null,
-        collapsed: false,
+        collapsed: true,
         sets: Array.from({ length: ex.sets }, (_, i) => ({
           num: i + 1,
           weight: '', reps: '', repsL: '', repsR: '',
@@ -1553,18 +1554,22 @@ function renderWorkoutPage() {
 function renderWorkoutBody() {
   const body = document.getElementById('workout-body');
   body.innerHTML = activeSession.exercises.map((ex, ei) => buildExCard(ex, ei)).join('');
+
+  // Add exercise button at the bottom
+  const addExBtn = document.createElement('button');
+  addExBtn.className = 'btn btn-ghost';
+  addExBtn.style.cssText = 'width:100%;margin:12px 0 4px;border:1.5px dashed rgba(0,180,255,0.3);color:var(--neon);letter-spacing:1px;';
+  addExBtn.textContent = '+ ADD EXERCISE';
+  addExBtn.addEventListener('click', () => openAddExerciseDuringWorkout());
+  body.appendChild(addExBtn);
+
   attachDragHandles();
-  // Restore any running set timers after re-render
   activeSession.exercises.forEach((ex, ei) => {
     ex.sets.forEach((s, si) => {
-      if (s.state === 'active' && s.setStartTime) {
-        startSetTimerDisplay(ei, si, s.setStartTime);
-      }
+      if (s.state === 'active' && s.setStartTime) startSetTimerDisplay(ei, si, s.setStartTime);
     });
   });
-  // Restore rest timer display if running
   if (restTimer.interval && restTimer.el) {
-    // Re-render will have cleared the DOM rest banner — restart it
     const { ei, si } = restTimer;
     if (ei !== undefined) showRestBanner(ei, si, restTimer.startTime);
   }
@@ -1630,7 +1635,7 @@ function buildSetRow(s, si, ei, isUni) {
   let btnLabel, btnClass;
   if (s.state === 'idle')   { btnLabel = 'START'; btnClass = 'state-idle'; }
   if (s.state === 'active') { btnLabel = 'STOP';  btnClass = 'state-active'; }
-  if (s.state === 'logged') { btnLabel = '✓';     btnClass = 'state-logged'; }
+  if (s.state === 'logged') { btnLabel = '✓ Set done'; btnClass = 'state-logged'; }
 
   // Set duration badge
   const durBadge = s.setDuration
@@ -1746,30 +1751,23 @@ function showRestBanner(ei, si, startTime) {
   const setRow = document.getElementById(`set-row-${ei}-${si}`);
   if (!setRow) return;
 
-  const banner = document.createElement('div');
-  banner.className = 'rest-banner';
-  banner.id = 'rest-banner';
-  banner.innerHTML = `
-    <div>
-      <div class="rest-banner-label">Rest</div>
-      <div class="rest-banner-time" id="rest-banner-time">0:00</div>
-      <div class="rest-banner-sub">Edit reps &amp; weight above · Start next set to reset timer</div>
-    </div>
-    <div style="font-size:28px;opacity:0.3;">☕</div>
-  `;
-  setRow.after(banner);
-  restTimer.el = banner;
+  const badge = document.getElementById('rest-timer-badge');
+  const badgeTime = document.getElementById('rest-timer-badge-time');
+  if (badge) badge.style.display = '';
 
   restTimer.interval = setInterval(() => {
-    const el = document.getElementById('rest-banner-time');
-    if (el) el.textContent = formatMMSS(Math.floor((Date.now() - startTime) / 1000));
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    if (badgeTime) badgeTime.textContent = formatMMSS(elapsed);
   }, 1000);
+  restTimer.el = badge;
 }
 
 function clearRestBanner() {
   if (restTimer.interval) { clearInterval(restTimer.interval); restTimer.interval = null; }
-  const banner = document.getElementById('rest-banner');
-  if (banner) banner.remove();
+  const badge = document.getElementById('rest-timer-badge');
+  if (badge) { badge.style.display = 'none'; }
+  const badgeTime = document.getElementById('rest-timer-badge-time');
+  if (badgeTime) badgeTime.textContent = '0:00';
   restTimer.el = null; restTimer.startTime = null;
   restTimer.ei = undefined; restTimer.si = undefined;
 }
@@ -1794,6 +1792,91 @@ function updateSet(ei, si, field, val) {
   if (!activeSession) return;
   activeSession.exercises[ei].sets[si][field] = val;
   autoSaveSession();
+}
+
+function openAddExerciseDuringWorkout() {
+  const allEx = load(SK.exercises) || [];
+  // Build a simple modal
+  const overlay = document.createElement('div');
+  overlay.id = 'add-ex-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(7,8,12,0.92);z-index:3000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 16px 40px;';
+
+  const panel = document.createElement('div');
+  panel.style.cssText = 'background:#151824;border:1px solid rgba(0,180,255,0.18);border-radius:16px;padding:20px;width:100%;max-width:420px;max-height:70vh;display:flex;flex-direction:column;';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;';
+  header.innerHTML = `<div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:#fff;">ADD EXERCISE</div><button onclick="document.getElementById('add-ex-overlay').remove()" style="background:none;border:none;color:#6b7280;font-size:18px;cursor:pointer;">✕</button>`;
+
+  // Search input
+  const search = document.createElement('input');
+  search.type = 'text'; search.placeholder = 'Search exercises…';
+  search.style.cssText = 'background:#0d0f17;border:1px solid rgba(0,180,255,0.15);border-radius:8px;padding:10px 12px;font-size:13px;color:#f0ede8;font-family:inherit;outline:none;margin-bottom:10px;width:100%;';
+
+  // Exercise list
+  const list = document.createElement('div');
+  list.style.cssText = 'overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:4px;';
+
+  function renderList(filter='') {
+    const filtered = allEx.filter(e => e.name.toLowerCase().includes(filter.toLowerCase()));
+    list.innerHTML = '';
+    if (!filtered.length) {
+      list.innerHTML = `<div style="color:#4b5563;font-size:12px;padding:12px 0;text-align:center;">No exercises found</div>`;
+    }
+    filtered.forEach(ex => {
+      const item = document.createElement('button');
+      item.style.cssText = 'background:#0d0f17;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:12px;text-align:left;cursor:pointer;color:#d1d5db;font-family:inherit;font-size:13px;';
+      item.innerHTML = `<span style="font-weight:600;">${ex.name}</span><span style="color:#4b5563;font-size:10px;margin-left:8px;">${ex.muscle||''}</span>`;
+      item.addEventListener('click', () => {
+        addExerciseToWorkout(ex);
+        overlay.remove();
+      });
+      list.appendChild(item);
+    });
+  }
+
+  search.addEventListener('input', () => renderList(search.value));
+  renderList();
+
+  panel.appendChild(header);
+  panel.appendChild(search);
+  panel.appendChild(list);
+  overlay.appendChild(panel);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  setTimeout(() => search.focus(), 100);
+}
+
+function addExerciseToWorkout(ex) {
+  if (!activeSession) return;
+  const prevSets = getLastPerformance(ex.name) || [];
+  const numSets = prevSets.length || 3;
+  activeSession.exercises.push({
+    id: ex.id,
+    name: ex.name,
+    muscle: ex.muscle,
+    unilateral: ex.unilateral,
+    startedAt: null,
+    duration: null,
+    collapsed: false, // expand newly added exercise
+    sets: Array.from({ length: numSets }, (_, i) => ({
+      num: i+1,
+      weight:'', reps:'', repsL:'', repsR:'', note:'',
+      logged:false, restDuration:null,
+      setStartTime:null, setDuration:null, state:'idle',
+      ghostWeight: prevSets[i]?.weight||'',
+      ghostReps:   prevSets[i]?.reps||'',
+      ghostRepsL:  prevSets[i]?.repsL||'',
+      ghostRepsR:  prevSets[i]?.repsR||'',
+    }))
+  });
+  autoSaveSession();
+  renderWorkoutBody();
+  // Scroll to the new exercise
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.ex-card');
+    if (cards.length) cards[cards.length-1].scrollIntoView({ behavior:'smooth', block:'start' });
+  }, 100);
 }
 
 function addSet(ei) {
@@ -1897,8 +1980,19 @@ function finishWorkout() {
     const completedSession = { ...activeSession };
     activeSession = null;
 
+    // Add to in-memory sessions so home page shows it immediately
+    _sessions.push({
+      id: completedSession.id,
+      routineId: completedSession.routineId,
+      routineName: completedSession.routineName,
+      startedAt: completedSession.startedAt,
+      duration: completedSession.duration,
+      exercises: completedSession.exercises,
+    });
+
     showToast('Workout saved! 💪');
     showPage('home', document.getElementById('nav-home'));
+    renderHome();
 
     // Offer Strava upload if connected
     if (stravaConnected) {
@@ -2989,8 +3083,10 @@ function showStravaUploadPrompt(session) {
 async function uploadToStrava(session, description) {
   const token = await getStravaToken();
   const name = session.routineName || session.exercises?.[0]?.name || 'Strength workout';
-  const startTime = new Date(session.startedAt).toISOString();
-  const duration = session.duration || 0;
+  const startTime = new Date(session.startedAt);
+  // Format as local time for Strava (avoid UTC conversion shifting the time)
+  const pad = n => String(n).padStart(2,'0');
+  const localISO = `${startTime.getFullYear()}-${pad(startTime.getMonth()+1)}-${pad(startTime.getDate())}T${pad(startTime.getHours())}:${pad(startTime.getMinutes())}:${pad(startTime.getSeconds())}Z`;
 
   const res = await fetch('https://www.strava.com/api/v3/activities', {
     method: 'POST',
@@ -3001,8 +3097,8 @@ async function uploadToStrava(session, description) {
     body: JSON.stringify({
       name,
       type: 'WeightTraining',
-      start_date_local: startTime,
-      elapsed_time: duration,
+      start_date_local: localISO,
+      elapsed_time: session.duration || 0,
       description: description + '\n\nLogged with Sterk Gutt 💪',
     })
   });
