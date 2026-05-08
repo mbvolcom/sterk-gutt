@@ -1432,11 +1432,16 @@ function renderHome() {
     return;
   }
 
-  list.innerHTML = recent.map(s => {
-    const totalSets = (s.exercises || []).reduce((a, ex) => a + (ex.sets || []).filter(st => st.logged).length, 0);
+  list.innerHTML = '';
+  recent.forEach(s => {
+    const totalSets = (s.exercises||[]).reduce((a,ex)=>a+(ex.sets||[]).filter(st=>st.logged).length, 0);
     const dur = s.duration ? formatDuration(s.duration) : '—';
-    const dateStr = new Date(s.startedAt).toLocaleDateString('no-NO', { weekday:'short', day:'numeric', month:'short' });
-    return `<div class="recent-item">
+    const dateStr = new Date(s.startedAt).toLocaleDateString('no-NO',{weekday:'short',day:'numeric',month:'short'});
+
+    const item = document.createElement('div');
+    item.className = 'recent-item';
+    item.style.cursor = 'pointer';
+    item.innerHTML = `
       <div class="recent-dot"></div>
       <div class="recent-info">
         <div class="recent-name">${s.routineName}</div>
@@ -1446,21 +1451,112 @@ function renderHome() {
         <span class="recent-sets">${totalSets}</span>
         <span style="font-size:9px;color:var(--muted);">sets</span>
       </div>
-      <button class="recent-delete" data-sid="${s.id}" onclick="deleteSession(this)" title="Delete">✕</button>
-    </div>`;
-  }).join('');
+      <button class="recent-delete" title="Delete">✕</button>`;
+
+    item.querySelector('.recent-delete').addEventListener('click', e => {
+      e.stopPropagation();
+      showConfirm('Delete Session?', 'This will permanently remove this workout from your history.', async () => {
+        _sessions = _sessions.filter(x => x.id !== s.id);
+        await dbDeleteSession(s.id);
+        renderHome();
+        showToast('Session deleted');
+      });
+    });
+
+    item.addEventListener('click', e => {
+      if (e.target.classList.contains('recent-delete')) return;
+      openSessionEditor(s.id);
+    });
+
+    list.appendChild(item);
+  });
+}
+
+function openSessionEditor(sessionId) {
+  const allSessions = load(SK.sessions)||[];
+  const s = allSessions.find(x => x.id === sessionId);
+  if (!s) return;
+  const EQUIPMENT = ['Barbell','Dumbbell','Cable','Bodyweight','Machine'];
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(7,8,12,0.97);z-index:9999;display:flex;flex-direction:column;overflow:hidden;';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;';
+  const dateStr = new Date(s.startedAt).toLocaleDateString('no-NO',{weekday:'long',day:'numeric',month:'long'});
+  header.innerHTML = `<div><div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:#f0ede8;">${s.routineName}</div><div style="font-size:11px;color:#4b5563;margin-top:2px;">${dateStr}</div></div>`;
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕';
+  closeBtn.style.cssText = 'background:none;border:none;color:#9ca3af;font-size:24px;cursor:pointer;padding:4px 8px;line-height:1;';
+  closeBtn.addEventListener('click', () => overlay.remove());
+  header.appendChild(closeBtn);
+
+  const body = document.createElement('div');
+  body.style.cssText = 'overflow-y:auto;flex:1;padding:12px 16px;-webkit-overflow-scrolling:touch;';
+
+  (s.exercises||[]).forEach((ex, ei) => {
+    const logged = (ex.sets||[]).filter(st=>st.logged);
+    const maxW = logged.length ? Math.max(...logged.map(st=>parseFloat(st.weight)||0)) : 0;
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;margin-bottom:10px;';
+
+    const exHeader = document.createElement('div');
+    exHeader.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
+    exHeader.innerHTML = `<div><div style="font-size:14px;font-weight:600;color:#d1d5db;">${ex.name}</div><div style="font-size:10px;color:#4b5563;margin-top:2px;">${ex.muscle||''} · ${logged.length} sets${maxW?` · best ${maxW}kg`:''}</div></div>`;
+
+    const eqTag = document.createElement('span');
+    eqTag.style.cssText = `font-size:10px;font-weight:600;padding:3px 9px;border-radius:12px;${ex.equipment?'color:var(--neon);background:rgba(0,180,255,0.1);border:1px solid rgba(0,180,255,0.2);':'color:#4b5563;'}`;
+    eqTag.textContent = ex.equipment || 'Untagged';
+    exHeader.appendChild(eqTag);
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
+
+    EQUIPMENT.forEach(eq => {
+      const btn = document.createElement('button');
+      btn.textContent = eq;
+      const isActive = ex.equipment === eq;
+      btn.style.cssText = `padding:5px 12px;border-radius:16px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid ${isActive?'var(--neon)':'rgba(255,255,255,0.1)'};background:${isActive?'rgba(0,180,255,0.12)':'transparent'};color:${isActive?'var(--neon)':'#6b7280'};`;
+
+      btn.addEventListener('click', async () => {
+        ex.equipment = ex.equipment === eq ? null : eq;
+        save(SK.sessions, allSessions);
+        // Also update _sessions cache
+        const cached = _sessions.find(x=>x.id===s.id);
+        if (cached) { const cex=(cached.exercises||[]).find(e=>e.name===ex.name); if(cex) cex.equipment=ex.equipment; }
+        await dbSaveSession(s);
+        eqTag.textContent = ex.equipment || 'Untagged';
+        eqTag.style.color = ex.equipment ? 'var(--neon)' : '#4b5563';
+        eqTag.style.background = ex.equipment ? 'rgba(0,180,255,0.1)' : 'transparent';
+        eqTag.style.border = ex.equipment ? '1px solid rgba(0,180,255,0.2)' : 'none';
+        btnRow.querySelectorAll('button').forEach(b => {
+          const active = b.textContent === ex.equipment;
+          b.style.borderColor = active ? 'var(--neon)' : 'rgba(255,255,255,0.1)';
+          b.style.background  = active ? 'rgba(0,180,255,0.12)' : 'transparent';
+          b.style.color       = active ? 'var(--neon)' : '#6b7280';
+        });
+        // Save equipment pref
+        const prefs = JSON.parse(localStorage.getItem('sg_eq_prefs')||'{}');
+        prefs[ex.name] = ex.equipment;
+        localStorage.setItem('sg_eq_prefs', JSON.stringify(prefs));
+        showToast(ex.equipment ? `Tagged: ${ex.equipment}` : 'Tag removed');
+      });
+      btnRow.appendChild(btn);
+    });
+
+    card.appendChild(exHeader);
+    card.appendChild(btnRow);
+    body.appendChild(card);
+  });
+
+  overlay.appendChild(header);
+  overlay.appendChild(body);
+  document.body.appendChild(overlay);
 }
 
 function deleteSession(btn) {
-  const id = +btn.dataset.sid;
-  showConfirm('Delete Session?', 'This will permanently remove this workout from your history.', async () => {
-    let sessions = load(SK.sessions) || [];
-    sessions = sessions.filter(s => s.id !== id);
-    save(SK.sessions, sessions);
-    await dbDeleteSession(id);
-    renderHome();
-    showToast('Session deleted');
-  });
+  // Legacy — kept for safety
+  showToast('Tap the session to edit or delete');
 }
 
 function resumeWorkout() {
@@ -2752,7 +2848,25 @@ function renderExerciseSection(equipFilter) {
 
   if (!points.length) {
     body.innerHTML = filterHTML + `<div class="ex-no-data">No data for ${exName}${_exEquipFilter!=='All'?' ('+_exEquipFilter+')':''}.</div>
-      <button onclick="openTagHistory('${exName}')" style="margin-top:8px;width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted2);cursor:pointer;font-family:inherit;">🏷 Tag equipment history</button>`;
+      <button id="tag-hist-btn" style="margin-top:8px;width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted2);cursor:pointer;font-family:inherit;">🏷 Tag equipment history</button>`;
+    document.getElementById('tag-hist-btn')?.addEventListener('click', () => openTagHistory(exName));
+    return;
+  }
+
+  // Single session — show summary card instead of charts
+  if (points.length === 1) {
+    const p = points[0];
+    body.innerHTML = filterHTML + `
+      <div style="background:#151824;border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:16px;margin-bottom:12px;">
+        <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#4b5563;margin-bottom:12px;">Only 1 session logged — keep training to see trends</div>
+        <div class="ex-progress-kpis">
+          <div class="ex-kpi"><div class="ex-kpi-val">${p.est1RM}<span style="font-size:11px;color:var(--muted2);">kg</span></div><div class="ex-kpi-lbl">Est. 1RM</div></div>
+          <div class="ex-kpi"><div class="ex-kpi-val">${p.volLoad}kg</div><div class="ex-kpi-lbl">Volume load</div></div>
+          <div class="ex-kpi"><div class="ex-kpi-val">${p.bestLabel}</div><div class="ex-kpi-lbl">Best set</div></div>
+        </div>
+      </div>
+      <button id="tag-hist-btn" style="width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted2);cursor:pointer;font-family:inherit;">🏷 Tag equipment history</button>`;
+    document.getElementById('tag-hist-btn')?.addEventListener('click', () => openTagHistory(exName));
     return;
   }
 
@@ -2777,7 +2891,9 @@ function renderExerciseSection(equipFilter) {
     <div style="position:relative;width:100%;height:200px;overflow:hidden;margin-bottom:20px;"><canvas id="chart-1rm-main" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas></div>
     <div class="ex-chart-title">Volume load per session (sets × reps × kg)</div>
     <div style="position:relative;width:100%;height:140px;overflow:hidden;margin-bottom:16px;"><canvas id="chart-vol-bars" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas></div>
-    <button onclick="openTagHistory('${exName}')" style="width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted2);cursor:pointer;font-family:inherit;">🏷 Tag equipment history</button>`;
+    <button id="tag-hist-btn" style="width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted2);cursor:pointer;font-family:inherit;">🏷 Tag equipment history</button>`;
+
+  document.getElementById('tag-hist-btn')?.addEventListener('click', () => openTagHistory(exName));
 
   setTimeout(() => {
     const c1=document.getElementById('chart-1rm-main'); if(c1) draw1RMChart(c1,points);
@@ -2789,99 +2905,113 @@ function renderExerciseSection(equipFilter) {
 async function openTagHistory(exName) {
   const EQUIPMENT = ['Barbell','Dumbbell','Cable','Bodyweight','Machine'];
   const allSessions = load(SK.sessions)||[];
-  const relevant = allSessions.filter(s=>(s.exercises||[]).some(ex=>ex.name===exName))
-    .sort((a,b)=>new Date(b.startedAt)-new Date(a.startedAt));
+  const relevant = allSessions
+    .filter(s => (s.exercises||[]).some(ex => ex.name === exName))
+    .sort((a,b) => new Date(b.startedAt) - new Date(a.startedAt));
 
   const overlay = document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(7,8,12,0.95);z-index:3000;display:flex;flex-direction:column;';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(7,8,12,0.97);z-index:9999;display:flex;flex-direction:column;overflow:hidden;';
 
   const header = document.createElement('div');
-  header.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;';
-  header.innerHTML=`<div><div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;">TAG HISTORY</div><div style="font-size:11px;color:#4b5563;margin-top:2px;">${exName}</div></div><button onclick="this.closest('[style]').remove()" style="background:none;border:none;color:#6b7280;font-size:20px;cursor:pointer;">✕</button>`;
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;';
+
+  const titleEl = document.createElement('div');
+  titleEl.innerHTML = `<div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:#f0ede8;">TAG HISTORY</div><div style="font-size:11px;color:#4b5563;margin-top:2px;">${exName}</div>`;
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕';
+  closeBtn.style.cssText = 'background:none;border:none;color:#9ca3af;font-size:24px;cursor:pointer;padding:4px 8px;line-height:1;';
+  closeBtn.addEventListener('click', () => overlay.remove());
+
+  header.appendChild(titleEl);
+  header.appendChild(closeBtn);
 
   const list = document.createElement('div');
-  list.style.cssText='overflow-y:auto;flex:1;padding:12px 16px;';
+  list.style.cssText = 'overflow-y:auto;flex:1;padding:12px 16px;-webkit-overflow-scrolling:touch;';
 
   if (!relevant.length) {
-    list.innerHTML='<div style="color:#4b5563;font-size:13px;padding:20px 0;text-align:center;">No sessions found.</div>';
+    list.innerHTML = '<div style="color:#4b5563;font-size:13px;padding:20px 0;text-align:center;">No sessions found.</div>';
   } else {
     relevant.forEach(s => {
-      const ex = (s.exercises||[]).find(e=>e.name===exName);
+      const ex = (s.exercises||[]).find(e => e.name === exName);
       if (!ex) return;
-      const logged=(ex.sets||[]).filter(st=>st.logged);
-      const dateStr=new Date(s.startedAt).toLocaleDateString('no-NO',{weekday:'short',day:'numeric',month:'short'});
-      const setsStr=logged.length?`${logged.length} sets · best ${Math.max(...logged.map(st=>parseFloat(st.weight)||0))}kg`:'';
+      const logged = (ex.sets||[]).filter(st => st.logged);
+      const dateStr = new Date(s.startedAt).toLocaleDateString('no-NO',{weekday:'short',day:'numeric',month:'short'});
+      const maxW = logged.length ? Math.max(...logged.map(st=>parseFloat(st.weight)||0)) : 0;
+      const setsStr = logged.length ? `${logged.length} sets · best ${maxW}kg` : 'no logged sets';
 
-      const row=document.createElement('div');
-      row.style.cssText='background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px 14px;margin-bottom:8px;';
-      row.innerHTML=`
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <div><div style="font-size:13px;color:#d1d5db;font-weight:500;">${dateStr}</div><div style="font-size:10px;color:#4b5563;margin-top:2px;">${setsStr}</div></div>
-          ${ex.equipment?`<span style="font-size:10px;font-weight:600;color:var(--neon);background:rgba(0,180,255,0.1);border:1px solid rgba(0,180,255,0.2);border-radius:12px;padding:3px 9px;">${ex.equipment}</span>`:'<span style="font-size:10px;color:#4b5563;">Untagged</span>'}
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          ${EQUIPMENT.map(eq=>`<button onclick="tagSession('${s.id}','${exName}','${eq}',this)" style="padding:5px 12px;border-radius:16px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid ${ex.equipment===eq?'var(--neon)':'rgba(255,255,255,0.1)'};background:${ex.equipment===eq?'rgba(0,180,255,0.12)':'transparent'};color:${ex.equipment===eq?'var(--neon)':'#6b7280'};">${eq}</button>`).join('')}
-        </div>`;
+      const row = document.createElement('div');
+      row.style.cssText = 'background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px 14px;margin-bottom:8px;';
+
+      const topRow = document.createElement('div');
+      topRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
+
+      const info = document.createElement('div');
+      info.innerHTML = `<div style="font-size:13px;color:#d1d5db;font-weight:500;">${dateStr}</div><div style="font-size:10px;color:#4b5563;margin-top:2px;">${setsStr}</div>`;
+
+      const currentTag = document.createElement('span');
+      currentTag.style.cssText = `font-size:10px;font-weight:600;padding:3px 9px;border-radius:12px;${ex.equipment ? 'color:var(--neon);background:rgba(0,180,255,0.1);border:1px solid rgba(0,180,255,0.2);' : 'color:#4b5563;'}`;
+      currentTag.textContent = ex.equipment || 'Untagged';
+
+      topRow.appendChild(info);
+      topRow.appendChild(currentTag);
+
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
+
+      EQUIPMENT.forEach(eq => {
+        const btn = document.createElement('button');
+        btn.textContent = eq;
+        const isActive = ex.equipment === eq;
+        btn.style.cssText = `padding:5px 12px;border-radius:16px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid ${isActive?'var(--neon)':'rgba(255,255,255,0.1)'};background:${isActive?'rgba(0,180,255,0.12)':'transparent'};color:${isActive?'var(--neon)':'#6b7280'};`;
+
+        btn.addEventListener('click', async () => {
+          const allS = load(SK.sessions)||[];
+          const sess = allS.find(x => x.id === s.id);
+          if (!sess) return;
+          const exObj = (sess.exercises||[]).find(e => e.name === exName);
+          if (!exObj) return;
+          exObj.equipment = exObj.equipment === eq ? null : eq;
+          save(SK.sessions, allS);
+          await dbSaveSession(sess);
+          // Update UI
+          currentTag.textContent = exObj.equipment || 'Untagged';
+          currentTag.style.color = exObj.equipment ? 'var(--neon)' : '#4b5563';
+          btnRow.querySelectorAll('button').forEach(b => {
+            const active = b.textContent === exObj.equipment;
+            b.style.borderColor = active ? 'var(--neon)' : 'rgba(255,255,255,0.1)';
+            b.style.background  = active ? 'rgba(0,180,255,0.12)' : 'transparent';
+            b.style.color       = active ? 'var(--neon)' : '#6b7280';
+          });
+          showToast(exObj.equipment ? `Tagged: ${exObj.equipment}` : 'Tag removed');
+        });
+        btnRow.appendChild(btn);
+      });
+
+      row.appendChild(topRow);
+      row.appendChild(btnRow);
       list.appendChild(row);
     });
   }
 
-  overlay.appendChild(header); overlay.appendChild(list);
+  overlay.appendChild(header);
+  overlay.appendChild(list);
   document.body.appendChild(overlay);
 }
 
 async function tagSession(sessionId, exName, equipment, btnEl) {
+  // Legacy — kept for compatibility
   const allSessions = load(SK.sessions)||[];
   const s = allSessions.find(s=>s.id===sessionId);
   if (!s) return;
   const ex = (s.exercises||[]).find(e=>e.name===exName);
   if (!ex) return;
-
-  // Toggle
   ex.equipment = ex.equipment === equipment ? null : equipment;
   save(SK.sessions, allSessions);
   await dbSaveSession(s);
-
-  // Update button styles in the row
-  const row = btnEl.closest('div[style]');
-  if (row) {
-    row.querySelectorAll('button').forEach(b => {
-      const isActive = b.textContent === ex.equipment;
-      b.style.borderColor = isActive ? 'var(--neon)' : 'rgba(255,255,255,0.1)';
-      b.style.background  = isActive ? 'rgba(0,180,255,0.12)' : 'transparent';
-      b.style.color       = isActive ? 'var(--neon)' : '#6b7280';
-    });
-    const tag = row.querySelector('span');
-    if (tag) {
-      tag.textContent = ex.equipment || 'Untagged';
-      tag.style.color = ex.equipment ? 'var(--neon)' : '#4b5563';
-    }
-  }
   showToast(ex.equipment ? `Tagged as ${ex.equipment}` : 'Tag removed');
 }
 
-
-function renderPRs(sessions) {} // kept for compatibility
-
-function renderMuscleBars(sessions) {
-  const muscles = {};
-  sessions.forEach(s => {
-    s.exercises?.forEach(ex => {
-      const sets = (ex.sets||[]).filter(st=>st.logged).length;
-      muscles[ex.muscle] = (muscles[ex.muscle]||0)+sets;
-    });
-  });
-  const container = document.getElementById('muscle-bars');
-  const entries = Object.entries(muscles).sort((a,b)=>b[1]-a[1]);
-  if (!entries.length) { container.innerHTML='<div style="color:var(--muted);font-size:11px;padding:10px 0;">No data yet</div>'; return; }
-  const max = Math.max(...entries.map(e=>e[1]));
-  container.innerHTML = entries.map(([m,v])=>`
-    <div class="muscle-bar-row">
-      <span class="muscle-bar-label">${m}</span>
-      <div class="muscle-bar-track"><div class="muscle-bar-fill" style="width:${Math.round(v/max*100)}%"></div></div>
-      <span class="muscle-bar-val">${v}</span>
-    </div>`).join('');
-}
 
 // ─── Canvas Charts ───
 function drawBarChart(ctx, canvas, labels, data, color) {
