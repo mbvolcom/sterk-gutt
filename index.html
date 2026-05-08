@@ -618,7 +618,10 @@ canvas.chart{width:100%!important;height:100%!important;}
 .muscle-bar-fill{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--neon),var(--neon2));transition:width 0.7s cubic-bezier(.16,1,.3,1);}
 .muscle-bar-val{font-size:10px;color:var(--neon);width:28px;text-align:right;}
 
-.exercise-select-wrap{margin-bottom:16px;}
+.eq-selector { display:flex; gap:5px; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--border); }
+.eq-btn { background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:4px 10px; font-size:10px; font-weight:600; color:var(--muted2); cursor:pointer; font-family:inherit; letter-spacing:0.5px; transition:all 0.15s; }
+.eq-btn:active { opacity:0.7; }
+.eq-btn.active { background:rgba(0,180,255,0.15); border-color:var(--neon); color:var(--neon); }
 .exercise-select-wrap select{
   width:100%;background:var(--surface2);border:1px solid var(--border);
   border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);
@@ -1526,6 +1529,7 @@ function startWorkout(routineId) {
         startedAt: null,
         duration: null,
         collapsed: true,
+        equipment: getEquipmentPref(ex.name),
         sets: Array.from({ length: ex.sets }, (_, i) => ({
           num: i + 1,
           weight: '', reps: '', repsL: '', repsR: '',
@@ -1596,16 +1600,23 @@ function buildExCard(ex, ei) {
 
   const setsHTML = ex.sets.map((s, si) => buildSetRow(s, si, ei, isUni)).join('');
 
+  const EQUIPMENT = ['Barbell','Dumbbell','Cable','Bodyweight','Machine'];
+  const eq = ex.equipment || null;
+  const eqHTML = `<div class="eq-selector" id="eq-${ei}">
+    ${EQUIPMENT.map(e => `<button class="eq-btn${eq===e?' active':''}" onclick="setEquipment(${ei},'${e}')">${e}</button>`).join('')}
+  </div>`;
+
   return `<div class="ex-card ${ex.collapsed ? 'collapsed' : ''}" id="ex-card-${ei}" data-ei="${ei}">
     <div class="ex-card-header">
       <span class="ex-drag-handle" data-ei="${ei}">⠿</span>
       <div class="ex-card-title" onclick="toggleExCollapse(${ei})">
         <div class="ex-card-name">${ex.name}</div>
-        <div class="ex-card-meta" id="ex-meta-${ei}">${ex.muscle}${ex.unilateral?' · Uni':''} · ${logged}/${total} sets</div>
+        <div class="ex-card-meta" id="ex-meta-${ei}">${ex.muscle}${ex.unilateral?' · Uni':''} · ${logged}/${total} sets${eq?` · ${eq}`:''}</div>
       </div>
       <span class="ex-collapse-btn" onclick="toggleExCollapse(${ei})">▾</span>
     </div>
     <div class="ex-card-body">
+      ${eqHTML}
       ${setHeaderHTML}
       <div id="sets-${ei}">${setsHTML}</div>
       <div class="ex-actions">
@@ -1883,6 +1894,30 @@ function addExerciseToWorkout(ex) {
     const cards = document.querySelectorAll('.ex-card');
     if (cards.length) cards[cards.length-1].scrollIntoView({ behavior:'smooth', block:'start' });
   }, 100);
+}
+
+function setEquipment(ei, equipment) {
+  if (!activeSession) return;
+  const ex = activeSession.exercises[ei];
+  ex.equipment = ex.equipment === equipment ? null : equipment; // toggle off if same
+  autoSaveSession();
+  // Re-render just the equipment selector and meta
+  const card = document.getElementById(`ex-card-${ei}`);
+  if (card) {
+    card.querySelectorAll('.eq-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.textContent === ex.equipment);
+    });
+    const meta = document.getElementById(`ex-meta-${ei}`);
+    if (meta) meta.textContent = `${ex.muscle}${ex.unilateral?' · Uni':''} · ${ex.sets.filter(s=>s.state==='logged').length}/${ex.sets.length} sets${ex.equipment?' · '+ex.equipment:''}`;
+  }
+  // Remember last used equipment for this exercise
+  const prefs = JSON.parse(localStorage.getItem('sg_eq_prefs')||'{}');
+  prefs[ex.name] = ex.equipment;
+  localStorage.setItem('sg_eq_prefs', JSON.stringify(prefs));
+}
+
+function getEquipmentPref(exName) {
+  try { return JSON.parse(localStorage.getItem('sg_eq_prefs')||'{}')[exName] || null; } catch { return null; }
 }
 
 function addSet(ei) {
@@ -2652,210 +2687,177 @@ function populateExSelect() {
   if (current) sel.value = current;
 }
 
-function renderExerciseSection() {
+let _exEquipFilter = 'All';
+
+function renderExerciseSection(equipFilter) {
+  if (equipFilter !== undefined) _exEquipFilter = equipFilter;
   const exName = document.getElementById('ex-select').value;
   const body   = document.getElementById('exercise-progress-body');
   if (!exName) { body.innerHTML = ''; return; }
 
   const fromDate = new Date(document.getElementById('stats-from').value + 'T00:00:00');
   const toDate   = new Date(document.getElementById('stats-to').value   + 'T23:59:59');
-  const sessions = (load(SK.sessions)||[]).filter(s => {
+  const allSess  = (load(SK.sessions)||[]).filter(s => {
     const d = new Date(s.startedAt); return d >= fromDate && d <= toDate;
   });
+
+  // Find all equipment types used for this exercise
+  const equipSet = new Set(['All']);
+  allSess.forEach(s => (s.exercises||[]).forEach(ex => {
+    if (ex.name === exName) equipSet.add(ex.equipment||'Unspecified');
+  }));
+  const equipOptions = [...equipSet];
+
+  // Filter sessions by equipment
+  const sessions = allSess.filter(s =>
+    (s.exercises||[]).some(ex => {
+      if (ex.name !== exName) return false;
+      if (_exEquipFilter === 'All') return true;
+      return (ex.equipment||'Unspecified') === _exEquipFilter;
+    })
+  );
+
+  // Equipment filter pills
+  const filterHTML = equipOptions.length > 1
+    ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+        ${equipOptions.map(e=>`<button onclick="renderExerciseSection('${e}')" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid ${_exEquipFilter===e?'var(--neon)':'var(--border)'};background:${_exEquipFilter===e?'rgba(0,180,255,0.12)':'var(--surface2)'};color:${_exEquipFilter===e?'var(--neon)':'var(--muted2)'};">${e}</button>`).join('')}
+      </div>` : '';
 
   const points = [];
   sessions.forEach(s => {
     (s.exercises||[]).forEach(ex => {
       if (ex.name !== exName) return;
+      if (_exEquipFilter !== 'All' && (ex.equipment||'Unspecified') !== _exEquipFilter) return;
       const logged = (ex.sets||[]).filter(st => st.logged);
       if (!logged.length) return;
-
-      // Volume load
       const volLoad = Math.round(logged.reduce((a,st) => {
         const w = parseFloat(st.weight)||0;
         const r = ex.unilateral ? ((parseFloat(st.repsL)||0)+(parseFloat(st.repsR)||0)) : (parseFloat(st.reps)||0);
-        return a + w*r;
+        return a+w*r;
       }, 0));
-
-      // Best set (highest 1RM) + its label
-      let best1RM = 0, bestW = 0, bestR = 0;
+      let best1RM=0, bestW=0, bestR=0;
       logged.forEach(st => {
-        const w = parseFloat(st.weight)||0;
-        const r = ex.unilateral ? Math.max(parseFloat(st.repsL)||0, parseFloat(st.repsR)||0) : parseFloat(st.reps)||0;
-        const rm = r > 0 ? w*(1+r/30) : 0;
-        if (rm > best1RM) { best1RM = rm; bestW = w; bestR = r; }
+        const w=parseFloat(st.weight)||0;
+        const r=ex.unilateral?Math.max(parseFloat(st.repsL)||0,parseFloat(st.repsR)||0):parseFloat(st.reps)||0;
+        const rm=r>0?w*(1+r/30):0;
+        if(rm>best1RM){best1RM=rm;bestW=w;bestR=r;}
       });
-
       points.push({
         dateStr: new Date(s.startedAt).toLocaleDateString('no-NO',{day:'numeric',month:'short'}),
-        volLoad,
-        est1RM: Math.round(best1RM*10)/10,
-        bestLabel: bestW > 0 ? `${bestW}kg×${bestR}` : '',
+        volLoad, est1RM:Math.round(best1RM*10)/10,
+        bestLabel: bestW>0?`${bestW}kg×${bestR}`:'',
       });
     });
   });
 
   if (!points.length) {
-    body.innerHTML = `<div class="ex-no-data">No data for ${exName} in this period.</div>`;
+    body.innerHTML = filterHTML + `<div class="ex-no-data">No data for ${exName}${_exEquipFilter!=='All'?' ('+_exEquipFilter+')':''}.</div>
+      <button onclick="openTagHistory('${exName}')" style="margin-top:8px;width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted2);cursor:pointer;font-family:inherit;">🏷 Tag equipment history</button>`;
     return;
   }
 
-  const first = points[0], last = points[points.length-1];
-  const rmChange = first.est1RM > 0 ? ((last.est1RM - first.est1RM) / first.est1RM * 100) : null;
-  const rmDiff   = first.est1RM > 0 ? (last.est1RM - first.est1RM).toFixed(1) : null;
-  const trendDir = rmChange > 2 ? 'up' : rmChange < -2 ? 'down' : 'flat';
-  const trendIcon = trendDir==='up'?'↑':trendDir==='down'?'↓':'→';
-  const trendColor = trendDir==='up'?'#00ff96':trendDir==='down'?'#ff4466':'#6b7280';
-  const trendBg   = trendDir==='up'?'rgba(0,255,150,0.1)':trendDir==='down'?'rgba(255,68,102,0.1)':'rgba(255,255,255,0.05)';
+  const first=points[0], last=points[points.length-1];
+  const rmChange=first.est1RM>0?((last.est1RM-first.est1RM)/first.est1RM*100):null;
+  const rmDiff=first.est1RM>0?(last.est1RM-first.est1RM).toFixed(1):null;
+  const trendDir=rmChange>2?'up':rmChange<-2?'down':'flat';
+  const trendIcon=trendDir==='up'?'↑':trendDir==='down'?'↓':'→';
+  const trendColor=trendDir==='up'?'#00ff96':trendDir==='down'?'#ff4466':'#6b7280';
+  const trendBg=trendDir==='up'?'rgba(0,255,150,0.1)':trendDir==='down'?'rgba(255,68,102,0.1)':'rgba(255,255,255,0.05)';
 
-  body.innerHTML = `
+  body.innerHTML = filterHTML + `
     <div class="ex-progress-kpis">
-      <div class="ex-kpi">
-        <div class="ex-kpi-val">${last.est1RM}<span style="font-size:11px;color:var(--muted2);">kg</span></div>
-        <div class="ex-kpi-lbl">Est. 1RM now</div>
-      </div>
-      <div class="ex-kpi">
-        <div class="ex-kpi-val" style="color:${trendColor}">${rmDiff !== null ? (rmDiff > 0 ? '+' : '') + rmDiff + 'kg' : '—'}</div>
-        <div class="ex-kpi-lbl">Since first session</div>
-      </div>
-      <div class="ex-kpi">
-        <div class="ex-kpi-val">${points.length}</div>
-        <div class="ex-kpi-lbl">Sessions tracked</div>
-      </div>
+      <div class="ex-kpi"><div class="ex-kpi-val">${last.est1RM}<span style="font-size:11px;color:var(--muted2);">kg</span></div><div class="ex-kpi-lbl">Est. 1RM now</div></div>
+      <div class="ex-kpi"><div class="ex-kpi-val" style="color:${trendColor}">${rmDiff!==null?(rmDiff>0?'+':'')+rmDiff+'kg':'—'}</div><div class="ex-kpi-lbl">Since first</div></div>
+      <div class="ex-kpi"><div class="ex-kpi-val">${points.length}</div><div class="ex-kpi-lbl">Sessions</div></div>
     </div>
-
     <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:16px;background:${trendBg};color:${trendColor};">
-      ${trendIcon} ${trendDir==='up'?`Gaining strength — est. 1RM up ${rmChange.toFixed(1)}%`:trendDir==='down'?`Est. 1RM down ${Math.abs(rmChange).toFixed(1)}%`:'Maintaining — stable strength'}
+      ${trendIcon} ${trendDir==='up'?`Gaining +${rmChange.toFixed(1)}%`:trendDir==='down'?`Down ${Math.abs(rmChange).toFixed(1)}%`:'Stable'}
     </div>
-
-    <div class="ex-chart-title">Estimated 1RM over time — best set annotated</div>
-    <div style="position:relative;width:100%;height:200px;overflow:hidden;margin-bottom:20px;">
-      <canvas id="chart-1rm-main" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
-    </div>
-
+    <div class="ex-chart-title">Est. 1RM over time — best set annotated</div>
+    <div style="position:relative;width:100%;height:200px;overflow:hidden;margin-bottom:20px;"><canvas id="chart-1rm-main" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas></div>
     <div class="ex-chart-title">Volume load per session (sets × reps × kg)</div>
-    <div style="position:relative;width:100%;height:140px;overflow:hidden;">
-      <canvas id="chart-vol-bars" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
-    </div>`;
+    <div style="position:relative;width:100%;height:140px;overflow:hidden;margin-bottom:16px;"><canvas id="chart-vol-bars" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas></div>
+    <button onclick="openTagHistory('${exName}')" style="width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted2);cursor:pointer;font-family:inherit;">🏷 Tag equipment history</button>`;
 
   setTimeout(() => {
-    const c1 = document.getElementById('chart-1rm-main');
-    if (c1) draw1RMChart(c1, points);
-    const c2 = document.getElementById('chart-vol-bars');
-    if (c2) drawVolBars(c2, points);
+    const c1=document.getElementById('chart-1rm-main'); if(c1) draw1RMChart(c1,points);
+    const c2=document.getElementById('chart-vol-bars'); if(c2) drawVolBars(c2,points);
   }, 150);
 }
 
-function draw1RMChart(canvas, points) {
-  const dpr = devicePixelRatio;
-  canvas.width  = canvas.offsetWidth  * dpr;
-  canvas.height = canvas.offsetHeight * dpr;
-  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
-  const w = canvas.offsetWidth, h = canvas.offsetHeight;
-  const pad = { top:28, right:16, bottom:32, left:44 };
-  const cW = w - pad.left - pad.right, cH = h - pad.top - pad.bottom;
-  const n = points.length;
-  const vals = points.map(p => p.est1RM);
-  const maxV = Math.max(...vals) * 1.1;
-  const minV = Math.min(...vals) * 0.92;
-  const xS = i => pad.left + (n===1 ? cW/2 : i/(n-1)*cW);
-  const yS = v => pad.top + cH - ((v-minV)/(maxV-minV||1))*cH;
+// ── RETROACTIVE EQUIPMENT TAGGING ────────────────────────────────────────────
+async function openTagHistory(exName) {
+  const EQUIPMENT = ['Barbell','Dumbbell','Cable','Bodyweight','Machine'];
+  const allSessions = load(SK.sessions)||[];
+  const relevant = allSessions.filter(s=>(s.exercises||[]).some(ex=>ex.name===exName))
+    .sort((a,b)=>new Date(b.startedAt)-new Date(a.startedAt));
 
-  // Grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
-  [0, 0.25, 0.5, 0.75, 1].forEach(t => {
-    const y = pad.top + t*cH;
-    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w-pad.right, y); ctx.stroke();
-    const val = Math.round(maxV - t*(maxV-minV));
-    ctx.fillStyle = '#4b5563'; ctx.font = '9px DM Mono, monospace'; ctx.textAlign = 'right';
-    ctx.fillText(val+'kg', pad.left-5, y+3);
-  });
+  const overlay = document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(7,8,12,0.95);z-index:3000;display:flex;flex-direction:column;';
 
-  // Gradient fill under line
-  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top+cH);
-  grad.addColorStop(0, 'rgba(0,180,255,0.18)');
-  grad.addColorStop(1, 'rgba(0,180,255,0)');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  points.forEach((p,i) => i===0 ? ctx.moveTo(xS(i),yS(p.est1RM)) : ctx.lineTo(xS(i),yS(p.est1RM)));
-  ctx.lineTo(xS(n-1), pad.top+cH); ctx.lineTo(xS(0), pad.top+cH); ctx.closePath(); ctx.fill();
+  const header = document.createElement('div');
+  header.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;';
+  header.innerHTML=`<div><div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;">TAG HISTORY</div><div style="font-size:11px;color:#4b5563;margin-top:2px;">${exName}</div></div><button onclick="this.closest('[style]').remove()" style="background:none;border:none;color:#6b7280;font-size:20px;cursor:pointer;">✕</button>`;
 
-  // Line
-  ctx.strokeStyle = '#00b4ff'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  ctx.beginPath();
-  points.forEach((p,i) => i===0 ? ctx.moveTo(xS(i),yS(p.est1RM)) : ctx.lineTo(xS(i),yS(p.est1RM)));
-  ctx.stroke();
+  const list = document.createElement('div');
+  list.style.cssText='overflow-y:auto;flex:1;padding:12px 16px;';
 
-  // Dots + annotations
-  points.forEach((p, i) => {
-    const x = xS(i), y = yS(p.est1RM);
-    // Dot
-    ctx.fillStyle = '#00b4ff';
-    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#0e0f11';
-    ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI*2); ctx.fill();
+  if (!relevant.length) {
+    list.innerHTML='<div style="color:#4b5563;font-size:13px;padding:20px 0;text-align:center;">No sessions found.</div>';
+  } else {
+    relevant.forEach(s => {
+      const ex = (s.exercises||[]).find(e=>e.name===exName);
+      if (!ex) return;
+      const logged=(ex.sets||[]).filter(st=>st.logged);
+      const dateStr=new Date(s.startedAt).toLocaleDateString('no-NO',{weekday:'short',day:'numeric',month:'short'});
+      const setsStr=logged.length?`${logged.length} sets · best ${Math.max(...logged.map(st=>parseFloat(st.weight)||0))}kg`:'';
 
-    // Best set label — show on every point if <6, else every other
-    const showLabel = n <= 8 || i % Math.ceil(n/8) === 0 || i === n-1;
-    if (showLabel && p.bestLabel) {
-      ctx.font = 'bold 8px DM Mono, monospace';
-      ctx.textAlign = 'center';
-      // Alternate above/below to avoid overlap
-      const above = i % 2 === 0;
-      ctx.fillStyle = '#6b7280';
-      ctx.fillText(p.bestLabel, x, above ? y-10 : y+18);
-    }
+      const row=document.createElement('div');
+      row.style.cssText='background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px 14px;margin-bottom:8px;';
+      row.innerHTML=`
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div><div style="font-size:13px;color:#d1d5db;font-weight:500;">${dateStr}</div><div style="font-size:10px;color:#4b5563;margin-top:2px;">${setsStr}</div></div>
+          ${ex.equipment?`<span style="font-size:10px;font-weight:600;color:var(--neon);background:rgba(0,180,255,0.1);border:1px solid rgba(0,180,255,0.2);border-radius:12px;padding:3px 9px;">${ex.equipment}</span>`:'<span style="font-size:10px;color:#4b5563;">Untagged</span>'}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${EQUIPMENT.map(eq=>`<button onclick="tagSession('${s.id}','${exName}','${eq}',this)" style="padding:5px 12px;border-radius:16px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid ${ex.equipment===eq?'var(--neon)':'rgba(255,255,255,0.1)'};background:${ex.equipment===eq?'rgba(0,180,255,0.12)':'transparent'};color:${ex.equipment===eq?'var(--neon)':'#6b7280'};">${eq}</button>`).join('')}
+        </div>`;
+      list.appendChild(row);
+    });
+  }
 
-    // X label
-    const showX = n <= 8 || i % Math.ceil(n/8) === 0 || i === n-1;
-    if (showX) {
-      ctx.fillStyle = '#4b5563'; ctx.font = '8px DM Mono, monospace'; ctx.textAlign = 'center';
-      ctx.fillText(p.dateStr, x, h-6);
-    }
-  });
+  overlay.appendChild(header); overlay.appendChild(list);
+  document.body.appendChild(overlay);
 }
 
-function drawVolBars(canvas, points) {
-  const dpr = devicePixelRatio;
-  canvas.width  = canvas.offsetWidth  * dpr;
-  canvas.height = canvas.offsetHeight * dpr;
-  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
-  const w = canvas.offsetWidth, h = canvas.offsetHeight;
-  const pad = { top:8, right:16, bottom:28, left:44 };
-  const cW = w - pad.left - pad.right, cH = h - pad.top - pad.bottom;
-  const n = points.length;
-  const vals = points.map(p => p.volLoad);
-  const maxV = Math.max(...vals, 1);
-  const barW = Math.max(4, cW/n - 4);
+async function tagSession(sessionId, exName, equipment, btnEl) {
+  const allSessions = load(SK.sessions)||[];
+  const s = allSessions.find(s=>s.id===sessionId);
+  if (!s) return;
+  const ex = (s.exercises||[]).find(e=>e.name===exName);
+  if (!ex) return;
 
-  // Grid
-  [0, 0.5, 1].forEach(t => {
-    const y = pad.top + t*cH;
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(w-pad.right,y); ctx.stroke();
-    ctx.fillStyle = '#4b5563'; ctx.font = '9px DM Mono, monospace'; ctx.textAlign = 'right';
-    ctx.fillText(Math.round(maxV - t*maxV)+'kg', pad.left-5, y+3);
-  });
+  // Toggle
+  ex.equipment = ex.equipment === equipment ? null : equipment;
+  save(SK.sessions, allSessions);
+  await dbSaveSession(s);
 
-  points.forEach((p, i) => {
-    const x = pad.left + i*(cW/n) + (cW/n - barW)/2;
-    const barH = (p.volLoad/maxV)*cH;
-    const y = pad.top + cH - barH;
-    const grad = ctx.createLinearGradient(0, y, 0, y+barH);
-    grad.addColorStop(0, '#7c6aff');
-    grad.addColorStop(1, '#7c6aff44');
-    ctx.fillStyle = grad;
-    ctx.shadowColor = '#7c6aff'; ctx.shadowBlur = 6;
-    ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(x, y, barW, barH, [3,3,0,0]) : ctx.rect(x, y, barW, barH);
-    ctx.fill(); ctx.shadowBlur = 0;
-
-    const showX = n <= 8 || i % Math.ceil(n/8) === 0 || i === n-1;
-    if (showX) {
-      ctx.fillStyle = '#4b5563'; ctx.font = '8px DM Mono, monospace'; ctx.textAlign = 'center';
-      ctx.fillText(p.dateStr, x+barW/2, h-6);
+  // Update button styles in the row
+  const row = btnEl.closest('div[style]');
+  if (row) {
+    row.querySelectorAll('button').forEach(b => {
+      const isActive = b.textContent === ex.equipment;
+      b.style.borderColor = isActive ? 'var(--neon)' : 'rgba(255,255,255,0.1)';
+      b.style.background  = isActive ? 'rgba(0,180,255,0.12)' : 'transparent';
+      b.style.color       = isActive ? 'var(--neon)' : '#6b7280';
+    });
+    const tag = row.querySelector('span');
+    if (tag) {
+      tag.textContent = ex.equipment || 'Untagged';
+      tag.style.color = ex.equipment ? 'var(--neon)' : '#4b5563';
     }
-  });
+  }
+  showToast(ex.equipment ? `Tagged as ${ex.equipment}` : 'Tag removed');
 }
 
 
