@@ -619,7 +619,11 @@ canvas.chart{width:100%!important;height:100%!important;}
 .muscle-bar-val{font-size:10px;color:var(--neon);width:28px;text-align:right;}
 
 .exercise-select-wrap{margin-bottom:16px;}
-.exercise-select-wrap select{font-size:12px;}
+.exercise-select-wrap select{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);
+  font-family:inherit;outline:none;cursor:pointer;appearance:auto;
+}
 
 /* ═══════════════════════════════════════
    FORMS / MODALS
@@ -881,7 +885,9 @@ canvas.chart{width:100%!important;height:100%!important;}
     <!-- WEEKLY FREQUENCY -->
     <div class="stat-card" style="margin-bottom:12px;">
       <div class="stat-card-title">Weekly sessions</div>
-      <div class="chart-wrap"><canvas id="chart-volume"></canvas></div>
+      <div style="position:relative;width:100%;height:160px;margin-top:8px;overflow:hidden;">
+        <canvas id="chart-volume" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
+      </div>
     </div>
 
     <!-- EXERCISE PROGRESS -->
@@ -2626,11 +2632,15 @@ function renderWeeklyFreqChart(sessions, fromDate, toDate) {
     const key = mon.toISOString().slice(0,10);
     weeks[key] = (weeks[key]||0)+1;
   });
-  const canvas = document.getElementById('chart-volume');
-  const ctx = canvas.getContext('2d');
   const labels = Object.keys(weeks).sort();
   const data = labels.map(k => weeks[k]);
-  drawBarChart(ctx, canvas, labels.map(l=>l.slice(5)), data, '#00b4ff');
+  // Defer draw so canvas has proper dimensions after paint
+  setTimeout(() => {
+    const canvas = document.getElementById('chart-volume');
+    if (!canvas || !canvas.offsetWidth) return;
+    const ctx = canvas.getContext('2d');
+    drawBarChart(ctx, canvas, labels.map(l=>l.slice(5)), data, '#00b4ff');
+  }, 100);
 }
 
 function populateExSelect() {
@@ -2725,11 +2735,11 @@ function renderExerciseSection() {
     <div class="ex-trend-badge ${trendDir}">${trendIcon} ${trendText}</div>
     ${wChange !== null ? `<div style="font-size:11px;color:var(--muted2);margin-bottom:12px;">Top weight: ${first.maxWeight}kg → ${last.maxWeight}kg (${wChange>0?'+':''}${wChange}%) · ${points.length} sessions</div>` : ''}
     <div class="ex-chart-title">Volume load per session (sets × reps × kg)</div>
-    <div class="chart-wrap"><canvas id="chart-vol-load"></canvas></div>
+    <div style="position:relative;width:100%;height:160px;margin-top:8px;overflow:hidden;"><canvas id="chart-vol-load" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas></div>
     <div class="ex-chart-title">Top weight per session (kg)</div>
-    <div class="chart-wrap"><canvas id="chart-top-weight"></canvas></div>
+    <div style="position:relative;width:100%;height:160px;margin-top:8px;overflow:hidden;"><canvas id="chart-top-weight" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas></div>
     <div class="ex-chart-title">Estimated 1RM per session (Epley formula)</div>
-    <div class="chart-wrap"><canvas id="chart-1rm"></canvas></div>`;
+    <div style="position:relative;width:100%;height:160px;margin-top:8px;overflow:hidden;"><canvas id="chart-1rm" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas></div>`;
 
   // Draw charts after DOM update
   setTimeout(() => {
