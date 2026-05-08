@@ -2657,54 +2657,40 @@ function renderExerciseSection() {
   const body   = document.getElementById('exercise-progress-body');
   if (!exName) { body.innerHTML = ''; return; }
 
-  const fromEl = document.getElementById('stats-from');
-  const toEl   = document.getElementById('stats-to');
-  const fromDate = new Date(fromEl.value + 'T00:00:00');
-  const toDate   = new Date(toEl.value   + 'T23:59:59');
-
-  const allSessions = load(SK.sessions) || [];
-  const sessions = allSessions.filter(s => {
-    const d = new Date(s.startedAt);
-    return d >= fromDate && d <= toDate;
+  const fromDate = new Date(document.getElementById('stats-from').value + 'T00:00:00');
+  const toDate   = new Date(document.getElementById('stats-to').value   + 'T23:59:59');
+  const sessions = (load(SK.sessions)||[]).filter(s => {
+    const d = new Date(s.startedAt); return d >= fromDate && d <= toDate;
   });
 
-  // Collect data points per session
   const points = [];
   sessions.forEach(s => {
     (s.exercises||[]).forEach(ex => {
       if (ex.name !== exName) return;
-      const logged = (ex.sets||[]).filter(st=>st.logged);
+      const logged = (ex.sets||[]).filter(st => st.logged);
       if (!logged.length) return;
 
-      const totalVol = logged.reduce((a,st) => {
+      // Volume load
+      const volLoad = Math.round(logged.reduce((a,st) => {
         const w = parseFloat(st.weight)||0;
-        const r = ex.unilateral
-          ? ((parseFloat(st.repsL)||0)+(parseFloat(st.repsR)||0))
-          : (parseFloat(st.reps)||0);
-        return a+w*r;
-      }, 0);
+        const r = ex.unilateral ? ((parseFloat(st.repsL)||0)+(parseFloat(st.repsR)||0)) : (parseFloat(st.reps)||0);
+        return a + w*r;
+      }, 0));
 
-      const maxWeight = Math.max(...logged.map(st=>parseFloat(st.weight)||0));
-      const totalReps = logged.reduce((a,st)=>a+(ex.unilateral?((parseFloat(st.repsL)||0)+(parseFloat(st.repsR)||0)):(parseFloat(st.reps)||0)),0);
-
-      // Epley 1RM: weight × (1 + reps/30), use best single set
-      let best1RM = 0;
+      // Best set (highest 1RM) + its label
+      let best1RM = 0, bestW = 0, bestR = 0;
       logged.forEach(st => {
         const w = parseFloat(st.weight)||0;
-        const r = ex.unilateral
-          ? Math.max(parseFloat(st.repsL)||0, parseFloat(st.repsR)||0)
-          : parseFloat(st.reps)||0;
-        if (r > 0) best1RM = Math.max(best1RM, w*(1+r/30));
+        const r = ex.unilateral ? Math.max(parseFloat(st.repsL)||0, parseFloat(st.repsR)||0) : parseFloat(st.reps)||0;
+        const rm = r > 0 ? w*(1+r/30) : 0;
+        if (rm > best1RM) { best1RM = rm; bestW = w; bestR = r; }
       });
 
       points.push({
-        date: new Date(s.startedAt),
         dateStr: new Date(s.startedAt).toLocaleDateString('no-NO',{day:'numeric',month:'short'}),
-        volumeLoad: Math.round(totalVol),
-        maxWeight,
-        totalReps,
-        sets: logged.length,
+        volLoad,
         est1RM: Math.round(best1RM*10)/10,
+        bestLabel: bestW > 0 ? `${bestW}kg×${bestR}` : '',
       });
     });
   });
@@ -2714,44 +2700,164 @@ function renderExerciseSection() {
     return;
   }
 
-  // KPIs
   const first = points[0], last = points[points.length-1];
-  const volChange = first.volumeLoad > 0 ? ((last.volumeLoad-first.volumeLoad)/first.volumeLoad*100).toFixed(1) : null;
-  const wChange   = first.maxWeight  > 0 ? ((last.maxWeight -first.maxWeight )/first.maxWeight *100).toFixed(1) : null;
-  const trendDir  = volChange > 2 ? 'up' : volChange < -2 ? 'down' : 'flat';
+  const rmChange = first.est1RM > 0 ? ((last.est1RM - first.est1RM) / first.est1RM * 100) : null;
+  const rmDiff   = first.est1RM > 0 ? (last.est1RM - first.est1RM).toFixed(1) : null;
+  const trendDir = rmChange > 2 ? 'up' : rmChange < -2 ? 'down' : 'flat';
   const trendIcon = trendDir==='up'?'↑':trendDir==='down'?'↓':'→';
-  const trendText = trendDir==='up'?`Progressing +${volChange}% volume load`:trendDir==='down'?`Volume load -${Math.abs(volChange)}%`:'Maintaining — stable load';
-
-  const maxVol  = Math.max(...points.map(p=>p.volumeLoad));
-  const maxW    = Math.max(...points.map(p=>p.maxWeight));
-  const max1RM  = Math.max(...points.map(p=>p.est1RM));
+  const trendColor = trendDir==='up'?'#00ff96':trendDir==='down'?'#ff4466':'#6b7280';
+  const trendBg   = trendDir==='up'?'rgba(0,255,150,0.1)':trendDir==='down'?'rgba(255,68,102,0.1)':'rgba(255,255,255,0.05)';
 
   body.innerHTML = `
     <div class="ex-progress-kpis">
-      <div class="ex-kpi"><div class="ex-kpi-val">${last.volumeLoad}kg</div><div class="ex-kpi-lbl">Last vol load</div></div>
-      <div class="ex-kpi"><div class="ex-kpi-val">${last.maxWeight}kg</div><div class="ex-kpi-lbl">Last top weight</div></div>
-      <div class="ex-kpi"><div class="ex-kpi-val">${last.est1RM}kg</div><div class="ex-kpi-lbl">Est. 1RM</div></div>
+      <div class="ex-kpi">
+        <div class="ex-kpi-val">${last.est1RM}<span style="font-size:11px;color:var(--muted2);">kg</span></div>
+        <div class="ex-kpi-lbl">Est. 1RM now</div>
+      </div>
+      <div class="ex-kpi">
+        <div class="ex-kpi-val" style="color:${trendColor}">${rmDiff !== null ? (rmDiff > 0 ? '+' : '') + rmDiff + 'kg' : '—'}</div>
+        <div class="ex-kpi-lbl">Since first session</div>
+      </div>
+      <div class="ex-kpi">
+        <div class="ex-kpi-val">${points.length}</div>
+        <div class="ex-kpi-lbl">Sessions tracked</div>
+      </div>
     </div>
-    <div class="ex-trend-badge ${trendDir}">${trendIcon} ${trendText}</div>
-    ${wChange !== null ? `<div style="font-size:11px;color:var(--muted2);margin-bottom:12px;">Top weight: ${first.maxWeight}kg → ${last.maxWeight}kg (${wChange>0?'+':''}${wChange}%) · ${points.length} sessions</div>` : ''}
-    <div class="ex-chart-title">Volume load per session (sets × reps × kg)</div>
-    <div style="position:relative;width:100%;height:160px;margin-top:8px;overflow:hidden;"><canvas id="chart-vol-load" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas></div>
-    <div class="ex-chart-title">Top weight per session (kg)</div>
-    <div style="position:relative;width:100%;height:160px;margin-top:8px;overflow:hidden;"><canvas id="chart-top-weight" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas></div>
-    <div class="ex-chart-title">Estimated 1RM per session (Epley formula)</div>
-    <div style="position:relative;width:100%;height:160px;margin-top:8px;overflow:hidden;"><canvas id="chart-1rm" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas></div>`;
 
-  // Draw charts after DOM update
+    <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:16px;background:${trendBg};color:${trendColor};">
+      ${trendIcon} ${trendDir==='up'?`Gaining strength — est. 1RM up ${rmChange.toFixed(1)}%`:trendDir==='down'?`Est. 1RM down ${Math.abs(rmChange).toFixed(1)}%`:'Maintaining — stable strength'}
+    </div>
+
+    <div class="ex-chart-title">Estimated 1RM over time — best set annotated</div>
+    <div style="position:relative;width:100%;height:200px;overflow:hidden;margin-bottom:20px;">
+      <canvas id="chart-1rm-main" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
+    </div>
+
+    <div class="ex-chart-title">Volume load per session (sets × reps × kg)</div>
+    <div style="position:relative;width:100%;height:140px;overflow:hidden;">
+      <canvas id="chart-vol-bars" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
+    </div>`;
+
   setTimeout(() => {
-    const labels = points.map(p=>p.dateStr);
-    const c1 = document.getElementById('chart-vol-load');
-    if (c1) drawLineChart(c1.getContext('2d'), c1, labels, points.map(p=>p.volumeLoad), '#00b4ff');
-    const c2 = document.getElementById('chart-top-weight');
-    if (c2) drawLineChart(c2.getContext('2d'), c2, labels, points.map(p=>p.maxWeight), '#00ffcc');
-    const c3 = document.getElementById('chart-1rm');
-    if (c3) drawLineChart(c3.getContext('2d'), c3, labels, points.map(p=>p.est1RM), '#7c6aff');
-  }, 50);
+    const c1 = document.getElementById('chart-1rm-main');
+    if (c1) draw1RMChart(c1, points);
+    const c2 = document.getElementById('chart-vol-bars');
+    if (c2) drawVolBars(c2, points);
+  }, 150);
 }
+
+function draw1RMChart(canvas, points) {
+  const dpr = devicePixelRatio;
+  canvas.width  = canvas.offsetWidth  * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+  const w = canvas.offsetWidth, h = canvas.offsetHeight;
+  const pad = { top:28, right:16, bottom:32, left:44 };
+  const cW = w - pad.left - pad.right, cH = h - pad.top - pad.bottom;
+  const n = points.length;
+  const vals = points.map(p => p.est1RM);
+  const maxV = Math.max(...vals) * 1.1;
+  const minV = Math.min(...vals) * 0.92;
+  const xS = i => pad.left + (n===1 ? cW/2 : i/(n-1)*cW);
+  const yS = v => pad.top + cH - ((v-minV)/(maxV-minV||1))*cH;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
+  [0, 0.25, 0.5, 0.75, 1].forEach(t => {
+    const y = pad.top + t*cH;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w-pad.right, y); ctx.stroke();
+    const val = Math.round(maxV - t*(maxV-minV));
+    ctx.fillStyle = '#4b5563'; ctx.font = '9px DM Mono, monospace'; ctx.textAlign = 'right';
+    ctx.fillText(val+'kg', pad.left-5, y+3);
+  });
+
+  // Gradient fill under line
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top+cH);
+  grad.addColorStop(0, 'rgba(0,180,255,0.18)');
+  grad.addColorStop(1, 'rgba(0,180,255,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  points.forEach((p,i) => i===0 ? ctx.moveTo(xS(i),yS(p.est1RM)) : ctx.lineTo(xS(i),yS(p.est1RM)));
+  ctx.lineTo(xS(n-1), pad.top+cH); ctx.lineTo(xS(0), pad.top+cH); ctx.closePath(); ctx.fill();
+
+  // Line
+  ctx.strokeStyle = '#00b4ff'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath();
+  points.forEach((p,i) => i===0 ? ctx.moveTo(xS(i),yS(p.est1RM)) : ctx.lineTo(xS(i),yS(p.est1RM)));
+  ctx.stroke();
+
+  // Dots + annotations
+  points.forEach((p, i) => {
+    const x = xS(i), y = yS(p.est1RM);
+    // Dot
+    ctx.fillStyle = '#00b4ff';
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#0e0f11';
+    ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI*2); ctx.fill();
+
+    // Best set label — show on every point if <6, else every other
+    const showLabel = n <= 8 || i % Math.ceil(n/8) === 0 || i === n-1;
+    if (showLabel && p.bestLabel) {
+      ctx.font = 'bold 8px DM Mono, monospace';
+      ctx.textAlign = 'center';
+      // Alternate above/below to avoid overlap
+      const above = i % 2 === 0;
+      ctx.fillStyle = '#6b7280';
+      ctx.fillText(p.bestLabel, x, above ? y-10 : y+18);
+    }
+
+    // X label
+    const showX = n <= 8 || i % Math.ceil(n/8) === 0 || i === n-1;
+    if (showX) {
+      ctx.fillStyle = '#4b5563'; ctx.font = '8px DM Mono, monospace'; ctx.textAlign = 'center';
+      ctx.fillText(p.dateStr, x, h-6);
+    }
+  });
+}
+
+function drawVolBars(canvas, points) {
+  const dpr = devicePixelRatio;
+  canvas.width  = canvas.offsetWidth  * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+  const w = canvas.offsetWidth, h = canvas.offsetHeight;
+  const pad = { top:8, right:16, bottom:28, left:44 };
+  const cW = w - pad.left - pad.right, cH = h - pad.top - pad.bottom;
+  const n = points.length;
+  const vals = points.map(p => p.volLoad);
+  const maxV = Math.max(...vals, 1);
+  const barW = Math.max(4, cW/n - 4);
+
+  // Grid
+  [0, 0.5, 1].forEach(t => {
+    const y = pad.top + t*cH;
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(w-pad.right,y); ctx.stroke();
+    ctx.fillStyle = '#4b5563'; ctx.font = '9px DM Mono, monospace'; ctx.textAlign = 'right';
+    ctx.fillText(Math.round(maxV - t*maxV)+'kg', pad.left-5, y+3);
+  });
+
+  points.forEach((p, i) => {
+    const x = pad.left + i*(cW/n) + (cW/n - barW)/2;
+    const barH = (p.volLoad/maxV)*cH;
+    const y = pad.top + cH - barH;
+    const grad = ctx.createLinearGradient(0, y, 0, y+barH);
+    grad.addColorStop(0, '#7c6aff');
+    grad.addColorStop(1, '#7c6aff44');
+    ctx.fillStyle = grad;
+    ctx.shadowColor = '#7c6aff'; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x, y, barW, barH, [3,3,0,0]) : ctx.rect(x, y, barW, barH);
+    ctx.fill(); ctx.shadowBlur = 0;
+
+    const showX = n <= 8 || i % Math.ceil(n/8) === 0 || i === n-1;
+    if (showX) {
+      ctx.fillStyle = '#4b5563'; ctx.font = '8px DM Mono, monospace'; ctx.textAlign = 'center';
+      ctx.fillText(p.dateStr, x+barW/2, h-6);
+    }
+  });
+}
+
 
 function renderPRs(sessions) {} // kept for compatibility
 
