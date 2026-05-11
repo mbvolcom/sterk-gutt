@@ -1246,7 +1246,8 @@ async function dbLoadSessions() {
 
 async function dbDeleteSession(id) {
   try {
-    await sb.from('sessions').delete().eq('id', id).eq('user_id', USER_ID);
+    const { error } = await sb.from('sessions').delete().eq('id', id);
+    if (error) throw error;
     _sessions = _sessions.filter(s => s.id !== id);
   } catch(e) { console.warn('Delete session failed:', e.message); }
 }
