@@ -2808,13 +2808,43 @@ function renderStats() {
   });
   if (_statsSubtab==='overview') renderOverview(sessions, from, to);
   if (_statsSubtab==='routines') renderRoutineStats(sessions);
-  if (_statsSubtab==='exercise') { populateExSelect(); renderExerciseSection(); }
+  if (_statsSubtab==='exercise') {
+    populateExSelect();
+    if (document.getElementById('ex-select')?.value) renderExerciseSection();
+  }
 }
 
 function renderOverview(sessions, fromDate, toDate) {
   renderKPIs(sessions, fromDate, toDate);
   renderMuscleBars(sessions);
   renderWeeklyFreqChart(sessions, fromDate, toDate);
+}
+
+function renderOverview(sessions, fromDate, toDate) {
+  renderKPIs(sessions, fromDate, toDate);
+  renderMuscleBars(sessions);
+  setTimeout(() => renderWeeklyFreqChart(sessions, fromDate, toDate), 50);
+}
+
+function renderMuscleBars(sessions) {
+  const muscles = {};
+  sessions.forEach(s => {
+    (s.exercises||[]).forEach(ex => {
+      const sets = (ex.sets||[]).filter(st=>st.logged).length;
+      if (sets) muscles[ex.muscle||'Other'] = (muscles[ex.muscle||'Other']||0) + sets;
+    });
+  });
+  const container = document.getElementById('muscle-bars');
+  if (!container) return;
+  const entries = Object.entries(muscles).sort((a,b)=>b[1]-a[1]);
+  if (!entries.length) { container.innerHTML='<div style="color:var(--muted);font-size:11px;padding:8px 0;">No data yet</div>'; return; }
+  const max = Math.max(...entries.map(e=>e[1]));
+  container.innerHTML = entries.map(([m,v])=>`
+    <div class="muscle-bar-row">
+      <span class="muscle-bar-label">${m}</span>
+      <div class="muscle-bar-track"><div class="muscle-bar-fill" style="width:${Math.round(v/max*100)}%"></div></div>
+      <span class="muscle-bar-val">${v}</span>
+    </div>`).join('');
 }
 
 function renderKPIs(sessions, fromDate, toDate) {
@@ -3003,8 +3033,7 @@ function renderExerciseSection(equipFilter) {
   const body   = document.getElementById('exercise-progress-body');
   if (!exName) { body.innerHTML = ''; return; }
 
-  const fromDate = new Date(document.getElementById('stats-from').value + 'T00:00:00');
-  const toDate   = new Date(document.getElementById('stats-to').value   + 'T23:59:59');
+  const {from: fromDate, to: toDate} = getStatsDates();
   const allSess  = (load(SK.sessions)||[]).filter(s => {
     const d = new Date(s.startedAt); return d >= fromDate && d <= toDate;
   });
