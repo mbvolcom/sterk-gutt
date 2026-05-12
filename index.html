@@ -641,6 +641,25 @@ canvas.chart{width:100%!important;height:100%!important;}
 .muscle-bar-val{font-size:10px;color:var(--neon);width:28px;text-align:right;}
 
 .eq-selector { display:flex; gap:5px; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--border); }
+
+/* ── In-workout suggestion card ── */
+.hint-card { margin:8px 14px 4px; border-radius:10px; overflow:hidden; transition:all 0.2s; border:1px solid rgba(0,180,255,0.2); background:rgba(0,180,255,0.06); }
+.hint-card-header { display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:pointer; user-select:none; }
+.hint-card-icon { font-size:14px; flex-shrink:0; }
+.hint-card-main { flex:1; min-width:0; }
+.hint-card-suggestion { font-size:12px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hint-card-sub { font-size:10px; color:var(--muted2); margin-top:1px; }
+.hint-card-chevron { font-size:10px; color:var(--muted2); transition:transform 0.2s; flex-shrink:0; }
+.hint-card.collapsed .hint-card-chevron { transform:rotate(-90deg); }
+.hint-card-body { padding:0 12px 10px; border-top:1px solid rgba(0,180,255,0.15); }
+.hint-card.collapsed .hint-card-body { display:none; }
+.hint-last-line { font-size:11px; color:var(--muted2); padding-top:8px; }
+.hint-last-line strong { color:var(--text); font-weight:600; }
+.hint-sparkline { display:flex; align-items:flex-end; gap:2px; height:28px; margin-top:8px; }
+.hint-sparkline-bar { flex:1; border-radius:2px 2px 0 0; background:rgba(0,180,255,0.4); min-width:4px; transition:background 0.15s; }
+.hint-sparkline-bar.last { background:#00b4ff; }
+.hint-done { border-color:rgba(0,255,150,0.2); background:rgba(0,255,150,0.05); }
+.hint-done .hint-card-suggestion { color:#00ff96; }
 .eq-btn { background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:4px 10px; font-size:10px; font-weight:600; color:var(--muted2); cursor:pointer; font-family:inherit; letter-spacing:0.5px; transition:all 0.15s; }
 .eq-btn:active { opacity:0.7; }
 .eq-btn.active { background:rgba(0,180,255,0.15); border-color:var(--neon); color:var(--neon); }
@@ -1693,7 +1712,10 @@ function renderWorkoutPage() {
 
 function renderWorkoutBody() {
   const body = document.getElementById('workout-body');
-  body.innerHTML = activeSession.exercises.map((ex, ei) => buildExCard(ex, ei)).join('');
+  body.innerHTML = '';
+  activeSession.exercises.forEach((ex, ei) => {
+    body.appendChild(buildExCard(ex, ei));
+  });
 
   // Add exercise button at the bottom
   const addExBtn = document.createElement('button');
@@ -1715,14 +1737,122 @@ function renderWorkoutBody() {
   }
 }
 
+// ── In-workout suggestion ─────────────────────────────────────────────────
+function getExerciseSuggestion(exName, equipment) {
+  const allSessions = load(SK.sessions)||[];
+  // Use all history, not just current period
+  const points = buildExercisePoints(allSessions, exName, equipment || null);
+  if (!points.length) return null;
+  const hint     = buildNextSessionSuggestion(points, exName, equipment);
+  const prog     = assessProgression(points);
+  const last     = points[points.length-1];
+  const weights  = points.map(p=>p.weight);
+  return { hint, prog, last, weights, points };
+}
+
+function buildSuggestionCard(ei, exName, equipment) {
+  const data = getExerciseSuggestion(exName, equipment);
+  const card = document.createElement('div');
+  card.className = 'hint-card';
+  card.id = 'hint-' + ei;
+
+  if (!data || !data.hint) {
+    const hdr = document.createElement('div');
+    hdr.className = 'hint-card-header';
+    hdr.innerHTML = '<span class="hint-card-icon">💡</span><div class="hint-card-main"><div class="hint-card-suggestion" style="color:var(--muted2);">No history yet — log this session to start tracking</div></div>';
+    card.appendChild(hdr);
+    return card;
+  }
+
+  const { hint, prog, last, weights } = data;
+  const statusIcon  = prog.status==='progressing'?'↑':prog.status==='plateau'?'→':prog.status==='regressing'?'↓':'💡';
+  const statusColor = prog.status==='progressing'?'#00ff96':prog.status==='plateau'?'#f0c060':prog.status==='regressing'?'#ff4466':'#00b4ff';
+
+  const lastAgo = last.date ? (() => {
+    const diff = Math.round((Date.now()-last.date.getTime())/(1000*60*60*24));
+    return diff===0?'today':diff===1?'yesterday':diff+'d ago';
+  })() : '';
+
+  const maxW = Math.max(...weights);
+  const recentWeights = weights.slice(-6);
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'hint-card-header';
+  const iconEl = document.createElement('span');
+  iconEl.className = 'hint-card-icon';
+  iconEl.style.color = statusColor;
+  iconEl.textContent = statusIcon;
+  const mainEl = document.createElement('div');
+  mainEl.className = 'hint-card-main';
+  const suggEl = document.createElement('div');
+  suggEl.className = 'hint-card-suggestion';
+  suggEl.textContent = hint.suggestion;
+  const subEl = document.createElement('div');
+  subEl.className = 'hint-card-sub';
+  subEl.textContent = hint.subtext;
+  mainEl.appendChild(suggEl);
+  mainEl.appendChild(subEl);
+  const chevEl = document.createElement('span');
+  chevEl.className = 'hint-card-chevron';
+  chevEl.textContent = '▾';
+  hdr.appendChild(iconEl);
+  hdr.appendChild(mainEl);
+  hdr.appendChild(chevEl);
+  card.appendChild(hdr);
+
+  // Body
+  const body = document.createElement('div');
+  body.className = 'hint-card-body';
+  const lastLine = document.createElement('div');
+  lastLine.className = 'hint-last-line';
+  lastLine.innerHTML = 'Last: <strong>' + last.bestLabel + '</strong>' + (lastAgo ? ' · ' + lastAgo : '');
+  body.appendChild(lastLine);
+
+  if (weights.length > 1) {
+    const spark = document.createElement('div');
+    spark.className = 'hint-sparkline';
+    recentWeights.forEach((w, i) => {
+      const bar = document.createElement('div');
+      bar.className = 'hint-sparkline-bar' + (i===recentWeights.length-1?' last':'');
+      bar.style.height = Math.round((w/maxW)*100)+'%';
+      bar.title = w+'kg';
+      spark.appendChild(bar);
+    });
+    body.appendChild(spark);
+  }
+  card.appendChild(body);
+
+  hdr.addEventListener('click', () => card.classList.toggle('collapsed'));
+  return card;
+}
+
+function updateHintAfterSet(ei) {
+  // Called after a set is logged — collapse hint and optionally show comparison
+  const card = document.getElementById(`hint-${ei}`);
+  if (!card) return;
+  const ex = activeSession?.exercises[ei];
+  if (!ex) return;
+  const logged = ex.sets.filter(s=>s.state==='logged');
+  if (!logged.length) return;
+
+  // Collapse after first logged set
+  card.classList.add('collapsed');
+
+  // Check if we've beaten the suggestion
+  const bestLoggedW = Math.max(...logged.map(s=>parseFloat(s.weight)||0));
+  const data = getExerciseSuggestion(ex.name, ex.equipment);
+  if (data?.last && bestLoggedW > data.last.weight) {
+    card.classList.add('hint-done');
+    const sugg = card.querySelector('.hint-card-suggestion');
+    if (sugg) sugg.textContent = `↑ New best: ${bestLoggedW}kg — great progress!`;
+  }
+}
+
 function buildExCard(ex, ei) {
   const logged = ex.sets.filter(s => s.state === 'logged').length;
   const total  = ex.sets.length;
   const isUni  = ex.unilateral;
-
-  const headerCols = isUni
-    ? 'KG · REPS L · REPS R · NOTE'
-    : 'KG · REPS · NOTE';
 
   let setHeaderHTML = isUni
     ? `<div class="set-header-row unilateral"><span>#</span><span style="text-align:center">KG</span><span style="text-align:center">L</span><span style="text-align:center">R</span><span style="text-align:center">NOTE</span></div>`
@@ -1736,17 +1866,20 @@ function buildExCard(ex, ei) {
     ${EQUIPMENT.map(e => `<button class="eq-btn${eq===e?' active':''}" onclick="setEquipment(${ei},'${e}')">${e}</button>`).join('')}
   </div>`;
 
-  return `<div class="ex-card ${ex.collapsed ? 'collapsed' : ''}" id="ex-card-${ei}" data-ei="${ei}">
+  // Build card as DOM element so we can inject the suggestion card
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = `<div class="ex-card ${ex.collapsed ? 'collapsed' : ''}" id="ex-card-${ei}" data-ei="${ei}">
     <div class="ex-card-header">
       <span class="ex-drag-handle" data-ei="${ei}">⠿</span>
       <div class="ex-card-title" onclick="toggleExCollapse(${ei})">
         <div class="ex-card-name">${ex.name}</div>
-        <div class="ex-card-meta" id="ex-meta-${ei}">${ex.muscle}${ex.unilateral?' · Uni':''} · ${logged}/${total} sets${eq?` · ${eq}`:''}</div>
+        <div class="ex-card-meta" id="ex-meta-${ei}">${ex.muscle}${ex.unilateral?' · Uni':''} · ${logged}/${total} sets${eq?' · '+eq:''}</div>
       </div>
       <span class="ex-collapse-btn" onclick="toggleExCollapse(${ei})">▾</span>
     </div>
-    <div class="ex-card-body">
+    <div class="ex-card-body" id="ex-body-${ei}">
       ${eqHTML}
+      <div id="hint-slot-${ei}"></div>
       ${setHeaderHTML}
       <div id="sets-${ei}">${setsHTML}</div>
       <div class="ex-actions">
@@ -1755,6 +1888,19 @@ function buildExCard(ex, ei) {
       </div>
     </div>
   </div>`;
+
+  const card = wrapper.firstElementChild;
+
+  // Inject suggestion card into hint slot
+  const slot = card.querySelector(`#hint-slot-${ei}`);
+  if (slot) {
+    const hintCard = buildSuggestionCard(ei, ex.name, ex.equipment);
+    // Auto-collapse if sets already logged
+    if (logged > 0) hintCard.classList.add('collapsed');
+    slot.appendChild(hintCard);
+  }
+
+  return card;
 }
 
 function buildSetRow(s, si, ei, isUni) {
@@ -1855,6 +2001,7 @@ function handleSetBtn(ei, si) {
     dbSaveSession(activeSession);
     refreshSetRow(ei, si);
     updateExMeta(ei);
+    updateHintAfterSet(ei);
 
   } else if (set.state === 'logged') {
     // Tap again to un-log
@@ -2739,8 +2886,9 @@ function nextDBStep(currentKg) {
 }
 
 function prevDBStep(currentKg) {
-  const i = DB_STEPS.findLastIndex(s => s <= currentKg);
-  return i > 0 ? DB_STEPS[i-1] : null;
+  let idx = -1;
+  for (let i = 0; i < DB_STEPS.length; i++) { if (DB_STEPS[i] <= currentKg) idx = i; }
+  return idx > 0 ? DB_STEPS[idx-1] : null;
 }
 
 function linearTrend(values) {
