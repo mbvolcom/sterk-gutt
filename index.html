@@ -133,6 +133,7 @@ body::before{
 .nav-btn svg{width:20px;height:20px;stroke-width:1.5;transition:filter 0.2s;}
 .nav-btn.active{color:var(--neon);}
 .nav-btn.active svg{filter:drop-shadow(0 0 4px var(--neon-glow));}
+
 /* SHARED COMPONENTS */
 .section-title{
   font-family:'Bebas Neue',sans-serif;
@@ -242,18 +243,493 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
 .recent-item:active{background:var(--surface2);}
 .recent-dot{
   width:8px;height:8px;border-radius:50%;
-  background:var(--neon);flex-shrink:0;
+  background:var(--neon);
+  box-shadow:0 0 6px var(--neon-glow);
+  flex-shrink:0;
 }
 .recent-info{flex:1;min-width:0;}
-.recent-name{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.recent-meta{font-size:11px;color:var(--muted2);margin-top:2px;}
-.recent-right{display:flex;align-items:center;gap:6px;flex-shrink:0;}
-.recent-sets{font-size:22px;font-weight:800;color:var(--neon);font-family:'Bebas Neue',sans-serif;}
-.recent-delete{
-  width:28px;height:28px;background:var(--red-dim);border:none;
-  color:var(--red);font-size:12px;cursor:pointer;border-radius:6px;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+.recent-name{font-size:13px;color:var(--text);font-weight:500;}
+.recent-meta{font-size:10px;color:var(--muted2);margin-top:2px;}
+.recent-right{font-size:11px;color:var(--muted);text-align:right;}
+.recent-sets{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--neon);display:block;}
+
+/* ═══════════════════════════════════════
+   WORKOUT PICKER MODAL
+═══════════════════════════════════════ */
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(7,8,12,0.92);
+  z-index:1000;
+  display:none;
+  flex-direction:column;
+  padding:20px 16px;
+  overflow-y:auto;
 }
+.modal-overlay.open{display:flex;}
+.modal-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:20px;
+}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:3px;color:#fff;}
+.modal-close{
+  width:36px;height:36px;border-radius:8px;
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--muted2);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+
+.routine-pick-item{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:16px;
+  margin-bottom:10px;
+  cursor:pointer;
+  transition:border-color 0.2s,background 0.2s;
+  display:flex;align-items:center;gap:14px;
+}
+.routine-pick-item:active{background:var(--surface2);border-color:var(--border2);}
+.routine-pick-icon{
+  width:40px;height:40px;border-radius:8px;
+  background:var(--neon-dim);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.routine-pick-icon svg{width:18px;height:18px;stroke:var(--neon);}
+.routine-pick-name{font-size:14px;font-weight:500;color:var(--text);}
+.routine-pick-meta{font-size:10px;color:var(--muted2);margin-top:3px;}
+
+.new-routine-btn{
+  background:transparent;
+  border:1px dashed var(--border2);
+  border-radius:12px;
+  padding:16px;
+  width:100%;
+  display:flex;align-items:center;gap:14px;
+  cursor:pointer;
+  color:var(--neon);
+  font-family:'DM Mono',monospace;
+  font-size:13px;
+  margin-top:4px;
+  transition:background 0.15s;
+}
+.new-routine-btn:active{background:var(--neon-dim);}
+
+/* ═══════════════════════════════════════
+   ACTIVE WORKOUT PAGE
+═══════════════════════════════════════ */
+#page-workout{padding:0;padding-bottom:calc(var(--nav-h) + 28px);}
+
+.workout-header{
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  padding:14px 16px;
+  position:sticky;top:0;z-index:10;
+}
+.workout-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.workout-name{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:#fff;}
+.workout-timer-badge{
+  font-family:'Bebas Neue',sans-serif;font-size:20px;
+  color:var(--neon);letter-spacing:2px;
+  text-shadow:0 0 8px var(--neon-glow);
+}
+.workout-progress{display:flex;gap:8px;align-items:center;}
+.workout-prog-text{font-size:10px;color:var(--muted2);}
+.workout-finish-btn{
+  background:var(--neon);color:#000;
+  border:none;border-radius:6px;padding:8px 16px;
+  font-family:'DM Mono',monospace;font-size:10px;font-weight:500;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  box-shadow:0 0 12px var(--neon-glow);
+}
+
+.workout-body{padding:12px 16px;}
+
+/* Exercise card in workout */
+.ex-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  margin-bottom:12px;
+  overflow:hidden;
+  transition:border-color 0.2s;
+}
+.ex-card.active-ex{border-color:var(--border2);box-shadow:0 0 16px rgba(0,180,255,0.06);}
+.ex-card-header{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 14px;
+  border-bottom:1px solid var(--border);
+  cursor:pointer;
+}
+.ex-drag-handle{
+  color:var(--muted);font-size:14px;cursor:grab;
+  touch-action:none;
+  padding:2px 4px;
+}
+.ex-card-title{flex:1;min-width:0;}
+.ex-card-name{font-size:13px;font-weight:500;color:var(--text);}
+.ex-card-meta{font-size:10px;color:var(--muted2);margin-top:1px;}
+.ex-duration{
+  font-family:'Bebas Neue',sans-serif;font-size:14px;
+  color:var(--neon3);letter-spacing:1px;
+}
+.ex-collapse-btn{color:var(--muted);font-size:12px;transition:transform 0.2s;}
+.ex-card.collapsed .ex-collapse-btn{transform:rotate(-90deg);}
+
+.ex-card-body{padding:10px 14px 14px;}
+.ex-card.collapsed .ex-card-body{display:none;}
+
+/* Set rows — simplified, no log button column */
+.set-header-row{
+  display:grid;
+  font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);
+  margin-bottom:6px;padding:0 4px;
+}
+.set-header-row.bilateral  { grid-template-columns:24px 1fr 1fr 1fr; }
+.set-header-row.unilateral { grid-template-columns:24px 1fr 1fr 1fr 1fr; }
+
+.set-row {
+  border-radius:8px;
+  margin-bottom:6px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  transition:border-color 0.2s;
+}
+.set-row.set-active  { border-color:var(--neon);  box-shadow:0 0 10px rgba(0,180,255,0.1); }
+.set-row.set-logged  { border-color:rgba(0,255,204,0.25); }
+
+.set-row-top {
+  display:grid;
+  gap:6px;align-items:center;
+  padding:8px 8px 0;
+}
+.set-row-top.bilateral  { grid-template-columns:24px 1fr 1fr 1fr; }
+.set-row-top.unilateral { grid-template-columns:24px 1fr 1fr 1fr 1fr; }
+
+.set-num {
+  font-family:'Bebas Neue',sans-serif;font-size:14px;
+  color:var(--muted);text-align:center;
+}
+.set-input {
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:7px 4px;
+  font-size:13px;text-align:center;
+  color:var(--text);-webkit-appearance:none;
+  font-family:'DM Mono',monospace;
+}
+.set-input:focus{border-color:var(--neon);box-shadow:0 0 0 1px var(--neon-dim);}
+.set-input.logged{border-color:rgba(0,255,204,0.3);background:rgba(0,255,204,0.05);}
+.set-input::placeholder{color:var(--muted);}
+.set-input.ghost-only{color:rgba(0,180,255,0.3)!important;font-style:italic;}
+.set-input:disabled{opacity:0.5;cursor:not-allowed;}
+
+.set-note-row { padding:6px 8px 0; }
+.set-note {
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:6px 8px;width:100%;
+  font-size:11px;color:var(--muted2);
+  font-family:'DM Mono',monospace;
+  resize:none;height:30px;overflow:hidden;
+}
+.set-note:focus{border-color:var(--neon);box-shadow:0 0 0 1px var(--neon-dim);color:var(--text);}
+
+/* START / STOP button row */
+.set-btn-row {
+  padding:8px;display:flex;gap:6px;align-items:center;
+}
+.set-start-btn {
+  flex:1;border:none;border-radius:6px;
+  padding:10px;cursor:pointer;
+  font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;
+  transition:all 0.15s;
+}
+.set-start-btn.state-idle {
+  background:#0d2a3e;color:#00b4ff;border:1px solid rgba(0,180,255,0.35);
+  box-shadow:0 0 10px rgba(0,180,255,0.15);
+}
+.set-start-btn.state-idle:active { background:#0a1f2e;color:#00cfff; }
+.set-start-btn.state-active {
+  background:var(--red);color:#fff;
+  box-shadow:0 0 14px rgba(255,68,102,0.4);
+  animation:pulse-red 1.5s infinite;
+}
+.set-start-btn.state-logged {
+  background:var(--green-dim);color:var(--green);
+  border:1px solid rgba(0,255,204,0.3);
+  font-size:13px;letter-spacing:1px;
+}
+
+@keyframes pulse-red {
+  0%,100%{box-shadow:0 0 14px rgba(255,68,102,0.4);}
+  50%{box-shadow:0 0 22px rgba(255,68,102,0.7);}
+}
+
+/* REST TIMER — prominent banner between sets */
+.rest-banner {
+  margin:6px 0;
+  border-radius:10px;
+  background:linear-gradient(135deg,rgba(0,180,255,0.12),rgba(0,255,204,0.08));
+  border:1px solid var(--border2);
+  padding:14px 16px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.rest-banner-label {
+  font-size:10px;letter-spacing:3px;text-transform:uppercase;
+  color:var(--muted2);margin-bottom:2px;
+}
+.rest-banner-time {
+  font-family:'Bebas Neue',sans-serif;
+  font-size:42px;letter-spacing:4px;
+  color:var(--neon);
+  text-shadow:0 0 20px var(--neon-glow);
+  line-height:1;
+}
+.rest-banner-sub {
+  font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:1px;
+}
+
+/* Set actions */
+.ex-actions{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+
+/* Save routine changes button */
+.save-routine-btn {
+  display:flex;align-items:center;gap:6px;
+  margin-top:8px;width:100%;
+  background:rgba(255,159,67,0.1);border:1px solid rgba(255,159,67,0.3);
+  border-radius:8px;padding:10px 14px;
+  color:var(--orange);font-family:'DM Mono',monospace;
+  font-size:11px;letter-spacing:1px;cursor:pointer;
+  transition:background 0.15s;
+}
+.save-routine-btn:active{background:rgba(255,159,67,0.2);}
+
+/* ═══════════════════════════════════════
+   ROUTINES PAGE
+═══════════════════════════════════════ */
+#page-routines{padding:20px 16px;padding-bottom:calc(var(--nav-h) + 28px);}
+
+.routine-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  margin-bottom:10px;
+  overflow:hidden;
+}
+.routine-card-header{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 16px;cursor:pointer;
+}
+.routine-card-name{font-size:14px;font-weight:500;color:var(--text);flex:1;}
+.routine-card-meta{font-size:10px;color:var(--muted2);margin-top:2px;}
+.routine-card-actions{display:flex;gap:8px;}
+.routine-card-actions button{
+  background:none;border:none;color:var(--muted2);
+  cursor:pointer;font-size:16px;padding:4px;
+  transition:color 0.15s;
+}
+.routine-card-actions button:hover{color:var(--neon);}
+
+/* Routine editor */
+.routine-editor{padding:0 16px 16px;}
+.routine-ex-item{
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:12px 14px;
+  margin-bottom:8px;
+  display:flex;align-items:center;gap:10px;
+}
+.routine-ex-info{flex:1;min-width:0;}
+.routine-ex-name{font-size:13px;color:var(--text);}
+.routine-ex-tags{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;}
+.tag{
+  font-size:9px;letter-spacing:1px;text-transform:uppercase;
+  padding:2px 7px;border-radius:3px;
+  background:var(--neon-dim);color:var(--neon);
+  border:1px solid var(--border2);
+}
+.tag.unilateral{background:rgba(124,106,255,0.1);color:var(--neon3);border-color:rgba(124,106,255,0.2);}
+
+/* ═══════════════════════════════════════
+   STATS PAGE
+═══════════════════════════════════════ */
+#page-stats{padding:20px 16px;padding-bottom:calc(var(--nav-h) + 28px);}
+
+.stats-filter{display:flex;gap:8px;margin-bottom:20px;overflow-x:auto;padding-bottom:4px;}
+.filter-btn{
+  flex-shrink:0;padding:7px 14px;border-radius:6px;
+  background:var(--surface);border:1px solid var(--border);
+  color:var(--muted2);font-family:'DM Mono',monospace;
+  font-size:10px;letter-spacing:1px;cursor:pointer;
+  transition:all 0.15s;white-space:nowrap;
+}
+.filter-btn.active{background:var(--neon-dim);border-color:var(--border2);color:var(--neon);}
+
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:16px;margin-bottom:12px;
+}
+.stat-card-title{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted2);font-weight:700;margin-bottom:14px;font-family:inherit;}
+.stat-value{font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--neon);text-shadow:0 0 10px var(--neon-glow);}
+.stat-label{font-size:10px;color:var(--muted2);}
+
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+
+/* Stats filter */
+.stats-filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:4px;}
+.stats-filter-title{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#e0ddd8;font-weight:600;margin-bottom:10px;}
+.stats-preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.stats-preset-btn{padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface2);color:#c8c4be;transition:all 0.15s;}
+.stats-preset-btn.active{background:rgba(0,180,255,0.15);border-color:var(--neon);color:var(--neon);}
+.stats-filter-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
+.stats-date-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;color:#e0ddd8;font-family:inherit;outline:none;}
+.stats-date-input:focus{border-color:var(--neon);}
+.stats-filter-sep{color:#6b7280;font-size:14px;flex-shrink:0;}
+.stats-apply-btn-sm{background:rgba(0,180,255,0.12);color:var(--neon);border:1px solid rgba(0,180,255,0.3);border-radius:8px;padding:7px 14px;font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:2px;cursor:pointer;flex-shrink:0;}
+
+/* Stats subtabs */
+.stats-subtabs{display:flex;gap:2px;background:rgba(10,22,40,0.06);border-radius:14px;padding:3px;margin:12px 0 8px;}
+.stats-subtab{flex:1;background:none;border:none;padding:8px 4px;font-size:12px;font-weight:600;color:var(--muted2);cursor:pointer;border-radius:11px;font-family:inherit;transition:all 0.15s;}
+.stats-subtab.active{background:var(--surface2);color:var(--text);box-shadow:none;}
+
+/* KPI cards */
+.stats-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.stats-kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.stats-kpi-val{font-family:'DM Mono',monospace;font-size:28px;line-height:1;margin-bottom:4px;font-weight:700;}
+.stats-kpi-lbl{font-size:11px;letter-spacing:0.05em;font-weight:600;color:#c8c4be;}
+.stats-kpi-sub{font-size:10px;color:#8a8680;margin-top:3px;}
+
+/* Routine breakdown cards */
+.routine-stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color 0.15s;}
+.routine-stat-card:hover{box-shadow:0 8px 32px rgba(41,114,255,0.15),none;}
+.routine-stat-name{font-size:14px;font-weight:700;color:#e0ddd8;margin-bottom:6px;}
+.routine-stat-meta{display:flex;gap:12px;flex-wrap:wrap;}
+.routine-stat-item{font-size:11px;color:#8a8680;}
+.routine-stat-item span{color:#c8c4be;font-weight:600;}
+.routine-bar-track{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:10px;overflow:hidden;}
+.routine-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--neon),var(--neon2));}
+
+/* Stat card title contrast fix */
+.stat-card-title{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted2);font-weight:700;margin-bottom:14px;font-family:inherit;}
+.ex-progress-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.ex-kpi{background:var(--surface2);border-radius:8px;padding:10px 8px;text-align:center;}
+.ex-kpi-val{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--neon);}
+.ex-kpi-lbl{font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+.ex-trend-badge{display:inline-flex;align-items:center;gap:4px;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;margin-bottom:12px;}
+.ex-trend-badge.up{background:rgba(0,255,150,0.12);color:#00ff96;}
+.ex-trend-badge.down{background:rgba(255,68,102,0.12);color:#ff4466;}
+.ex-trend-badge.flat{background:rgba(255,255,255,0.06);color:var(--muted2);}
+.ex-chart-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);margin:12px 0 6px;}
+.ex-no-data{font-size:12px;color:var(--muted2);padding:20px 0;text-align:center;}
+
+/* Charts */
+.chart-wrap{position:relative;width:100%;height:160px;margin-top:8px;}
+canvas.chart{width:100%!important;height:100%!important;}
+
+.pr-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 0;border-bottom:1px solid var(--border);
+}
+.pr-item:last-child{border-bottom:none;}
+.pr-name{font-size:12px;color:var(--text);}
+.pr-val{font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--neon);}
+
+.muscle-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.muscle-bar-label{font-size:10px;color:var(--muted2);width:100px;flex-shrink:0;}
+.muscle-bar-track{flex:1;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;}
+.muscle-bar-fill{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--neon),var(--neon2));transition:width 0.7s cubic-bezier(.16,1,.3,1);}
+.muscle-bar-val{font-size:10px;color:var(--neon);width:28px;text-align:right;}
+
+.eq-selector { display:flex; gap:5px; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--border); }
+
+/* ── In-workout suggestion card ── */
+.hint-card { margin:8px 14px 4px; border-radius:14px; overflow:hidden; transition:all 0.2s; border:1px solid rgba(41,114,255,0.18); background:rgba(41,114,255,0.06); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+.hint-card-header { display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:pointer; user-select:none; }
+.hint-card-icon { font-size:14px; flex-shrink:0; }
+.hint-card-main { flex:1; min-width:0; }
+.hint-card-suggestion { font-size:12px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hint-card-sub { font-size:10px; color:var(--muted2); margin-top:1px; }
+.hint-card-chevron { font-size:10px; color:var(--muted2); transition:transform 0.2s; flex-shrink:0; }
+.hint-card.collapsed .hint-card-chevron { transform:rotate(-90deg); }
+.hint-card-body { padding:0 12px 10px; border-top:1px solid rgba(0,180,255,0.15); }
+.hint-card.collapsed .hint-card-body { display:none; }
+.hint-last-line { font-size:11px; color:var(--muted2); padding-top:8px; }
+.hint-last-line strong { color:var(--text); font-weight:600; }
+.hint-sparkline { display:flex; align-items:flex-end; gap:2px; height:28px; margin-top:8px; }
+.hint-sparkline-bar { flex:1; border-radius:2px 2px 0 0; background:rgba(0,180,255,0.4); min-width:4px; transition:background 0.15s; }
+.hint-sparkline-bar.last { background:#00b4ff; }
+.hint-done { border-color:rgba(30,201,122,0.25); background:rgba(30,201,122,0.07); }
+.hint-done .hint-card-suggestion { color:#00ff96; }
+.eq-btn { background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:4px 10px; font-size:10px; font-weight:600; color:var(--muted2); cursor:pointer; font-family:inherit; letter-spacing:0.5px; transition:all 0.15s; }
+.eq-btn:active { opacity:0.8; }
+.eq-btn.active { background:rgba(0,180,255,0.15); border-color:var(--neon); color:var(--neon); }
+.exercise-select-wrap select{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);
+  font-family:inherit;outline:none;cursor:pointer;appearance:auto;
+}
+
+/* ═══════════════════════════════════════
+   FORMS / MODALS
+═══════════════════════════════════════ */
+.form-group{margin-bottom:14px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.checkbox-row{display:flex;align-items:center;gap:10px;}
+.checkbox-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--neon);flex-shrink:0;}
+.checkbox-row label{margin-bottom:0;font-size:12px;color:var(--text);}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:calc(var(--nav-h) + 16px);left:50%;transform:translateX(-50%);
+  background:var(--neon);color:#000;
+  padding:10px 20px;border-radius:8px;
+  font-size:12px;font-weight:500;letter-spacing:1px;
+  z-index:2000;opacity:0;transition:opacity 0.3s;
+  pointer-events:none;white-space:nowrap;
+}
+.toast.show{opacity:1;}
+
+/* GHOST VALUES (previous session) */
+.set-input.has-ghost { color: var(--text); }
+.set-input.ghost-only {
+  color: rgba(0,180,255,0.3) !important;
+  font-style: italic;
+}
+.set-input.ghost-only::placeholder { color: rgba(0,180,255,0.3); }
+
+/* EXERCISE PICKER in routine editor */
+.ex-search-wrap { position: relative; margin-bottom: 8px; }
+.ex-search-results {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 8px; max-height: 200px; overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.ex-search-item {
+  padding: 10px 14px; cursor: pointer; font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ex-search-item:last-child { border-bottom: none; }
+.ex-search-item:active { background: var(--surface2); }
+.ex-search-item-name { color: var(--text); }
+.ex-search-item-muscle { font-size: 10px; color: var(--muted2); }
+.ex-create-option {
+  padding: 10px 14px; cursor: pointer; font-size: 12px;
+  color: var(--neon); display: flex; align-items: center; gap: 8px;
+}
+.ex-create-option:active { background: var(--neon-dim); }
+
+/* DELETE SESSION button on recent items */
+.recent-delete {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: none; border: 1px solid rgba(255,68,102,0.2);
+  color: var(--red); font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; opacity: 0.6; transition: opacity 0.15s;
+}
+.recent-delete:active { opacity: 1; background: var(--red-dim); }
 
 /* RESUME WORKOUT banner */
 .resume-banner {
@@ -346,7 +822,7 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
   <div class="logo">STERK<span>GUTT</span></div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
     <div class="header-right" id="header-date"></div>
-    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v2.4.0</div>
+    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v2.3.0</div>
     <div id="sync-status" style="font-size:9px;letter-spacing:1px;transition:color 0.3s;"></div>
   </div>
 </div>
@@ -2146,7 +2622,7 @@ function createAndAddExercise() {
   const newEx = { id: 'ex_' + Date.now(), name, muscle, unilateral };
   allEx.push(newEx);
   save(SK.exercises, allEx);
-  dbSaveExercise(newEx); // persist to Supabase so it appears in Exercises tab
+  dbSaveExercise(newEx);
 
   addExToRoutine({ ...newEx, sets });
 }
@@ -2190,7 +2666,7 @@ function createAndAddExercise() {
   const newEx = { id: 'ex_' + Date.now(), name, muscle, unilateral };
   allEx.push(newEx);
   save(SK.exercises, allEx);
-  dbSaveExercise(newEx); // persist to Supabase so it appears in Exercises tab
+  dbSaveExercise(newEx);
 
   addExToRoutine({ ...newEx, sets });
 }
@@ -2342,16 +2818,13 @@ function saveExerciseLib() {
   let savedEx;
   if (editingExId) {
     const idx = allEx.findIndex(e => e.id === editingExId);
-    if (idx >= 0) {
-      allEx[idx] = { ...allEx[idx], name, muscle: selectedMuscle, unilateral };
-      savedEx = allEx[idx];
-    }
+    if (idx >= 0) { allEx[idx] = { ...allEx[idx], name, muscle: selectedMuscle, unilateral }; savedEx = allEx[idx]; }
   } else {
     savedEx = { id: 'ex_' + Date.now(), name, muscle: selectedMuscle, unilateral };
     allEx.push(savedEx);
   }
   save(SK.exercises, allEx);
-  if (savedEx) dbSaveExercise(savedEx); // persist to Supabase
+  if (savedEx) dbSaveExercise(savedEx);
   closeModal('exercise-lib-editor');
   renderExerciseLibrary();
   showToast(editingExId ? 'Exercise updated' : 'Exercise created');
@@ -2409,6 +2882,7 @@ function createAndAddExercise() {
   const newEx = { id: 'ex_' + Date.now(), name, muscle: selectedMuscle, unilateral };
   allEx.push(newEx);
   save(SK.exercises, allEx);
+  dbSaveExercise(newEx);
   addExToRoutine({ ...newEx, sets });
 }
 
