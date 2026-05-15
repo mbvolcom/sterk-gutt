@@ -23,19 +23,15 @@ let currentUser = null;
 async function initAuth() {
   // Listen for auth state changes
   sb.auth.onAuthStateChange(async (event, session) => {
-    console.log('onAuthStateChange — event:', event, 'user:', session?.user?.id);
     if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
       try {
         currentUser = session.user;
         USER_ID = session.user.id;
         hideLoginScreen();
-        console.log('Starting migrateDataIfNeeded...');
         await migrateDataIfNeeded();
-        console.log('Starting syncFromCloud...');
         // Small delay to ensure Supabase client is fully ready
         await new Promise(resolve => setTimeout(resolve, 100));
         await syncFromCloud();
-        console.log('syncFromCloud done, rendering home...');
         renderHome();
         const activePage = document.querySelector('.page.active');
         if (activePage && activePage.id === 'page-routines') renderRoutines();
@@ -187,7 +183,6 @@ async function dbLoadExercises() {
       });
     });
     if (toSave.length) {
-      console.log('Recovering', toSave.length, 'missing exercises');
       for (const ex of toSave) await dbSaveExercise(ex);
     }
   } catch(e) { console.warn('Load exercises failed:', e.message); }
@@ -303,9 +298,7 @@ async function supabaseFetch(table, params = '', method = 'GET', body = null) {
 
 async function dbLoadRoutines() {
   try {
-    console.log('dbLoadRoutines — querying with USER_ID:', USER_ID);
     const data = await supabaseFetch('routines', `select=*&user_id=eq.${USER_ID}&order=created_at`);
-    console.log('dbLoadRoutines — result:', data?.length);
 
     if (data && data.length) {
       _routines = data.map(r => ({ id:r.id, name:r.name, exercises:r.exercises, createdAt:new Date(r.created_at).getTime() }));
@@ -342,9 +335,7 @@ async function dbSaveSession(session) {
 
 async function dbLoadSessions() {
   try {
-    console.log('dbLoadSessions — raw fetch with USER_ID:', USER_ID);
     const data = await supabaseFetch('sessions', `select=*&is_active=eq.false&order=started_at`);
-    console.log('dbLoadSessions — raw data:', data?.length);
     if (data) {
       _sessions = data.map(s => ({
         id:s.id, routineId:s.routine_id, routineName:s.routine_name,
@@ -381,16 +372,11 @@ async function dbLoadActiveSession() {
 // ── Main init sync ────────────────────────────────────────
 async function syncFromCloud() {
   setSyncStatus('syncing');
-  console.log('syncFromCloud — USER_ID:', USER_ID);
   try {
-    console.log('Loading routines...');
     await dbLoadRoutines();
-    console.log('Loading sessions...');
     await dbLoadSessions();
-    console.log('Loading exercises...');
     await dbLoadExercises();
     setSyncStatus('ok');
-    console.log('Loaded from Supabase — exercises:', _exercises.length, 'routines:', _routines.length, 'sessions:', _sessions.length);
   } catch(e) {
     console.error('syncFromCloud error:', e.message, e.stack);
     setSyncStatus('offline');
