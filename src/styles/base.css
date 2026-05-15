@@ -1,0 +1,45 @@
+/* BASE: reset, tokens, body */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+
+:root {
+  --bg: #07080c;
+  --bg2: #0d0f17;
+  --bg3: #12141f;
+  --surface: #151824;
+  --surface2: #1c1f30;
+  --border: rgba(0,180,255,0.08);
+  --border2: rgba(0,180,255,0.18);
+  --text: #e8eaf0;
+  --muted: #4a5068;
+  --muted2: #6b7490;
+  --neon: #00b4ff;
+  --neon-dim: rgba(0,180,255,0.15);
+  --neon-glow: rgba(0,180,255,0.4);
+  --neon2: #00ffcc;
+  --neon3: #7c6aff;
+  --red: #ff4466;
+  --red-dim: rgba(255,68,102,0.15);
+  --green: #00ffcc;
+  --green-dim: rgba(0,255,204,0.12);
+  --orange: #ff9f43;
+  --orange-dim: rgba(255,159,67,0.12);
+  --nav-h: 64px;
+  --header-h: 56px;
+}
+
+html,body{height:100%;overflow:hidden;}
+body{
+  font-family:'DM Mono',monospace;
+  background:var(--bg);
+  color:var(--text);
+  display:flex;
+  flex-direction:column;
+}
+body::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+  pointer-events:none;
+  z-index:9999;
+}
