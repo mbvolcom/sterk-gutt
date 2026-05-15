@@ -17,7 +17,8 @@ let currentUser = null;
 async function initAuth() {
   // Listen for auth state changes
   sb.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' && session) {
+    console.log('onAuthStateChange — event:', event, 'user:', session?.user?.id);
+    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
       currentUser = session.user;
       USER_ID = session.user.id;
       hideLoginScreen();
@@ -26,32 +27,14 @@ async function initAuth() {
       renderHome();
       const activePage = document.querySelector('.page.active');
       if (activePage && activePage.id === 'page-routines') renderRoutines();
-    } else if (event === 'SIGNED_OUT') {
+    } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
       currentUser = null;
       showLoginScreen();
     }
   });
 
-  // Check if already logged in
-  const { data: { session } } = await sb.auth.getSession();
-  console.log('initAuth — session:', session?.user?.id, 'USER_ID:', USER_ID);
-  if (session) {
-    currentUser = session.user;
-    USER_ID = session.user.id;
-    console.log('initAuth — set USER_ID to:', USER_ID);
-    hideLoginScreen();
-    await migrateDataIfNeeded();
-    await syncFromCloud();
-    const active = await dbLoadActiveSession();
-    if (active) {
-      activeSession = active;
-      renderWorkoutPage();
-      startGlobalTimer();
-    }
-    renderHome();
-  } else {
-    showLoginScreen();
-  }
+  // onAuthStateChange fires INITIAL_SESSION immediately — handles both
+  // already-logged-in and fresh login cases. No need for getSession separately.
 }
 
 async function signInWithGoogle() {
