@@ -349,18 +349,9 @@ async function dbSaveSession(session) {
 
 async function dbLoadSessions() {
   try {
-    let { data, error } = await sb.from('sessions').select('*').eq('user_id', USER_ID).eq('is_active', false).order('started_at');
+    let { data, error } = await sb.from('sessions').select('*').eq('is_active', false).order('started_at');
     if (error) throw error;
-
-    // Fallback: if no sessions found, check if any exist under a different user_id
-    if (!data || data.length === 0) {
-      const { data: allData } = await sb.from('sessions').select('*').eq('is_active', false).order('started_at');
-      if (allData && allData.length > 0) {
-        console.log('Sessions found under different user_id — adopting them');
-        await sb.from('sessions').update({ user_id: USER_ID }).neq('user_id', USER_ID);
-        data = allData;
-      }
-    }
+    console.log('dbLoadSessions — raw data:', data?.length, 'USER_ID:', USER_ID);
 
     if (data) {
       _sessions = data.map(s => ({
@@ -368,6 +359,9 @@ async function dbLoadSessions() {
         startedAt:new Date(s.started_at).getTime(), duration:s.duration, exercises:s.exercises,
       }));
     }
+    // Force re-render home after sessions load
+    const list = document.getElementById('recent-list');
+    if (list) renderHome();
     return _sessions;
   } catch(e) { console.warn('Load sessions failed:', e.message); return []; }
 }
