@@ -116,7 +116,7 @@ async function getUserId() {
     id = 'sg_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
     localStorage.setItem('sg_user_id', id);
     // Also store in Supabase for reference
-    await sb.from('user_config').upsert({ key: 'user_id', value: id }, { onConflict: 'key' });
+    // user_config skip — using auth.uid() now
   }
   return id;
 }
@@ -190,8 +190,8 @@ async function dbLoadExercises() {
 
 async function dbSeedExercises() {
   const rows = DEFAULT_EXERCISES.map(e => ({ ...e, user_id: USER_ID }));
-  const { error } = await sb.from('exercises').upsert(rows, { onConflict: 'id' });
-  if (!error) _exercises = [...DEFAULT_EXERCISES];
+  await supabaseFetch('exercises', 'on_conflict=id', 'POST', rows);
+  _exercises = [...DEFAULT_EXERCISES];
 }
 
 async function dbSaveExercise(ex) {
@@ -203,37 +203,18 @@ async function dbSaveExercise(ex) {
   // Refresh exercises tab if visible
   if (document.getElementById('page-exercises')?.classList.contains('active')) renderExerciseLibrary();
 
-  // Persist to Supabase — try upsert by id first, fall back to name-based upsert
   try {
     const row = { id: ex.id, name: ex.name, muscle: ex.muscle||'', unilateral: !!ex.unilateral, user_id: USER_ID };
-
-    // First try: upsert by id
-    let { error } = await sb.from('exercises').upsert(row, { onConflict: 'id' });
-
-    if (error) {
-      console.warn('upsert by id failed:', error.message, '— trying insert');
-      // Second try: plain insert (for new exercises where id might be string type mismatch)
-      const ins = await sb.from('exercises').insert(row);
-      if (ins.error) {
-        console.warn('insert failed:', ins.error.message, '— trying upsert by name+user_id');
-        // Third try: upsert by name + user_id (always works regardless of id type)
-        const ups = await sb.from('exercises').upsert(
-          { name: ex.name, muscle: ex.muscle||'', unilateral: !!ex.unilateral, user_id: USER_ID },
-          { onConflict: 'name,user_id' }
-        );
-        if (ups.error) throw ups.error;
-      }
-    }
+    await supabaseFetch('exercises', 'on_conflict=id', 'POST', row);
     setSyncStatus('ok');
   } catch(e) {
-    console.warn('dbSaveExercise all attempts failed:', e.message);
+    console.warn('dbSaveExercise failed:', e.message);
     setSyncStatus('offline');
-    // Data is safe in _exercises memory — will persist next time
   }
 }
 async function dbDeleteExercise(id) {
   try {
-    await sb.from('exercises').delete().eq('id', id).eq('user_id', USER_ID);
+    await supabaseFetch(`exercises?id=eq.${id}&user_id=eq.${USER_ID}`, '', 'DELETE');
     _exercises = _exercises.filter(e => e.id !== id);
   } catch(e) { console.warn('Delete exercise failed:', e.message); }
 }
@@ -242,13 +223,13 @@ async function dbDeleteExercise(id) {
 async function dbSaveRoutine(routine) {
   try {
     setSyncStatus('syncing');
-    const { error } = await sb.from('routines').upsert({
+    const row = {
       id: routine.id, user_id: USER_ID, name: routine.name,
       exercises: routine.exercises,
       created_at: new Date(routine.createdAt).toISOString(),
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'id' });
-    if (error) throw error;
+    };
+    await supabaseFetch('routines', 'on_conflict=id', 'POST', row);
     const idx = _routines.findIndex(r => r.id === routine.id);
     if (idx >= 0) _routines[idx] = routine; else _routines.push(routine);
     setSyncStatus('ok');
@@ -258,7 +239,7 @@ async function dbSaveRoutine(routine) {
 async function dbDeleteRoutine(id) {
   try {
     setSyncStatus('syncing');
-    await sb.from('routines').delete().eq('id', id).eq('user_id', USER_ID);
+    await supabaseFetch(`routines?id=eq.${id}&user_id=eq.${USER_ID}`, '', 'DELETE');
     _routines = _routines.filter(r => r.id !== id);
     setSyncStatus('ok');
   } catch(e) { console.warn('Delete routine failed:', e.message); setSyncStatus('offline'); }
@@ -318,7 +299,7 @@ async function dbLoadRoutines() {
 async function dbSaveSession(session) {
   try {
     setSyncStatus('syncing');
-    const { error } = await sb.from('sessions').upsert({
+    await supabaseFetch('sessions', 'on_conflict=id', 'POST', {
       id: session.id, user_id: USER_ID,
       routine_id: session.routineId || null,
       routine_name: session.routineName,
@@ -327,8 +308,7 @@ async function dbSaveSession(session) {
       duration: session.duration || null,
       exercises: session.exercises,
       is_active: !session.duration,
-    }, { onConflict: 'id' });
-    if (error) throw error;
+    });
     setSyncStatus('ok');
   } catch(e) { console.warn('Save session failed:', e.message); setSyncStatus('offline'); }
 }
@@ -350,7 +330,7 @@ async function dbLoadSessions() {
 
 async function dbDeleteSession(id) {
   try {
-    const { error } = await sb.from('sessions').delete().eq('id', id);
+    await supabaseFetch(`sessions?id=eq.${id}`, '', 'DELETE');
     if (error) throw error;
     _sessions = _sessions.filter(s => s.id !== id);
   } catch(e) { console.warn('Delete session failed:', e.message); }
@@ -358,7 +338,7 @@ async function dbDeleteSession(id) {
 
 async function dbLoadActiveSession() {
   try {
-    const { data } = await sb.from('sessions').select('*').eq('user_id', USER_ID).eq('is_active', true).order('started_at', { ascending: false }).limit(1);
+    const data = await supabaseFetch('sessions', `user_id=eq.${USER_ID}&is_active=eq.true&order=started_at.desc&limit=1`);
     if (data && data.length) {
       _activeSession = {
         id:data[0].id, routineId:data[0].routine_id, routineName:data[0].routine_name,
@@ -1620,10 +1600,16 @@ function renderEditorExercises() {
           ${ex.unilateral ? '<span class="tag unilateral">Unilateral</span>' : ''}
         </div>
       </div>
-      <input type="number" value="${ex.sets}" min="1" max="20"
-        style="width:46px;text-align:center;padding:6px 4px;flex-shrink:0;"
-        onchange="editorExercises[${i}].sets=Math.max(1,+this.value)"/>
-      <span style="font-size:10px;color:var(--muted2);flex-shrink:0;">sets</span>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+        <input type="number" value="${ex.sets}" min="1" max="20"
+          style="width:40px;text-align:center;padding:6px 4px;"
+          onchange="editorExercises[${i}].sets=Math.max(1,+this.value)"/>
+        <span style="font-size:10px;color:var(--muted2);">sets</span>
+        <input type="text" value="${ex.reps||''}" placeholder="reps"
+          style="width:54px;text-align:center;padding:6px 4px;"
+          onchange="editorExercises[${i}].reps=this.value.trim()"/>
+        <span style="font-size:10px;color:var(--muted2);">reps</span>
+      </div>
       <button class="btn-icon" onclick="removeEditorEx(${i})" style="color:var(--red);border-color:var(--red-dim);flex-shrink:0;">✕</button>
     </div>
   `).join('');
