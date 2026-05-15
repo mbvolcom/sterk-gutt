@@ -274,7 +274,9 @@ async function dbDeleteRoutine(id) {
 
 async function dbLoadRoutines() {
   try {
+    console.log('dbLoadRoutines — querying with USER_ID:', USER_ID);
     let { data, error } = await sb.from('routines').select('*').eq('user_id', USER_ID).order('created_at');
+    console.log('dbLoadRoutines — result:', data?.length, 'error:', error?.message);
     if (error) throw error;
 
     // Fallback: if no routines found for this user_id, check if any routines exist at all
