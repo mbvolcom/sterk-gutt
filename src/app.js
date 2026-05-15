@@ -3244,14 +3244,8 @@ async function uploadToStrava(session, description) {
   return res.json();
 }
 
-// ── SERVICE WORKER ──────────────────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(r => console.log('SW registered:', r.scope))
-      .catch(e => console.warn('SW failed:', e));
-  });
-}
+// Service worker disabled to prevent caching issues
+// if ('serviceWorker' in navigator) { ... }
 
 // Wait for DOM before initialising
 if (document.readyState === 'loading') {
