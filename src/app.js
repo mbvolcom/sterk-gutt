@@ -48,7 +48,7 @@ async function signInWithGoogle() {
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: window.location.origin,
+      redirectTo: 'https://sterk-gutt.pages.dev',
     },
   });
   if (error) console.error('Google sign in error:', error.message);
@@ -61,7 +61,7 @@ async function signInWithMagicLink() {
   btn.textContent = 'Sending...'; btn.disabled = true;
   const { error } = await sb.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.origin },
+    options: { emailRedirectTo: 'https://sterk-gutt.pages.dev' },
   });
   btn.disabled = false;
   if (error) {
