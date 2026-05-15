@@ -394,7 +394,11 @@ async function dbLoadActiveSession() {
 // ── Main init sync ────────────────────────────────────────
 async function syncFromCloud() {
   setSyncStatus('syncing');
-  USER_ID = await getUserId();
+  // If logged in via Google auth, USER_ID is already set — don't overwrite with localStorage
+  if (!currentUser) {
+    USER_ID = await getUserId();
+  }
+  console.log('syncFromCloud — USER_ID:', USER_ID);
   await Promise.all([dbLoadRoutines(), dbLoadSessions()]);
   await dbLoadExercises();
   setSyncStatus('ok');
