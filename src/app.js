@@ -19,14 +19,21 @@ async function initAuth() {
   sb.auth.onAuthStateChange(async (event, session) => {
     console.log('onAuthStateChange — event:', event, 'user:', session?.user?.id);
     if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-      currentUser = session.user;
-      USER_ID = session.user.id;
-      hideLoginScreen();
-      await migrateDataIfNeeded();
-      await syncFromCloud();
-      renderHome();
-      const activePage = document.querySelector('.page.active');
-      if (activePage && activePage.id === 'page-routines') renderRoutines();
+      try {
+        currentUser = session.user;
+        USER_ID = session.user.id;
+        hideLoginScreen();
+        console.log('Starting migrateDataIfNeeded...');
+        await migrateDataIfNeeded();
+        console.log('Starting syncFromCloud...');
+        await syncFromCloud();
+        console.log('syncFromCloud done, rendering home...');
+        renderHome();
+        const activePage = document.querySelector('.page.active');
+        if (activePage && activePage.id === 'page-routines') renderRoutines();
+      } catch(e) {
+        console.error('Auth flow error:', e.message, e.stack);
+      }
     } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
       currentUser = null;
       showLoginScreen();
