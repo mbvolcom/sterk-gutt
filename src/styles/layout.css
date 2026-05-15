@@ -1,0 +1,84 @@
+/* LAYOUT: header, nav, pages */
+.app-header{
+  min-height:var(--header-h);
+  height:auto;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 20px 12px;
+  flex-shrink:0;
+  position:relative;
+}
+.app-header::after{
+  content:'';
+  position:absolute;
+  bottom:0;left:0;right:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,var(--neon),transparent);
+  opacity:0.4;
+}
+.logo{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:26px;
+  letter-spacing:4px;
+  color:#fff;
+  line-height:1;
+}
+.logo span{color:var(--neon);text-shadow:0 0 12px var(--neon-glow);}
+.header-right{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
+
+.main{
+  flex:1;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding-bottom:calc(var(--nav-h) + 16px);
+  -webkit-overflow-scrolling:touch;
+}
+.page{display:none;}
+.page.active{display:block;}
+
+.bottom-nav{
+  height:var(--nav-h);
+  background:var(--bg2);
+  border-top:1px solid var(--border);
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  flex-shrink:0;
+  position:relative;
+}
+.bottom-nav::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,var(--neon),transparent);
+  opacity:0.3;
+}
+.nav-btn{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;border:none;background:none;cursor:pointer;
+  color:var(--muted);font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:1.5px;text-transform:uppercase;
+  transition:color 0.2s;padding:8px 2px;
+}
+.nav-btn svg{width:20px;height:20px;stroke-width:1.5;transition:filter 0.2s;}
+.nav-btn.active{color:var(--neon);}
+.nav-btn.active svg{filter:drop-shadow(0 0 4px var(--neon-glow));}
+
+.section-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:13px;letter-spacing:3px;color:var(--muted2);
+  text-transform:uppercase;margin-bottom:12px;
+  display:flex;align-items:center;gap:10px;
+}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border2);}
+
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  overflow:hidden;
+}
+.card-neon{border-color:var(--border2);box-shadow:0 0 20px rgba(0,180,255,0.05);}
