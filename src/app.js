@@ -3150,3 +3150,27 @@ if ('serviceWorker' in navigator) {
 }
 
 init();
+
+// ── EXPOSE FUNCTIONS TO WINDOW (required for onclick= in HTML) ───────────────
+Object.assign(window, {
+  // Nav & pages
+  showPage, openModal, closeModal,
+  // Home
+  openWorkoutPicker, handleStravaHomeBtn,
+  // Workout
+  startWorkout, resumeWorkout, finishWorkout,
+  handleSetBtn, addSet, removeLastSet, toggleExCollapse,
+  setEquipment, updateSet,
+  // Routine editor
+  openRoutineEditor, saveRoutine, saveRoutineChanges, deleteRoutine,
+  addExerciseToEditor, removeEditorEx, toggleRoutineCard,
+  // Exercise picker
+  selectExerciseFromPicker, showNewExForm, hideNewExForm,
+  createAndAddExercise, selectMuscle,
+  // Exercise library
+  openExerciseLibEditor, saveExerciseLib, deleteExerciseLib, setLibFilter,
+  // Stats
+  setStatsSubtab, applyCustomRange,
+  // Confirm dialog
+  confirmOk, closeConfirm,
+});
