@@ -7,7 +7,14 @@ import { createClient } from '@supabase/supabase-js';
 // Re-export createClient so the rest of the file can use sb directly
 const SUPA_URL = 'https://fzbovpdnpvsfdnxyftqv.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6Ym92cGRucHZzZmRueHlmdHF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwMzM5NzcsImV4cCI6MjA5MzYwOTk3N30.LqtdpwtEfZweiQW3NJmtFkVZuCG7_ANLP8yLB8XfIn4';
-const sb = createClient(SUPA_URL, SUPA_KEY);
+const sb = createClient(SUPA_URL, SUPA_KEY, {
+  auth: {
+    detectSessionInUrl: true,
+    persistSession: true,
+    autoRefreshToken: true,
+    storageKey: 'sg-auth',
+  },
+});
 
 // ── AUTH ─────────────────────────────────────────────────────────────────────
 const OLD_LEGACY_USER_ID = 'sg_k5dgxv305khmp604919'; // data to migrate on first login
