@@ -12,7 +12,6 @@ const sb = createClient(SUPA_URL, SUPA_KEY, {
     detectSessionInUrl: true,
     persistSession: true,
     autoRefreshToken: true,
-    storageKey: 'sg-auth',
   },
 });
 
