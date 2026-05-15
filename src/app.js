@@ -32,6 +32,8 @@ async function initAuth() {
         console.log('Starting migrateDataIfNeeded...');
         await migrateDataIfNeeded();
         console.log('Starting syncFromCloud...');
+        // Small delay to ensure Supabase client is fully ready
+        await new Promise(resolve => setTimeout(resolve, 100));
         await syncFromCloud();
         console.log('syncFromCloud done, rendering home...');
         renderHome();
@@ -162,43 +164,32 @@ function setSyncStatus(status) {
 // ── EXERCISES ────────────────────────────────────────────
 async function dbLoadExercises() {
   try {
-    const { data, error } = await sb.from('exercises').select('*').eq('user_id', USER_ID).order('name');
-    if (error) throw error;
+    const data = await supabaseFetch('exercises', `select=*&user_id=eq.${USER_ID}&order=name`);
     if (data && data.length) {
       _exercises = data.map(e => ({ id:e.id, name:e.name, muscle:e.muscle, unilateral:!!e.unilateral }));
     } else {
       await dbSeedExercises();
     }
-
-    // Recovery: scan routines and sessions for any exercises not yet in the library
-    // This catches exercises created via routines that never made it to Supabase
-    const allRoutines = _routines || [];
-    const allSessions = _sessions || [];
+    // Recovery: scan routines and sessions for exercises not in library
     const knownNames = new Set(_exercises.map(e => e.name));
     const toSave = [];
-
-    [...allRoutines, ...allSessions].forEach(item => {
+    [..._routines, ..._sessions].forEach(item => {
       (item.exercises || []).forEach(ex => {
         if (ex.name && !knownNames.has(ex.name)) {
           knownNames.add(ex.name);
           const recovered = {
             id: ex.id || ('ex_' + Date.now() + '_' + Math.random().toString(36).slice(2)),
-            name: ex.name,
-            muscle: ex.muscle || 'Other',
-            unilateral: !!ex.unilateral,
+            name: ex.name, muscle: ex.muscle || 'Other', unilateral: !!ex.unilateral,
           };
           _exercises.push(recovered);
           toSave.push(recovered);
         }
       });
     });
-
-    // Persist any recovered exercises to Supabase
     if (toSave.length) {
-      console.log('Recovering', toSave.length, 'missing exercises:', toSave.map(e=>e.name));
+      console.log('Recovering', toSave.length, 'missing exercises');
       for (const ex of toSave) await dbSaveExercise(ex);
     }
-
   } catch(e) { console.warn('Load exercises failed:', e.message); }
 }
 
@@ -278,31 +269,33 @@ async function dbDeleteRoutine(id) {
   } catch(e) { console.warn('Delete routine failed:', e.message); setSyncStatus('offline'); }
 }
 
+async function supabaseFetch(table, params = '') {
+  // Get current session token
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session?.access_token || SUPA_KEY;
+  const res = await fetch(
+    `${SUPA_URL}/rest/v1/${table}?${params}`,
+    {
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      }
+    }
+  );
+  if (!res.ok) throw new Error(`${table} fetch failed: ${res.status}`);
+  return res.json();
+}
+
 async function dbLoadRoutines() {
   try {
     console.log('dbLoadRoutines — querying with USER_ID:', USER_ID);
-    let { data, error } = await sb.from('routines').select('*').eq('user_id', USER_ID).order('created_at');
-    console.log('dbLoadRoutines — result:', data?.length, 'error:', error?.message);
-    if (error) throw error;
-
-    // Fallback: if no routines found for this user_id, check if any routines exist at all
-    // (handles user_id mismatch after reinstall or localStorage clear)
-    if (!data || data.length === 0) {
-      const { data: allData } = await sb.from('routines').select('*').order('created_at');
-      if (allData && allData.length > 0) {
-        // Routines exist under a different user_id — adopt them
-        console.warn('Routines found under different user_id — adopting them');
-        for (const r of allData) {
-          await sb.from('routines').update({ user_id: USER_ID }).eq('id', r.id);
-        }
-        data = allData;
-      }
-    }
+    const data = await supabaseFetch('routines', `select=*&user_id=eq.${USER_ID}&order=created_at`);
+    console.log('dbLoadRoutines — result:', data?.length);
 
     if (data && data.length) {
       _routines = data.map(r => ({ id:r.id, name:r.name, exercises:r.exercises, createdAt:new Date(r.created_at).getTime() }));
     } else {
-      // Truly first use — seed all default routines
       try {
         for (const r of DEFAULT_ROUTINES) await dbSaveRoutine(r);
       } catch(e) {
@@ -335,17 +328,15 @@ async function dbSaveSession(session) {
 
 async function dbLoadSessions() {
   try {
-    let { data, error } = await sb.from('sessions').select('*').eq('is_active', false).order('started_at');
-    if (error) throw error;
-    console.log('dbLoadSessions — raw data:', data?.length, 'USER_ID:', USER_ID);
-
+    console.log('dbLoadSessions — raw fetch with USER_ID:', USER_ID);
+    const data = await supabaseFetch('sessions', `select=*&is_active=eq.false&order=started_at`);
+    console.log('dbLoadSessions — raw data:', data?.length);
     if (data) {
       _sessions = data.map(s => ({
         id:s.id, routineId:s.routine_id, routineName:s.routine_name,
         startedAt:new Date(s.started_at).getTime(), duration:s.duration, exercises:s.exercises,
       }));
     }
-    // Force re-render home after sessions load
     const list = document.getElementById('recent-list');
     if (list) renderHome();
     return _sessions;
