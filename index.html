@@ -263,8 +263,10 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
   z-index:1000;
   display:none;
   flex-direction:column;
+  align-items:stretch;
   padding:20px 16px;
   overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
 }
 .modal-overlay.open{display:flex;}
 .modal-header{
@@ -677,9 +679,9 @@ canvas.chart{width:100%!important;height:100%!important;}
 .form-group{margin-bottom:14px;}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
-.checkbox-row{display:flex;align-items:center;gap:10px;}
-.checkbox-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--neon);flex-shrink:0;}
-.checkbox-row label{margin-bottom:0;font-size:12px;color:var(--text);}
+.checkbox-row{display:flex;align-items:center;gap:12px;padding:6px 0;cursor:pointer;}
+.checkbox-row input[type=checkbox]{width:24px;height:24px;accent-color:var(--neon);flex-shrink:0;cursor:pointer;-webkit-appearance:checkbox;appearance:checkbox;}
+.checkbox-row label{margin-bottom:0;font-size:13px;color:var(--text);cursor:pointer;flex:1;}
 
 /* Toast */
 .toast{
@@ -824,7 +826,7 @@ canvas.chart{width:100%!important;height:100%!important;}
   <div class="logo">STERK<span>GUTT</span></div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
     <div class="header-right" id="header-date"></div>
-    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v2.6.1</div>
+    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v2.7.2</div>
     <button id="strava-connect-row" onclick="handleStravaHomeBtn()" style="
       display:flex;align-items:center;gap:5px;
       background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
@@ -1053,7 +1055,7 @@ canvas.chart{width:100%!important;height:100%!important;}
     <div class="form-group">
       <div class="checkbox-row">
         <input type="checkbox" id="ex-picker-uni"/>
-        <label>Unilateral (single arm/leg)</label>
+        <label for="ex-picker-uni">Unilateral (single arm/leg)</label>
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:8px;">
@@ -1080,7 +1082,7 @@ canvas.chart{width:100%!important;height:100%!important;}
   <div class="form-group" style="margin-top:12px;">
     <div class="checkbox-row">
       <input type="checkbox" id="ex-lib-uni"/>
-      <label>Unilateral (single arm/leg)</label>
+      <label for="ex-lib-uni">Unilateral (single arm/leg)</label>
     </div>
   </div>
   <div style="display:flex;gap:10px;margin-top:16px;">
@@ -1168,11 +1170,40 @@ async function dbLoadExercises() {
     const { data, error } = await sb.from('exercises').select('*').eq('user_id', USER_ID).order('name');
     if (error) throw error;
     if (data && data.length) {
-      _exercises = data.map(e => ({ id:e.id, name:e.name, muscle:e.muscle, unilateral:e.unilateral }));
+      _exercises = data.map(e => ({ id:e.id, name:e.name, muscle:e.muscle, unilateral:!!e.unilateral }));
     } else {
-      // First time — seed defaults
       await dbSeedExercises();
     }
+
+    // Recovery: scan routines and sessions for any exercises not yet in the library
+    // This catches exercises created via routines that never made it to Supabase
+    const allRoutines = _routines || [];
+    const allSessions = _sessions || [];
+    const knownNames = new Set(_exercises.map(e => e.name));
+    const toSave = [];
+
+    [...allRoutines, ...allSessions].forEach(item => {
+      (item.exercises || []).forEach(ex => {
+        if (ex.name && !knownNames.has(ex.name)) {
+          knownNames.add(ex.name);
+          const recovered = {
+            id: ex.id || ('ex_' + Date.now() + '_' + Math.random().toString(36).slice(2)),
+            name: ex.name,
+            muscle: ex.muscle || 'Other',
+            unilateral: !!ex.unilateral,
+          };
+          _exercises.push(recovered);
+          toSave.push(recovered);
+        }
+      });
+    });
+
+    // Persist any recovered exercises to Supabase
+    if (toSave.length) {
+      console.log('Recovering', toSave.length, 'missing exercises:', toSave.map(e=>e.name));
+      for (const ex of toSave) await dbSaveExercise(ex);
+    }
+
   } catch(e) { console.warn('Load exercises failed:', e.message); }
 }
 
@@ -1183,34 +1214,42 @@ async function dbSeedExercises() {
 }
 
 async function dbSaveExercise(ex) {
+  // Update in-memory immediately so UI reflects change right away
+  const clean = { id: ex.id, name: ex.name, muscle: ex.muscle||'', unilateral: !!ex.unilateral };
+  const idx = _exercises.findIndex(e => e.id === ex.id);
+  if (idx >= 0) _exercises[idx] = clean;
+  else          _exercises.push(clean);
+  // Refresh exercises tab if visible
+  if (document.getElementById('page-exercises')?.classList.contains('active')) renderExerciseLibrary();
+
+  // Persist to Supabase — try upsert by id first, fall back to name-based upsert
   try {
-    // Try upsert first; if id type mismatch use insert
-    const { error } = await sb.from('exercises').upsert(
-      { id: ex.id, name: ex.name, muscle: ex.muscle, unilateral: !!ex.unilateral, user_id: USER_ID },
-      { onConflict: 'id' }
-    );
+    const row = { id: ex.id, name: ex.name, muscle: ex.muscle||'', unilateral: !!ex.unilateral, user_id: USER_ID };
+
+    // First try: upsert by id
+    let { error } = await sb.from('exercises').upsert(row, { onConflict: 'id' });
+
     if (error) {
-      // Fallback: plain insert (handles cases where upsert fails on id type)
-      const { error: err2 } = await sb.from('exercises').insert(
-        { id: ex.id, name: ex.name, muscle: ex.muscle, unilateral: !!ex.unilateral, user_id: USER_ID }
-      );
-      if (err2) throw err2;
+      console.warn('upsert by id failed:', error.message, '— trying insert');
+      // Second try: plain insert (for new exercises where id might be string type mismatch)
+      const ins = await sb.from('exercises').insert(row);
+      if (ins.error) {
+        console.warn('insert failed:', ins.error.message, '— trying upsert by name+user_id');
+        // Third try: upsert by name + user_id (always works regardless of id type)
+        const ups = await sb.from('exercises').upsert(
+          { name: ex.name, muscle: ex.muscle||'', unilateral: !!ex.unilateral, user_id: USER_ID },
+          { onConflict: 'name,user_id' }
+        );
+        if (ups.error) throw ups.error;
+      }
     }
-    // Update in-memory store
-    const idx = _exercises.findIndex(e => e.id === ex.id);
-    if (idx >= 0) _exercises[idx] = ex; else _exercises.push(ex);
-    // Refresh exercises tab if visible
-    const exPage = document.getElementById('page-exercises');
-    if (exPage && exPage.classList.contains('active')) renderExerciseLibrary();
+    setSyncStatus('ok');
   } catch(e) {
-    console.warn('Save exercise failed:', e.message);
-    // Still keep in memory even if Supabase fails
-    const idx = _exercises.findIndex(e => e.id === ex.id);
-    if (idx >= 0) _exercises[idx] = ex; else _exercises.push(ex);
-    if (document.getElementById('page-exercises')?.classList.contains('active')) renderExerciseLibrary();
+    console.warn('dbSaveExercise all attempts failed:', e.message);
+    setSyncStatus('offline');
+    // Data is safe in _exercises memory — will persist next time
   }
 }
-
 async function dbDeleteExercise(id) {
   try {
     await sb.from('exercises').delete().eq('id', id).eq('user_id', USER_ID);
@@ -1331,7 +1370,8 @@ async function dbLoadActiveSession() {
 async function syncFromCloud() {
   setSyncStatus('syncing');
   USER_ID = await getUserId();
-  await Promise.all([dbLoadExercises(), dbLoadRoutines(), dbLoadSessions()]);
+  await Promise.all([dbLoadRoutines(), dbLoadSessions()]);
+  await dbLoadExercises();
   setSyncStatus('ok');
   console.log('Loaded from Supabase — exercises:', _exercises.length, 'routines:', _routines.length, 'sessions:', _sessions.length);
 }
@@ -2800,19 +2840,31 @@ function openExerciseLibEditor(exId) {
   editingExId = exId;
   selectedMuscle = '';
 
+  // Clear fields first
+  document.getElementById('ex-lib-name').value = '';
+  document.getElementById('ex-lib-uni').checked = false;
+  document.getElementById('ex-lib-editor-title').textContent = exId ? 'EDIT EXERCISE' : 'NEW EXERCISE';
+
   if (exId) {
     const allEx = load(SK.exercises) || [];
     const ex = allEx.find(e => e.id === exId);
     if (ex) {
       document.getElementById('ex-lib-name').value = ex.name;
-      document.getElementById('ex-lib-uni').checked = ex.unilateral;
-      selectedMuscle = ex.muscle;
-      document.getElementById('ex-lib-editor-title').textContent = 'EDIT EXERCISE';
+      selectedMuscle = ex.muscle || '';
+      // Set checkbox after muscle picker renders to avoid iOS DOM reflow reset
+      const isUni = !!ex.unilateral;
+      renderMusclePicker('ex-lib-muscle-grid');
+      openModal('exercise-lib-editor');
+      // Use setTimeout to set after the modal is fully painted
+      setTimeout(() => {
+        const cb = document.getElementById('ex-lib-uni');
+        if (cb) {
+          cb.checked = isUni;
+          cb.defaultChecked = isUni;
+        }
+      }, 50);
+      return;
     }
-  } else {
-    document.getElementById('ex-lib-name').value = '';
-    document.getElementById('ex-lib-uni').checked = false;
-    document.getElementById('ex-lib-editor-title').textContent = 'NEW EXERCISE';
   }
 
   renderMusclePicker('ex-lib-muscle-grid');
