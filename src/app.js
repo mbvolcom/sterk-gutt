@@ -82,26 +82,9 @@ async function signOut() {
 }
 
 async function migrateDataIfNeeded() {
-  if (!currentUser) return;
-  // Check if user has any sessions — if not, migrate legacy data
-  const { data: existing } = await sb.from('sessions')
-    .select('id').eq('user_id', USER_ID).limit(1);
-  if (existing && existing.length > 0) return; // already have data, skip
-
-  // Check if legacy data exists
-  const { data: legacy } = await sb.from('sessions')
-    .select('id').eq('user_id', OLD_LEGACY_USER_ID).limit(1);
-  if (!legacy || legacy.length === 0) return; // no legacy data
-
-  console.log('Migrating legacy data to new user...');
-  showToast('Migrating your data...');
-  await Promise.all([
-    sb.from('sessions').update({ user_id: USER_ID }).eq('user_id', OLD_LEGACY_USER_ID),
-    sb.from('routines').update({ user_id: USER_ID }).eq('user_id', OLD_LEGACY_USER_ID),
-    sb.from('exercises').update({ user_id: USER_ID }).eq('user_id', OLD_LEGACY_USER_ID),
-  ]);
-  console.log('Migration complete');
-  showToast('Data migrated successfully!');
+  // Data already migrated manually via SQL — skip
+  console.log('migrateDataIfNeeded — skipping (already done)');
+  return;
 }
 
 function showLoginScreen() {
