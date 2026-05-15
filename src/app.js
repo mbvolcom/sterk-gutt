@@ -34,9 +34,11 @@ async function initAuth() {
 
   // Check if already logged in
   const { data: { session } } = await sb.auth.getSession();
+  console.log('initAuth — session:', session?.user?.id, 'USER_ID:', USER_ID);
   if (session) {
     currentUser = session.user;
     USER_ID = session.user.id;
+    console.log('initAuth — set USER_ID to:', USER_ID);
     hideLoginScreen();
     await migrateDataIfNeeded();
     await syncFromCloud();
