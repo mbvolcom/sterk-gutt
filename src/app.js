@@ -363,15 +363,20 @@ async function dbLoadActiveSession() {
 // ── Main init sync ────────────────────────────────────────
 async function syncFromCloud() {
   setSyncStatus('syncing');
-  // If logged in via Google auth, USER_ID is already set — don't overwrite with localStorage
-  if (!currentUser) {
-    USER_ID = await getUserId();
-  }
   console.log('syncFromCloud — USER_ID:', USER_ID);
-  await Promise.all([dbLoadRoutines(), dbLoadSessions()]);
-  await dbLoadExercises();
-  setSyncStatus('ok');
-  console.log('Loaded from Supabase — exercises:', _exercises.length, 'routines:', _routines.length, 'sessions:', _sessions.length);
+  try {
+    console.log('Loading routines...');
+    await dbLoadRoutines();
+    console.log('Loading sessions...');
+    await dbLoadSessions();
+    console.log('Loading exercises...');
+    await dbLoadExercises();
+    setSyncStatus('ok');
+    console.log('Loaded from Supabase — exercises:', _exercises.length, 'routines:', _routines.length, 'sessions:', _sessions.length);
+  } catch(e) {
+    console.error('syncFromCloud error:', e.message, e.stack);
+    setSyncStatus('offline');
+  }
 }
 
 // ═══════════════════════════════════════════
