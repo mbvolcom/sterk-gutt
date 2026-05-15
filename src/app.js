@@ -269,22 +269,36 @@ async function dbDeleteRoutine(id) {
   } catch(e) { console.warn('Delete routine failed:', e.message); setSyncStatus('offline'); }
 }
 
-async function supabaseFetch(table, params = '') {
-  // Get current session token
-  const { data: { session } } = await sb.auth.getSession();
-  const token = session?.access_token || SUPA_KEY;
+async function supabaseFetch(table, params = '', method = 'GET', body = null) {
+  // Read token directly from localStorage — avoids Supabase client auth hang on refresh
+  const authKey = `sb-fzbovpdnpvsfdnxyftqv-auth-token`;
+  let token = SUPA_KEY; // fallback to anon key
+  try {
+    const stored = localStorage.getItem(authKey);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      token = parsed.access_token || parsed[0]?.access_token || SUPA_KEY;
+    }
+  } catch(e) { /* use anon key */ }
+
   const res = await fetch(
     `${SUPA_URL}/rest/v1/${table}?${params}`,
     {
+      method,
       headers: {
         'apikey': SUPA_KEY,
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
-      }
+        'Prefer': method === 'POST' ? 'return=representation' : '',
+      },
+      body: body ? JSON.stringify(body) : undefined,
     }
   );
-  if (!res.ok) throw new Error(`${table} fetch failed: ${res.status}`);
-  return res.json();
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`${table} ${method} failed: ${res.status} ${err}`);
+  }
+  return method === 'DELETE' ? null : res.json();
 }
 
 async function dbLoadRoutines() {
