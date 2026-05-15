@@ -39,6 +39,14 @@ async function initAuth() {
     USER_ID = session.user.id;
     hideLoginScreen();
     await migrateDataIfNeeded();
+    await syncFromCloud();
+    const active = await dbLoadActiveSession();
+    if (active) {
+      activeSession = active;
+      renderWorkoutPage();
+      startGlobalTimer();
+    }
+    renderHome();
   } else {
     showLoginScreen();
   }
@@ -3054,21 +3062,10 @@ function init() {
   const headerDate = document.getElementById('header-date');
   if (headerDate) headerDate.textContent = now.toLocaleDateString('no-NO', { weekday:'short', day:'numeric', month:'short' }).toUpperCase();
 
-  initAuth().then(async () => {
-    if (currentUser) {
-      // Load everything from Supabase
-      await syncFromCloud();
-      const active = await dbLoadActiveSession();
-      if (active) {
-        activeSession = active;
-        renderWorkoutPage();
-        startGlobalTimer();
-      }
-      renderHome();
-    }
+  // Auth handles data loading — just init auth and Strava
+  initAuth().then(() => {
+    initStrava();
   });
-
-  initStrava();
 }
 
 // ═══════════════════════════════════════════
