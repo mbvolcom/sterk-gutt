@@ -3149,9 +3149,13 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-init();
+// Wait for DOM before initialising
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init(); // DOM already ready
+}
 
-// ── EXPOSE FUNCTIONS TO WINDOW (required for onclick= in HTML) ───────────────
 Object.assign(window, {
   // Nav & pages
   showPage, openModal, closeModal,
