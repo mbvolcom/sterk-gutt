@@ -9,6 +9,112 @@ const SUPA_URL = 'https://fzbovpdnpvsfdnxyftqv.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6Ym92cGRucHZzZmRueHlmdHF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwMzM5NzcsImV4cCI6MjA5MzYwOTk3N30.LqtdpwtEfZweiQW3NJmtFkVZuCG7_ANLP8yLB8XfIn4';
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
+// ── AUTH ─────────────────────────────────────────────────────────────────────
+const OLD_LEGACY_USER_ID = 'sg_k5dgxv305khmp604919'; // data to migrate on first login
+
+let currentUser = null;
+
+async function initAuth() {
+  // Listen for auth state changes
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      currentUser = session.user;
+      USER_ID = session.user.id;
+      hideLoginScreen();
+      await migrateDataIfNeeded();
+      await syncFromCloud();
+      renderHome();
+      const activePage = document.querySelector('.page.active');
+      if (activePage && activePage.id === 'page-routines') renderRoutines();
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      showLoginScreen();
+    }
+  });
+
+  // Check if already logged in
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    USER_ID = session.user.id;
+    hideLoginScreen();
+    await migrateDataIfNeeded();
+  } else {
+    showLoginScreen();
+  }
+}
+
+async function signInWithGoogle() {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin,
+    },
+  });
+  if (error) console.error('Google sign in error:', error.message);
+}
+
+async function signInWithMagicLink() {
+  const email = document.getElementById('magic-email').value.trim();
+  if (!email) { showToast('Enter your email'); return; }
+  const btn = document.getElementById('magic-link-btn');
+  btn.textContent = 'Sending...'; btn.disabled = true;
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin },
+  });
+  btn.disabled = false;
+  if (error) {
+    btn.textContent = 'Send magic link';
+    showToast('Error: ' + error.message);
+  } else {
+    btn.textContent = 'Send magic link';
+    document.getElementById('magic-link-sent').style.display = 'block';
+  }
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  currentUser = null;
+  USER_ID = 'pending';
+  _exercises = []; _routines = []; _sessions = [];
+  showLoginScreen();
+}
+
+async function migrateDataIfNeeded() {
+  if (!currentUser) return;
+  // Check if user has any sessions — if not, migrate legacy data
+  const { data: existing } = await sb.from('sessions')
+    .select('id').eq('user_id', USER_ID).limit(1);
+  if (existing && existing.length > 0) return; // already have data, skip
+
+  // Check if legacy data exists
+  const { data: legacy } = await sb.from('sessions')
+    .select('id').eq('user_id', OLD_LEGACY_USER_ID).limit(1);
+  if (!legacy || legacy.length === 0) return; // no legacy data
+
+  console.log('Migrating legacy data to new user...');
+  showToast('Migrating your data...');
+  await Promise.all([
+    sb.from('sessions').update({ user_id: USER_ID }).eq('user_id', OLD_LEGACY_USER_ID),
+    sb.from('routines').update({ user_id: USER_ID }).eq('user_id', OLD_LEGACY_USER_ID),
+    sb.from('exercises').update({ user_id: USER_ID }).eq('user_id', OLD_LEGACY_USER_ID),
+  ]);
+  console.log('Migration complete');
+  showToast('Data migrated successfully!');
+}
+
+function showLoginScreen() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+}
+
+function hideLoginScreen() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'flex';
+}
+
+
 // ═══════════════════════════════════════════
 // SUPABASE CONFIG
 // ═══════════════════════════════════════════
@@ -233,8 +339,19 @@ async function dbSaveSession(session) {
 
 async function dbLoadSessions() {
   try {
-    const { data, error } = await sb.from('sessions').select('*').eq('user_id', USER_ID).eq('is_active', false).order('started_at');
+    let { data, error } = await sb.from('sessions').select('*').eq('user_id', USER_ID).eq('is_active', false).order('started_at');
     if (error) throw error;
+
+    // Fallback: if no sessions found, check if any exist under a different user_id
+    if (!data || data.length === 0) {
+      const { data: allData } = await sb.from('sessions').select('*').eq('is_active', false).order('started_at');
+      if (allData && allData.length > 0) {
+        console.log('Sessions found under different user_id — adopting them');
+        await sb.from('sessions').update({ user_id: USER_ID }).neq('user_id', USER_ID);
+        data = allData;
+      }
+    }
+
     if (data) {
       _sessions = data.map(s => ({
         id:s.id, routineId:s.routine_id, routineName:s.routine_name,
@@ -2934,23 +3051,21 @@ function init() {
   initData();
 
   const now = new Date();
-  document.getElementById('header-date').textContent = now.toLocaleDateString('no-NO', { weekday:'short', day:'numeric', month:'short' }).toUpperCase();
+  const headerDate = document.getElementById('header-date');
+  if (headerDate) headerDate.textContent = now.toLocaleDateString('no-NO', { weekday:'short', day:'numeric', month:'short' }).toUpperCase();
 
-  renderHome();
-
-  // Load everything from Supabase
-  syncFromCloud().then(async () => {
-    // Check for an active session in Supabase
-    const active = await dbLoadActiveSession();
-    if (active) {
-      activeSession = active;
-      renderWorkoutPage();
-      startGlobalTimer();
+  initAuth().then(async () => {
+    if (currentUser) {
+      // Load everything from Supabase
+      await syncFromCloud();
+      const active = await dbLoadActiveSession();
+      if (active) {
+        activeSession = active;
+        renderWorkoutPage();
+        startGlobalTimer();
+      }
+      renderHome();
     }
-    renderHome();
-    const activePage = document.querySelector('.page.active');
-    if (activePage && activePage.id === 'page-routines') renderRoutines();
-    if (activePage && activePage.id === 'page-stats') renderStats();
   });
 
   initStrava();
@@ -3158,7 +3273,7 @@ if (document.readyState === 'loading') {
 
 Object.assign(window, {
   // Nav & pages
-  showPage, openModal, closeModal,
+  showPage, openModal, closeModal, signInWithGoogle, signInWithMagicLink, signOut,
   // Home
   openWorkoutPicker, handleStravaHomeBtn,
   // Workout
