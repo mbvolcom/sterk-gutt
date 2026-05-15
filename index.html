@@ -66,13 +66,14 @@ body::before{
 
 /* TOP HEADER */
 .app-header{
-  height:var(--header-h);
+  min-height:var(--header-h);
+  height:auto;
   background:var(--bg2);
   border-bottom:1px solid var(--border);
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:0 20px;
+  padding:10px 20px 12px;
   flex-shrink:0;
   position:relative;
 }
@@ -432,6 +433,7 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
   resize:none;height:30px;overflow:hidden;
 }
 .set-note:focus{border-color:var(--neon);box-shadow:0 0 0 1px var(--neon-dim);color:var(--text);}
+.set-note--prefilled{border-color:rgba(0,180,255,0.25);color:var(--muted2);font-style:italic;}
 
 /* START / STOP button row */
 .set-btn-row {
@@ -820,9 +822,21 @@ canvas.chart{width:100%!important;height:100%!important;}
 
 <div class="app-header">
   <div class="logo">STERK<span>GUTT</span></div>
-  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
     <div class="header-right" id="header-date"></div>
-    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v2.3.0</div>
+    <div style="font-size:9px;color:var(--muted);letter-spacing:1px;">v2.6.1</div>
+    <button id="strava-connect-row" onclick="handleStravaHomeBtn()" style="
+      display:flex;align-items:center;gap:5px;
+      background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+      border-radius:20px;padding:3px 9px 3px 7px;cursor:pointer;
+      font-family:inherit;font-size:10px;font-weight:600;letter-spacing:0.5px;
+      color:var(--muted2);transition:all 0.2s;
+    ">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0">
+        <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+      </svg>
+      <span id="strava-home-label"></span>
+    </button>
     <div id="sync-status" style="font-size:9px;letter-spacing:1px;transition:color 0.3s;"></div>
   </div>
 </div>
@@ -840,12 +854,6 @@ canvas.chart{width:100%!important;height:100%!important;}
           <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
           Start Workout
         </button>
-        <div id="strava-connect-row" style="margin-top:12px;display:none;">
-          <button class="btn btn-ghost" id="strava-home-btn" onclick="handleStravaHomeBtn()" style="width:100%;justify-content:center;gap:8px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
-            <span id="strava-home-label">Connect Strava</span>
-          </button>
-        </div>
       </div>
 
       <div class="section-title">Recent Sessions</div>
@@ -1176,11 +1184,31 @@ async function dbSeedExercises() {
 
 async function dbSaveExercise(ex) {
   try {
-    const { error } = await sb.from('exercises').upsert({ ...ex, user_id: USER_ID }, { onConflict: 'id' });
-    if (error) throw error;
+    // Try upsert first; if id type mismatch use insert
+    const { error } = await sb.from('exercises').upsert(
+      { id: ex.id, name: ex.name, muscle: ex.muscle, unilateral: !!ex.unilateral, user_id: USER_ID },
+      { onConflict: 'id' }
+    );
+    if (error) {
+      // Fallback: plain insert (handles cases where upsert fails on id type)
+      const { error: err2 } = await sb.from('exercises').insert(
+        { id: ex.id, name: ex.name, muscle: ex.muscle, unilateral: !!ex.unilateral, user_id: USER_ID }
+      );
+      if (err2) throw err2;
+    }
+    // Update in-memory store
     const idx = _exercises.findIndex(e => e.id === ex.id);
     if (idx >= 0) _exercises[idx] = ex; else _exercises.push(ex);
-  } catch(e) { console.warn('Save exercise failed:', e.message); }
+    // Refresh exercises tab if visible
+    const exPage = document.getElementById('page-exercises');
+    if (exPage && exPage.classList.contains('active')) renderExerciseLibrary();
+  } catch(e) {
+    console.warn('Save exercise failed:', e.message);
+    // Still keep in memory even if Supabase fails
+    const idx = _exercises.findIndex(e => e.id === ex.id);
+    if (idx >= 0) _exercises[idx] = ex; else _exercises.push(ex);
+    if (document.getElementById('page-exercises')?.classList.contains('active')) renderExerciseLibrary();
+  }
 }
 
 async function dbDeleteExercise(id) {
@@ -1697,9 +1725,9 @@ function startWorkout(routineId) {
         sets: Array.from({ length: ex.sets }, (_, i) => ({
           num: i + 1,
           weight: '', reps: '', repsL: '', repsR: '',
-          note: '', logged: false, restDuration: null,
+          note: prevSets[i] ? (prevSets[i].note || '') : '',
+          logged: false, restDuration: null,
           setStartTime: null, setDuration: null,
-          // state: 'idle' | 'active' | 'logged'
           state: 'idle',
           ghostWeight: prevSets[i] ? (prevSets[i].weight || '') : '',
           ghostReps:   prevSets[i] ? (prevSets[i].reps   || '') : '',
@@ -1753,25 +1781,26 @@ function renderWorkoutBody() {
 }
 
 // ── In-workout suggestion ─────────────────────────────────────────────────
-function getExerciseSuggestion(exName, equipment) {
+function getExerciseSuggestion(exName, equipment, numSets) {
   const allSessions = load(SK.sessions)||[];
-  // Use all history, not just current period
   const points = buildExercisePoints(allSessions, exName, equipment || null);
   if (!points.length) return null;
-  const hint     = buildNextSessionSuggestion(points, exName, equipment);
-  const prog     = assessProgression(points);
-  const last     = points[points.length-1];
-  const weights  = points.map(p=>p.weight);
-  return { hint, prog, last, weights, points };
+  const perSet = buildSetSuggestions(points, exName, equipment, numSets || 3);
+  const prog   = assessProgression(points);
+  const last   = points[points.length-1];
+  const weights = points.map(p=>p.weight);
+  return { perSet, prog, last, weights, points };
 }
 
 function buildSuggestionCard(ei, exName, equipment) {
-  const data = getExerciseSuggestion(exName, equipment);
-  const card = document.createElement('div');
+  const ex      = activeSession?.exercises[ei];
+  const numSets = ex?.sets?.length || 3;
+  const data    = getExerciseSuggestion(exName, equipment, numSets);
+  const card    = document.createElement('div');
   card.className = 'hint-card';
   card.id = 'hint-' + ei;
 
-  if (!data || !data.hint) {
+  if (!data || !data.perSet) {
     const hdr = document.createElement('div');
     hdr.className = 'hint-card-header';
     hdr.innerHTML = '<span class="hint-card-icon">💡</span><div class="hint-card-main"><div class="hint-card-suggestion" style="color:var(--muted2);">No history yet — log this session to start tracking</div></div>';
@@ -1779,88 +1808,139 @@ function buildSuggestionCard(ei, exName, equipment) {
     return card;
   }
 
-  const { hint, prog, last, weights } = data;
-  const statusIcon  = prog.status==='progressing'?'↑':prog.status==='plateau'?'→':prog.status==='regressing'?'↓':'💡';
-  const statusColor = prog.status==='progressing'?'#00ff96':prog.status==='plateau'?'#f0c060':prog.status==='regressing'?'#ff4466':'#00b4ff';
+  const { perSet, prog, last, weights } = data;
+  const decisionColor = {
+    step_up:     '#00ff96',
+    consolidate: '#00b4ff',
+    drop:        '#ff4466',
+  }[perSet.overallDecision] || '#00b4ff';
+
+  const decisionIcon = {
+    step_up:     '↑',
+    consolidate: '→',
+    drop:        '↓',
+  }[perSet.overallDecision] || '💡';
 
   const lastAgo = last.date ? (() => {
     const diff = Math.round((Date.now()-last.date.getTime())/(1000*60*60*24));
     return diff===0?'today':diff===1?'yesterday':diff+'d ago';
   })() : '';
 
-  const maxW = Math.max(...weights);
-  const recentWeights = weights.slice(-6);
-
-  // Header
+  // ── Header (always visible) ───────────────────────────────────────────────
   const hdr = document.createElement('div');
   hdr.className = 'hint-card-header';
+
   const iconEl = document.createElement('span');
   iconEl.className = 'hint-card-icon';
-  iconEl.style.color = statusColor;
-  iconEl.textContent = statusIcon;
+  iconEl.style.color = decisionColor;
+  iconEl.textContent = decisionIcon;
+
   const mainEl = document.createElement('div');
   mainEl.className = 'hint-card-main';
+
   const suggEl = document.createElement('div');
   suggEl.className = 'hint-card-suggestion';
-  suggEl.textContent = hint.suggestion;
+  suggEl.textContent = perSet.summary;
+
   const subEl = document.createElement('div');
   subEl.className = 'hint-card-sub';
-  subEl.textContent = hint.subtext;
+  subEl.textContent = perSet.subtext;
+
   mainEl.appendChild(suggEl);
   mainEl.appendChild(subEl);
+
   const chevEl = document.createElement('span');
   chevEl.className = 'hint-card-chevron';
   chevEl.textContent = '▾';
+
   hdr.appendChild(iconEl);
   hdr.appendChild(mainEl);
   hdr.appendChild(chevEl);
   card.appendChild(hdr);
 
-  // Body
+  // ── Body: per-set table ───────────────────────────────────────────────────
   const body = document.createElement('div');
   body.className = 'hint-card-body';
+
+  // Last session summary line
   const lastLine = document.createElement('div');
   lastLine.className = 'hint-last-line';
-  lastLine.innerHTML = 'Last: <strong>' + last.bestLabel + '</strong>' + (lastAgo ? ' · ' + lastAgo : '');
+  lastLine.innerHTML = 'Last: <strong>' + last.bestLabel + '</strong>' + (lastAgo?' · '+lastAgo:'');
   body.appendChild(lastLine);
 
-  if (weights.length > 1) {
-    const spark = document.createElement('div');
-    spark.className = 'hint-sparkline';
-    recentWeights.forEach((w, i) => {
-      const bar = document.createElement('div');
-      bar.className = 'hint-sparkline-bar' + (i===recentWeights.length-1?' last':'');
-      bar.style.height = Math.round((w/maxW)*100)+'%';
-      bar.title = w+'kg';
-      spark.appendChild(bar);
-    });
-    body.appendChild(spark);
-  }
-  card.appendChild(body);
+  // Per-set table
+  if (perSet.sets && perSet.sets.length) {
+    const table = document.createElement('div');
+    table.style.cssText = 'margin-top:10px;display:flex;flex-direction:column;gap:4px;';
 
+    // Show last session's actual sets alongside targets
+    const lastPerSet = last.perSet || [];
+
+    perSet.sets.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:grid;grid-template-columns:32px 1fr 1fr 20px;align-items:center;gap:6px;padding:5px 8px;background:rgba(255,255,255,0.03);border-radius:6px;font-size:11px;';
+
+      const trendColor = s.trend==='↑'?'#00ff96':s.trend==='↓'?'#ff4466':'#6b7280';
+      const repsStr    = s.repsMin===s.repsMax ? `${s.repsMin}` : `${s.repsMin}–${s.repsMax}`;
+      const prevStr    = lastPerSet[i] ? `${lastPerSet[i].weight}kg×${lastPerSet[i].reps}` : '—';
+
+      row.innerHTML =
+        `<span style="color:var(--muted2);font-weight:600;">S${i+1}</span>` +
+        `<span style="color:var(--muted2);font-size:10px;">${prevStr}</span>` +
+        `<span style="color:#e8eaf0;font-weight:700;">${s.weight}kg × ${repsStr}</span>` +
+        `<span style="color:${trendColor};font-weight:700;">${s.trend}</span>`;
+      table.appendChild(row);
+    });
+
+    // Column header
+    const colHdr = document.createElement('div');
+    colHdr.style.cssText = 'display:grid;grid-template-columns:32px 1fr 1fr 20px;gap:6px;padding:0 8px;font-size:9px;color:var(--muted2);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2px;';
+    colHdr.innerHTML = '<span></span><span>Last</span><span>Target</span><span></span>';
+    table.insertBefore(colHdr, table.firstChild);
+
+    body.appendChild(table);
+  }
+
+  card.appendChild(body);
   hdr.addEventListener('click', () => card.classList.toggle('collapsed'));
   return card;
 }
 
 function updateHintAfterSet(ei) {
-  // Called after a set is logged — collapse hint and optionally show comparison
-  const card = document.getElementById(`hint-${ei}`);
+  const card = document.getElementById('hint-' + ei);
   if (!card) return;
   const ex = activeSession?.exercises[ei];
   if (!ex) return;
-  const logged = ex.sets.filter(s=>s.state==='logged');
+  const logged = ex.sets.filter(s => s.state === 'logged');
   if (!logged.length) return;
 
   // Collapse after first logged set
   card.classList.add('collapsed');
 
-  // Check if we've beaten the suggestion
-  const bestLoggedW = Math.max(...logged.map(s=>parseFloat(s.weight)||0));
-  const data = getExerciseSuggestion(ex.name, ex.equipment);
-  if (data?.last && bestLoggedW > data.last.weight) {
+  // Check vs per-set targets — update summary if beating targets
+  const data = getExerciseSuggestion(ex.name, ex.equipment, ex.sets.length);
+  if (!data?.perSet?.sets) return;
+
+  const targets = data.perSet.sets;
+  let beatingAll = true, anyBeat = false;
+  logged.forEach((s, i) => {
+    const tgt = targets[i];
+    if (!tgt) return;
+    const w = parseFloat(s.weight)||0;
+    const r = ex.unilateral
+      ? Math.max(parseFloat(s.repsL)||0, parseFloat(s.repsR)||0)
+      : parseFloat(s.reps)||0;
+    if (w >= tgt.weight && r >= tgt.repsMax) anyBeat = true;
+    else beatingAll = false;
+  });
+
+  if (beatingAll && logged.length === ex.sets.length) {
     card.classList.add('hint-done');
     const sugg = card.querySelector('.hint-card-suggestion');
-    if (sugg) sugg.textContent = `↑ New best: ${bestLoggedW}kg — great progress!`;
+    if (sugg) sugg.textContent = '✓ All targets hit — great session!';
+  } else if (anyBeat) {
+    const sugg = card.querySelector('.hint-card-suggestion');
+    if (sugg) sugg.style.color = '#00ff96';
   }
 }
 
@@ -1975,7 +2055,7 @@ function buildSetRow(s, si, ei, isUni) {
       ${inputs}
     </div>
     <div class="set-note-row">
-      <input class="set-note" placeholder="note..." value="${s.note||''}"
+      <input class="set-note${s.note ? ' set-note--prefilled' : ''}" placeholder="note..." value="${s.note||''}"
         ${inputDisabled} onchange="updateSet(${ei},${si},'note',this.value)"/>
     </div>
     <div class="set-btn-row">
@@ -2216,9 +2296,14 @@ function addSet(ei) {
   if (!activeSession) return;
   const ex   = activeSession.exercises[ei];
   const prev = ex.sets[ex.sets.length - 1] || {};
+  // Look up last performance for this new set index
+  const lastPerf = getLastPerformance(ex.name) || [];
+  const si = ex.sets.length;
+  const lastSet = lastPerf[si] || null;
   ex.sets.push({
-    num: ex.sets.length + 1,
-    weight: '', reps: '', repsL: '', repsR: '', note: '',
+    num: si + 1,
+    weight: '', reps: '', repsL: '', repsR: '',
+    note: lastSet ? (lastSet.note || '') : '',
     logged: false, restDuration: null,
     setStartTime: null, setDuration: null, state: 'idle',
     ghostWeight: prev.weight || '', ghostReps: prev.reps || '',
@@ -2227,9 +2312,9 @@ function addSet(ei) {
   autoSaveSession();
   const container = document.getElementById(`sets-${ei}`);
   if (container) {
-    const si  = ex.sets.length - 1;
+    const newSi = ex.sets.length - 1;
     const div = document.createElement('div');
-    div.innerHTML = buildSetRow(ex.sets[si], si, ei, ex.unilateral);
+    div.innerHTML = buildSetRow(ex.sets[newSi], newSi, ei, ex.unilateral);
     container.appendChild(div.firstChild);
   }
   updateExMeta(ei);
@@ -2609,23 +2694,7 @@ function hideNewExForm() {
   filterExPicker(document.getElementById('ex-picker-search').value);
 }
 
-function createAndAddExercise() {
-  const name = document.getElementById('ex-picker-search').value.trim();
-  const muscle = document.getElementById('ex-picker-muscle').value.trim();
-  const unilateral = document.getElementById('ex-picker-uni').checked;
-  const sets = parseInt(document.getElementById('ex-picker-sets').value) || 3;
-
-  if (!name)   { showToast('Enter an exercise name'); return; }
-  if (!muscle) { showToast('Enter a muscle group'); return; }
-
-  const allEx = load(SK.exercises) || [];
-  const newEx = { id: 'ex_' + Date.now(), name, muscle, unilateral };
-  allEx.push(newEx);
-  save(SK.exercises, allEx);
-  dbSaveExercise(newEx);
-
-  addExToRoutine({ ...newEx, sets });
-}
+function createAndAddExercise_UNUSED1() { /* removed duplicate */ }
 
 function addExToRoutine(ex) {
   if (pickerExIdx !== null) {
@@ -2635,51 +2704,6 @@ function addExToRoutine(ex) {
   }
   closeModal('exercise-picker');
   renderEditorExercises();
-  const modal = document.getElementById('routine-editor');
-  setTimeout(() => modal.scrollTop = modal.scrollHeight, 50);
-}
-
-function showNewExForm(name) {
-  document.getElementById('ex-picker-new-form').style.display = 'block';
-  document.getElementById('ex-picker-search').value = name;
-  document.getElementById('ex-picker-muscle').value = '';
-  document.getElementById('ex-picker-uni').checked = false;
-  document.getElementById('ex-picker-results').innerHTML = '';
-}
-
-function hideNewExForm() {
-  document.getElementById('ex-picker-new-form').style.display = 'none';
-  filterExPicker(document.getElementById('ex-picker-search').value);
-}
-
-function createAndAddExercise() {
-  const name = document.getElementById('ex-picker-search').value.trim();
-  const muscle = document.getElementById('ex-picker-muscle').value.trim();
-  const unilateral = document.getElementById('ex-picker-uni').checked;
-  const sets = parseInt(document.getElementById('ex-picker-sets').value) || 3;
-
-  if (!name) { showToast('Enter an exercise name'); return; }
-  if (!muscle) { showToast('Enter a muscle group'); return; }
-
-  // Save to global library
-  const allEx = load(SK.exercises) || [];
-  const newEx = { id: 'ex_' + Date.now(), name, muscle, unilateral };
-  allEx.push(newEx);
-  save(SK.exercises, allEx);
-  dbSaveExercise(newEx);
-
-  addExToRoutine({ ...newEx, sets });
-}
-
-function addExToRoutine(ex) {
-  if (pickerExIdx !== null) {
-    editorExercises[pickerExIdx] = ex;
-  } else {
-    editorExercises.push(ex);
-  }
-  closeModal('exercise-picker');
-  renderEditorExercises();
-  // Scroll editor to bottom
   const modal = document.getElementById('routine-editor');
   setTimeout(() => modal.scrollTop = modal.scrollHeight, 50);
 }
@@ -2896,14 +2920,18 @@ function createAndAddExercise() {
 // Marius's dumbbell steps in kg
 const DB_STEPS = [6, 10.5, 15, 19.5, 24, 28.5, 33, 40];
 
-// Exercises where jumping a full dumbbell step is hard
+// Compound presses — expect more inter-set fatigue drop (allow 20%)
 const COMPOUND_PRESS = ['Bench Press','Incline Bench Press','Dumbbell OHP','Push Up','Floor Press'];
+// Compound pulls — allow 15% drop
+const COMPOUND_PULL  = ['Bent Row','Single Arm DB Row','Chest-Supported Row','Bent-Over Row','Pull-up'];
+// Isolation — flag if drop >10%
+// Everything else is isolation by default
 
 function nextDBStep(currentKg) {
   const i = DB_STEPS.findIndex(s => s >= currentKg);
   if (i === -1) return null;
   if (DB_STEPS[i] === currentKg) return DB_STEPS[i+1] ?? null;
-  return DB_STEPS[i]; // next step up from current
+  return DB_STEPS[i];
 }
 
 function prevDBStep(currentKg) {
@@ -2913,7 +2941,6 @@ function prevDBStep(currentKg) {
 }
 
 function linearTrend(values) {
-  // Returns slope per session (kg/session)
   const n = values.length;
   if (n < 2) return 0;
   const xs = values.map((_, i) => i);
@@ -2924,9 +2951,33 @@ function linearTrend(values) {
   return den === 0 ? 0 : num/den;
 }
 
+// Get allowed fatigue drop for exercise type
+function getFatigueTolerance(exName) {
+  if (COMPOUND_PRESS.includes(exName)) return 0.20;
+  if (COMPOUND_PULL.includes(exName))  return 0.15;
+  return 0.10; // isolation
+}
+
+// Extract per-set data from a session for a specific exercise
+function getSessionSets(session, exName, equipFilter) {
+  const ex = (session.exercises||[]).find(e => {
+    if (e.name !== exName) return false;
+    if (equipFilter && equipFilter !== 'All' && (e.equipment||'') !== equipFilter) return false;
+    return true;
+  });
+  if (!ex) return null;
+  const logged = (ex.sets||[]).filter(s => s.logged);
+  if (!logged.length) return null;
+  return logged.map(s => ({
+    weight: parseFloat(s.weight)||0,
+    reps: ex.unilateral
+      ? Math.max(parseFloat(s.repsL)||0, parseFloat(s.repsR)||0)
+      : parseFloat(s.reps)||0,
+    note: s.note||'',
+  }));
+}
+
 function buildExercisePoints(sessions, exName, equipFilter) {
-  // Returns array of { dateStr, weight, reps, sets, est1RM, volLoad, bestLabel }
-  // one entry per session (best set of the session)
   const points = [];
   const sessionsInOrder = [...sessions].sort((a,b)=>
     new Date(a.startedAt||a.started_at) - new Date(b.startedAt||b.started_at));
@@ -2938,7 +2989,6 @@ function buildExercisePoints(sessions, exName, equipFilter) {
       const logged = (ex.sets||[]).filter(st => st.logged);
       if (!logged.length) return;
 
-      // Best set = highest est 1RM
       let bestW=0, bestR=0, best1RM=0;
       logged.forEach(st => {
         const w = parseFloat(st.weight)||0;
@@ -2959,13 +3009,17 @@ function buildExercisePoints(sessions, exName, equipFilter) {
       points.push({
         date: new Date(startedAt),
         dateStr: new Date(startedAt).toLocaleDateString('no-NO',{day:'numeric',month:'short'}),
-        weight: bestW,
-        reps: bestR,
-        sets: logged.length,
-        est1RM: Math.round(best1RM*10)/10,
-        volLoad,
+        weight: bestW, reps: bestR, sets: logged.length,
+        est1RM: Math.round(best1RM*10)/10, volLoad,
         bestLabel: bestW>0 ? `${bestW}kg×${bestR}` : '—',
         equipment: ex.equipment||null,
+        // Store full per-set data for hypertrophy logic
+        perSet: logged.map(st => ({
+          weight: parseFloat(st.weight)||0,
+          reps: ex.unilateral
+            ? Math.max(parseFloat(st.repsL)||0, parseFloat(st.repsR)||0)
+            : parseFloat(st.reps)||0,
+        })),
       });
     });
   });
@@ -2973,90 +3027,157 @@ function buildExercisePoints(sessions, exName, equipFilter) {
 }
 
 function assessProgression(points) {
-  // Returns { status, trendPerMonth, plateau, lastN }
   if (points.length < 2) return { status:'insufficient', trendPerMonth:0, plateau:false };
-
   const weights = points.map(p=>p.weight);
   const slopePerSession = linearTrend(weights);
-  const trendPerMonth = Math.round(slopePerSession * 4 * 10) / 10; // ~4 sessions/month
-
+  const trendPerMonth = Math.round(slopePerSession * 4 * 10) / 10;
   const last3 = points.slice(-3);
   const last3Weights = last3.map(p=>p.weight);
-  const maxInLast3 = Math.max(...last3Weights);
-  const minInLast3 = Math.min(...last3Weights);
-  const plateau = last3.length >= 3 && maxInLast3 - minInLast3 < 1; // <1kg variance
+  const plateau = last3.length >= 3 && Math.max(...last3Weights) - Math.min(...last3Weights) < 1;
   const regressing = last3.length >= 3 && last3Weights[last3Weights.length-1] < last3Weights[0] - 0.5;
-
   let status = 'progressing';
   if (regressing) status = 'regressing';
   else if (plateau) status = 'plateau';
   else if (slopePerSession <= 0.01) status = 'plateau';
-
   return { status, trendPerMonth, plateau, regressing };
 }
 
-function buildNextSessionSuggestion(points, exName, equipment) {
+// ── HYPERTROPHY PER-SET SUGGESTION ENGINE ────────────────────────────────────
+//
+// Rules:
+// 1. Default rep range: 8–12 (override per exercise type)
+// 2. Stay at weight until ALL sets hit top of range
+// 3. 2-for-2: only step up after 2 consecutive sessions hitting top on ALL sets
+// 4. Fatigue tolerance: allow % drop from set 1 without flagging
+// 5. If any set is below bottom of range: too heavy → consider dropping weight
+//
+function buildSetSuggestions(points, exName, equipment, numSets) {
   if (!points.length) return null;
-  const last = points[points.length-1];
-  const { weight: w, reps: r, sets } = last;
-  if (!w) return null;
 
-  const isCompound = COMPOUND_PRESS.includes(exName);
-  const isDB = !equipment || equipment === 'Dumbbell';
-  const nextStep = isDB ? nextDBStep(w) : null;
-  const stepGap = nextStep ? nextStep - w : null;
-  const isBigJump = stepGap && stepGap > 6;
+  const isDB       = !equipment || equipment === 'Dumbbell';
+  const isCompound = COMPOUND_PRESS.includes(exName) || COMPOUND_PULL.includes(exName);
+  const fatigueTol = getFatigueTolerance(exName);
 
-  // Get rep range from exercise (assume 6-12 as default)
-  const repMax = 12;
+  // Rep range — compounds tend to be 6–10, isolation 10–15
+  const repMin = isCompound ? 6  : 8;
+  const repMax = isCompound ? 10 : 12;
 
-  let suggestion = '';
-  let subtext = '';
+  const last     = points[points.length - 1];
+  const prevLast = points.length >= 2 ? points[points.length - 2] : null;
 
-  if (r >= repMax) {
-    // Hit top of rep range — step up weight
-    if (isDB && nextStep) {
-      if (isBigJump && isCompound) {
-        suggestion = `Try ${nextStep}kg × ${Math.max(4, r-3)}-${r-1} reps`;
-        subtext = `Big jump from ${w}kg (+${stepGap}kg) — start with fewer reps`;
-      } else if (isBigJump) {
-        suggestion = `Try ${nextStep}kg × ${Math.max(5, r-2)} reps`;
-        subtext = `Step up from ${w}kg — ${stepGap}kg jump, take it steady`;
-      } else {
-        suggestion = `Step up to ${nextStep}kg × ${Math.max(6, r-2)}-${r} reps`;
-        subtext = `You've hit the top of your rep range at ${w}kg`;
-      }
+  const lastSets  = last.perSet  || [];
+  const prevSets  = prevLast?.perSet || [];
+
+  if (!lastSets.length) return buildNextSessionSuggestion(points, exName, equipment);
+
+  // ── Check 2-for-2 readiness ───────────────────────────────────────────────
+  function allSetsHitTop(perSet) {
+    if (!perSet.length) return false;
+    return perSet.every(s => s.reps >= repMax);
+  }
+  const lastHitTop = allSetsHitTop(lastSets);
+  const prevHitTop = prevSets.length ? allSetsHitTop(prevSets) : false;
+  const twoForTwo  = lastHitTop && prevHitTop;
+
+  // ── Check if weight is too heavy (set 1 below repMin) ────────────────────
+  const set1Reps   = lastSets[0]?.reps || 0;
+  const tooHeavy   = set1Reps > 0 && set1Reps < repMin;
+
+  // ── Check intra-session fatigue pattern ───────────────────────────────────
+  const set1W      = lastSets[0]?.weight || last.weight;
+  const maxDrop    = Math.floor(set1Reps * fatigueTol);
+
+  // ── Determine next weight ─────────────────────────────────────────────────
+  const currentW  = lastSets[0]?.weight || last.weight;
+  const nextStep  = isDB ? nextDBStep(currentW) : currentW + 2;
+  const prevStep  = isDB ? prevDBStep(currentW) : currentW - 2;
+  const stepGap   = nextStep ? nextStep - currentW : null;
+  const bigJump   = stepGap && stepGap > 6;
+
+  // ── Build per-set targets ─────────────────────────────────────────────────
+  const n = numSets || Math.max(lastSets.length, 3);
+
+  let overallDecision; // 'step_up' | 'consolidate' | 'drop'
+  if (tooHeavy)    overallDecision = 'drop';
+  else if (twoForTwo) overallDecision = 'step_up';
+  else             overallDecision = 'consolidate';
+
+  const sets = [];
+  for (let i = 0; i < n; i++) {
+    const prev = lastSets[i] || lastSets[lastSets.length - 1] || { weight: currentW, reps: repMin };
+
+    if (overallDecision === 'step_up') {
+      // Step up — expect reps to drop back toward bottom of range
+      const targetW    = nextStep || currentW;
+      // Compound press big jump: back off reps more
+      const repDrop    = bigJump && COMPOUND_PRESS.includes(exName) ? 3 : 2;
+      const targetReps = Math.max(repMin, prev.reps - repDrop - i); // fatigue per set
+      sets.push({ weight: targetW, repsMin: Math.max(repMin, targetReps-1), repsMax: targetReps+1,
+        trend: '↑', note: i===0 ? `Step up from ${currentW}kg` : '' });
+
+    } else if (overallDecision === 'drop') {
+      const targetW    = prevStep || currentW;
+      const targetReps = Math.min(repMax - 1, prev.reps + 2);
+      sets.push({ weight: targetW, repsMin: targetReps, repsMax: Math.min(repMax, targetReps+2),
+        trend: '↓', note: i===0 ? `Too heavy at ${currentW}kg — drop down` : '' });
+
     } else {
-      suggestion = `Add 1-2kg: try ${w+2}kg × ${Math.max(6, r-2)} reps`;
-      subtext = `Top of rep range — time to increase weight`;
+      // Consolidate — same weight, try to add 1 rep where possible
+      const targetW = prev.weight || currentW;
+      let targetReps;
+      if (prev.reps >= repMax) {
+        targetReps = repMax; // already there, hold
+      } else if (prev.reps < repMin) {
+        targetReps = repMin; // below floor, get to minimum
+      } else {
+        // Add 1 rep unless set dropped due to normal fatigue
+        const expectedDrop = Math.floor((lastSets[0]?.reps || prev.reps) * fatigueTol);
+        const normalFatigue = i > 0 && (lastSets[0]?.reps || 0) - prev.reps <= expectedDrop;
+        targetReps = normalFatigue ? prev.reps + 1 : prev.reps + 1;
+      }
+      const atTop = targetReps >= repMax;
+      sets.push({
+        weight: targetW,
+        repsMin: Math.min(targetReps, repMax),
+        repsMax: Math.min(targetReps + 1, repMax),
+        trend: atTop ? '→' : '↑',
+        note: '',
+      });
     }
-  } else if (r >= repMax - 2) {
-    // Close to top — add a rep first
-    suggestion = `Same weight ${w}kg — aim for ${r+1}-${r+2} reps`;
-    subtext = `One more rep before stepping up to ${nextStep ? nextStep+'kg' : 'heavier weight'}`;
-  } else if (r < 6) {
-    // Low reps — add reps not weight
-    suggestion = `Keep ${w}kg — build to ${r+2} reps per set`;
-    subtext = `Focus on reps before adding weight`;
+  }
+
+  // ── Summary line ──────────────────────────────────────────────────────────
+  let summary, subtext;
+  if (overallDecision === 'step_up') {
+    summary = `Step up to ${nextStep}kg — you hit ${repMax}+ reps ${twoForTwo ? 'two sessions running' : 'last session'}`;
+    subtext = bigJump ? `Big jump (+${stepGap}kg) — expect reps to drop` : `Aim for ${repMin}–${repMax} reps at the new weight`;
+  } else if (overallDecision === 'drop') {
+    summary = `Drop to ${prevStep||currentW}kg — ${set1Reps} reps on set 1 is below the floor`;
+    subtext = `Build back to ${repMin}–${repMax} reps before stepping up again`;
+  } else if (lastHitTop) {
+    summary = `Hold ${currentW}kg — hit top range last session, one more to confirm`;
+    subtext = `Hit ${repMax}+ reps again this session to earn the step up`;
   } else {
-    // Mid rep range — add a rep
-    suggestion = `Keep ${w}kg — try for ${r+1} reps`;
-    subtext = `Progress: add 1 rep this session`;
+    const worstSet = lastSets.reduce((a,b) => b.reps<a.reps?b:a, lastSets[0]);
+    summary = `Hold ${currentW}kg — add 1 rep where possible`;
+    subtext = worstSet.reps < repMin
+      ? `Set dropped to ${worstSet.reps} reps — focus on consistency first`
+      : `Closing in on ${repMax} reps across all sets`;
   }
 
-  // Plateau advice
-  const prog = assessProgression(points);
-  if (prog.status === 'plateau' && points.length >= 3) {
-    suggestion = `Try ${w}kg for ${Math.min(r+2, repMax)} reps (plateau — push reps)`;
-    subtext = `Stuck at ${w}kg for ${points.slice(-3).length} sessions — focus on rep quality`;
-  }
-  if (prog.status === 'regressing') {
-    const safeW = prevDBStep(w) || w;
-    suggestion = `Drop to ${safeW}kg × ${Math.min(r+3, repMax)} reps`;
-    subtext = `Weight trending down — consolidate at ${safeW}kg before stepping back up`;
-  }
+  return { sets, summary, subtext, overallDecision, repMin, repMax, currentW };
+}
 
-  return { suggestion, subtext };
+function buildNextSessionSuggestion(points, exName, equipment) {
+  // Kept for backwards compatibility — wraps buildSetSuggestions into single-line format
+  if (!points.length) return null;
+  const result = buildSetSuggestions(points, exName, equipment, points[points.length-1]?.sets || 3);
+  if (!result) return null;
+  if (result.sets) {
+    // Convert to single suggestion string
+    return { suggestion: result.summary, subtext: result.subtext };
+  }
+  return result;
 }
 
 function renderExerciseAnalysis(container, points, exName, equipment) {
@@ -3939,12 +4060,22 @@ async function initStrava() {
 }
 
 function updateStravaBtn() {
-  const row = document.getElementById('strava-connect-row');
+  const btn = document.getElementById('strava-connect-row');
   const lbl = document.getElementById('strava-home-label');
-  if (row) row.style.display = '';
-  if (lbl) lbl.textContent = stravaConnected ? '✓ Strava connected' : 'Connect Strava';
-  const btn = document.getElementById('strava-home-btn');
-  if (btn) btn.style.color = stravaConnected ? 'var(--green)' : 'var(--neon)';
+  if (!btn) return;
+  if (stravaConnected) {
+    btn.style.borderColor = 'rgba(0,255,150,0.35)';
+    btn.style.background  = 'rgba(0,255,150,0.08)';
+    btn.style.color       = 'var(--green)';
+    btn.querySelector('svg').style.fill = 'var(--green)';
+    if (lbl) lbl.textContent = '✓';
+  } else {
+    btn.style.borderColor = 'rgba(255,255,255,0.1)';
+    btn.style.background  = 'rgba(255,255,255,0.06)';
+    btn.style.color       = 'var(--muted2)';
+    btn.querySelector('svg').style.fill = '#FC4C02';
+    if (lbl) lbl.textContent = '';
+  }
 }
 
 function handleStravaHomeBtn() {
