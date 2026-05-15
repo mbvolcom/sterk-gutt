@@ -295,7 +295,12 @@ async function dbLoadRoutines() {
       _routines = data.map(r => ({ id:r.id, name:r.name, exercises:r.exercises, createdAt:new Date(r.created_at).getTime() }));
     } else {
       // Truly first use — seed all default routines
-      for (const r of DEFAULT_ROUTINES) await dbSaveRoutine(r);
+      try {
+        for (const r of DEFAULT_ROUTINES) await dbSaveRoutine(r);
+      } catch(e) {
+        console.warn('Seed routines failed:', e.message);
+        _routines = [...DEFAULT_ROUTINES];
+      }
     }
     return _routines;
   } catch(e) { console.warn('Load routines failed:', e.message); return []; }
