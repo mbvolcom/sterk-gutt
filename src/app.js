@@ -233,7 +233,11 @@ async function dbSaveRoutine(routine) {
     const idx = _routines.findIndex(r => r.id === routine.id);
     if (idx >= 0) _routines[idx] = routine; else _routines.push(routine);
     setSyncStatus('ok');
-  } catch(e) { console.warn('Save routine failed:', e.message); setSyncStatus('offline'); }
+  } catch(e) {
+    console.warn('Save routine failed:', e.message);
+    setSyncStatus('offline');
+    showToast('⚠ Save failed: ' + e.message);
+  }
 }
 
 async function dbDeleteRoutine(id) {
@@ -1612,7 +1616,8 @@ function renderEditorExercises() {
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
         <input type="number" value="${ex.sets}" min="1" max="20"
           style="width:40px;text-align:center;padding:6px 4px;"
-          onchange="editorExercises[${i}].sets=Math.max(1,+this.value)"/>
+          oninput="editorExercises[${i}].sets=Math.max(1,+this.value||1)"
+          onchange="editorExercises[${i}].sets=Math.max(1,+this.value||1)"/>
         <span style="font-size:10px;color:var(--muted2);">sets</span>
       </div>
       <button class="btn-icon" onclick="removeEditorEx(${i})" style="color:var(--red);border-color:var(--red-dim);flex-shrink:0;">✕</button>
