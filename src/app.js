@@ -21,31 +21,30 @@ const OLD_LEGACY_USER_ID = 'sg_k5dgxv305khmp604919'; // data to migrate on first
 let currentUser = null;
 
 async function initAuth() {
-  // Listen for auth state changes
+  let hasSynced = false;
   sb.auth.onAuthStateChange(async (event, session) => {
     if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
       try {
         currentUser = session.user;
         USER_ID = session.user.id;
         hideLoginScreen();
-        await migrateDataIfNeeded();
-        // Small delay to ensure Supabase client is fully ready
-        await new Promise(resolve => setTimeout(resolve, 100));
-        await syncFromCloud();
-        renderHome();
-        const activePage = document.querySelector('.page.active');
-        if (activePage && activePage.id === 'page-routines') renderRoutines();
+        if (!hasSynced) {
+          hasSynced = true;
+          await migrateDataIfNeeded();
+          await syncFromCloud();
+          renderHome();
+          const activePage = document.querySelector('.page.active');
+          if (activePage && activePage.id === 'page-routines') renderRoutines();
+        }
       } catch(e) {
         console.error('Auth flow error:', e.message, e.stack);
       }
     } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
       currentUser = null;
+      hasSynced = false;
       showLoginScreen();
     }
   });
-
-  // onAuthStateChange fires INITIAL_SESSION immediately — handles both
-  // already-logged-in and fresh login cases. No need for getSession separately.
 }
 
 async function signInWithGoogle() {
@@ -296,8 +295,6 @@ async function dbLoadRoutines() {
 
     if (data && data.length) {
       _routines = data.map(r => ({ id:r.id, name:r.name, exercises:r.exercises, createdAt:new Date(r.created_at).getTime() }));
-      window.__routines = _routines; // debug
-      console.log('dbLoadRoutines — first routine exercises:', JSON.stringify(_routines[0]?.exercises?.slice(0,2)));
     } else {
       try {
         for (const r of DEFAULT_ROUTINES) await dbSaveRoutine(r);
