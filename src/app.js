@@ -1903,6 +1903,27 @@ function saveExerciseLib() {
   }
   save(SK.exercises, allEx);
   if (savedEx) dbSaveExercise(savedEx);
+
+  // Propagate name/muscle/unilateral changes to all routines that contain this exercise
+  if (editingExId) {
+    const routines = load(SK.routines) || [];
+    let routinesChanged = false;
+    routines.forEach(r => {
+      r.exercises.forEach(ex => {
+        if (ex.id === editingExId || ex.name === savedEx.name) {
+          ex.name = name;
+          ex.muscle = selectedMuscle;
+          ex.unilateral = unilateral;
+          routinesChanged = true;
+        }
+      });
+    });
+    if (routinesChanged) {
+      save(SK.routines, routines);
+      routines.forEach(r => dbSaveRoutine(r));
+    }
+  }
+
   closeModal('exercise-lib-editor');
   renderExerciseLibrary();
   showToast(editingExId ? 'Exercise updated' : 'Exercise created');
