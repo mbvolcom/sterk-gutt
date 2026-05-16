@@ -228,9 +228,7 @@ async function dbSaveRoutine(routine) {
       created_at: new Date(routine.createdAt).toISOString(),
       updated_at: new Date().toISOString(),
     };
-    console.log('dbSaveRoutine — saving:', routine.id, routine.name, 'exercises[0].sets:', routine.exercises?.[0]?.sets);
-    const result = await supabaseFetch('routines', 'on_conflict=id', 'POST', row);
-    console.log('dbSaveRoutine — result:', JSON.stringify(result?.[0]?.exercises?.[0]?.sets));
+    await supabaseFetch('routines', 'on_conflict=id', 'POST', row);
     const idx = _routines.findIndex(r => r.id === routine.id);
     if (idx >= 0) _routines[idx] = routine; else _routines.push(routine);
     setSyncStatus('ok');
@@ -1617,8 +1615,8 @@ function renderEditorExercises() {
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
         <input type="number" value="${ex.sets}" min="1" max="20"
           style="width:40px;text-align:center;padding:6px 4px;"
-          oninput="editorExercises[${i}].sets=Math.max(1,+this.value||1)"
-          onchange="editorExercises[${i}].sets=Math.max(1,+this.value||1)"/>
+          oninput="updateEditorExSets(${i},this.value)"
+          onchange="updateEditorExSets(${i},this.value)"/>
         <span style="font-size:10px;color:var(--muted2);">sets</span>
       </div>
       <button class="btn-icon" onclick="removeEditorEx(${i})" style="color:var(--red);border-color:var(--red-dim);flex-shrink:0;">✕</button>
@@ -3253,6 +3251,7 @@ Object.assign(window, {
   // Routine editor
   openRoutineEditor, saveRoutine, saveRoutineChanges, deleteRoutine,
   addExerciseToEditor, removeEditorEx, toggleRoutineCard,
+  updateEditorExSets: (i, v) => { if (editorExercises[i]) editorExercises[i].sets = Math.max(1, +v || 1); },
   // Exercise picker
   selectExerciseFromPicker, showNewExForm, hideNewExForm,
   createAndAddExercise, selectMuscle,
