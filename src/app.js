@@ -228,7 +228,9 @@ async function dbSaveRoutine(routine) {
       created_at: new Date(routine.createdAt).toISOString(),
       updated_at: new Date().toISOString(),
     };
-    await supabaseFetch('routines', 'on_conflict=id', 'POST', row);
+    console.log('dbSaveRoutine — saving:', routine.id, routine.name, 'exercises[0].sets:', routine.exercises?.[0]?.sets);
+    const result = await supabaseFetch('routines', 'on_conflict=id', 'POST', row);
+    console.log('dbSaveRoutine — result:', JSON.stringify(result?.[0]?.exercises?.[0]?.sets));
     const idx = _routines.findIndex(r => r.id === routine.id);
     if (idx >= 0) _routines[idx] = routine; else _routines.push(routine);
     setSyncStatus('ok');
