@@ -296,6 +296,8 @@ async function dbLoadRoutines() {
 
     if (data && data.length) {
       _routines = data.map(r => ({ id:r.id, name:r.name, exercises:r.exercises, createdAt:new Date(r.created_at).getTime() }));
+      window.__routines = _routines; // debug
+      console.log('dbLoadRoutines — first routine exercises:', JSON.stringify(_routines[0]?.exercises?.slice(0,2)));
     } else {
       try {
         for (const r of DEFAULT_ROUTINES) await dbSaveRoutine(r);
