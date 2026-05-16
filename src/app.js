@@ -246,9 +246,8 @@ async function dbDeleteRoutine(id) {
 }
 
 async function supabaseFetch(table, params = '', method = 'GET', body = null) {
-  // Read token directly from localStorage — avoids Supabase client auth hang on refresh
   const authKey = `sb-fzbovpdnpvsfdnxyftqv-auth-token`;
-  let token = SUPA_KEY; // fallback to anon key
+  let token = SUPA_KEY;
   try {
     const stored = localStorage.getItem(authKey);
     if (stored) {
@@ -257,19 +256,29 @@ async function supabaseFetch(table, params = '', method = 'GET', body = null) {
     }
   } catch(e) { /* use anon key */ }
 
-  const res = await fetch(
-    `${SUPA_URL}/rest/v1/${table}?${params}`,
-    {
-      method,
-      headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Prefer': method === 'POST' ? 'return=representation' : '',
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    }
-  );
+  // Split table from params if params contains on_conflict (upsert)
+  const isUpsert = params.includes('on_conflict');
+  const url = `${SUPA_URL}/rest/v1/${table}${params ? '?' + params : ''}`;
+
+  const headers = {
+    'apikey': SUPA_KEY,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+  if (method === 'POST' && isUpsert) {
+    headers['Prefer'] = 'resolution=merge-duplicates,return=representation';
+  } else if (method === 'POST') {
+    headers['Prefer'] = 'return=representation';
+  } else if (method === 'DELETE') {
+    headers['Prefer'] = 'return=minimal';
+  }
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`${table} ${method} failed: ${res.status} ${err}`);
@@ -1605,10 +1614,6 @@ function renderEditorExercises() {
           style="width:40px;text-align:center;padding:6px 4px;"
           onchange="editorExercises[${i}].sets=Math.max(1,+this.value)"/>
         <span style="font-size:10px;color:var(--muted2);">sets</span>
-        <input type="text" value="${ex.reps||''}" placeholder="reps"
-          style="width:54px;text-align:center;padding:6px 4px;"
-          onchange="editorExercises[${i}].reps=this.value.trim()"/>
-        <span style="font-size:10px;color:var(--muted2);">reps</span>
       </div>
       <button class="btn-icon" onclick="removeEditorEx(${i})" style="color:var(--red);border-color:var(--red-dim);flex-shrink:0;">✕</button>
     </div>
