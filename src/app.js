@@ -394,11 +394,11 @@ const DEFAULT_ROUTINES = [
   {
     id: 'lower1', name: 'Lower 1', createdAt: Date.now(),
     exercises: [
-      { id: 'e8', name: 'Goblet Squat', muscle: 'Quads', sets: 4, unilateral: false },
-      { id: 'e9', name: 'Step-ups', muscle: 'Quads', sets: 4, unilateral: true },
-      { id: 'e10', name: 'Walking Lunges', muscle: 'Quads', sets: 3, unilateral: false },
-      { id: 'e11', name: 'RDL', muscle: 'Hamstrings', sets: 3, unilateral: false },
-      { id: 'e12', name: 'Single Leg Calf Raise', muscle: 'Calves', sets: 5, unilateral: true },
+      { id: 'e8', name: 'Goblet Squat', muscle: 'Legs', sets: 4, unilateral: false },
+      { id: 'e9', name: 'Step-ups', muscle: 'Legs', sets: 4, unilateral: true },
+      { id: 'e10', name: 'Walking Lunges', muscle: 'Legs', sets: 3, unilateral: false },
+      { id: 'e11', name: 'RDL', muscle: 'Legs', sets: 3, unilateral: false },
+      { id: 'e12', name: 'Single Leg Calf Raise', muscle: 'Legs', sets: 5, unilateral: true },
       { id: 'e13', name: 'Hammer Curl', muscle: 'Biceps', sets: 2, unilateral: false },
       { id: 'e14', name: 'Paused Lateral Raise', muscle: 'Shoulders', sets: 2, unilateral: false },
       { id: 'e15', name: 'Dumbbell Curls', muscle: 'Biceps', sets: 3, unilateral: false },
@@ -419,12 +419,12 @@ const DEFAULT_ROUTINES = [
   {
     id: 'lower2', name: 'Lower 2', createdAt: Date.now(),
     exercises: [
-      { id: 'e23', name: 'Bulgarian Split Squat', muscle: 'Quads', sets: 4, unilateral: true },
-      { id: 'e24', name: 'Step-ups', muscle: 'Quads', sets: 4, unilateral: true },
-      { id: 'e25', name: 'Single Leg RDL', muscle: 'Hamstrings', sets: 3, unilateral: true },
-      { id: 'e26', name: 'Single Leg Hip Thrust', muscle: 'Glutes', sets: 3, unilateral: true },
-      { id: 'e27', name: 'Single Leg Calf Raise', muscle: 'Calves', sets: 5, unilateral: true },
-      { id: 'e28', name: 'Lying Curl', muscle: 'Hamstrings', sets: 3, unilateral: false },
+      { id: 'e23', name: 'Bulgarian Split Squat', muscle: 'Legs', sets: 4, unilateral: true },
+      { id: 'e24', name: 'Step-ups', muscle: 'Legs', sets: 4, unilateral: true },
+      { id: 'e25', name: 'Single Leg RDL', muscle: 'Legs', sets: 3, unilateral: true },
+      { id: 'e26', name: 'Single Leg Hip Thrust', muscle: 'Legs', sets: 3, unilateral: true },
+      { id: 'e27', name: 'Single Leg Calf Raise', muscle: 'Legs', sets: 5, unilateral: true },
+      { id: 'e28', name: 'Lying Curl', muscle: 'Legs', sets: 3, unilateral: false },
       { id: 'e29', name: 'Paused Lateral Raise', muscle: 'Shoulders', sets: 2, unilateral: false },
       { id: 'e30', name: 'Single Arm Preacher Curl', muscle: 'Biceps', sets: 2, unilateral: true },
     ]
@@ -480,6 +480,12 @@ function getLastPerformance(exName) {
 // CONSTANTS
 // ═══════════════════════════════════════════
 const MUSCLE_GROUPS = ['Abs','Back','Biceps','Chest','Legs','Shoulders','Triceps'];
+
+const MUSCLE_NORMALISE = {
+  'Quads': 'Legs', 'Hamstrings': 'Legs', 'Glutes': 'Legs', 'Calves': 'Legs',
+};
+function normaliseMuscle(m) { return MUSCLE_NORMALISE[m] || m; }
+
 
 // ═══════════════════════════════════════════
 // NAV & PAGES
@@ -1797,7 +1803,7 @@ function renderExerciseLibrary() {
   `).join('');
 
   // Exercise list
-  const filtered = libMuscleFilter === 'All' ? allEx : allEx.filter(e => e.muscle === libMuscleFilter);
+  const filtered = libMuscleFilter === 'All' ? allEx : allEx.filter(e => normaliseMuscle(e.muscle) === libMuscleFilter);
   const list = document.getElementById('exercises-list');
 
   if (filtered.length === 0) {
@@ -1808,8 +1814,8 @@ function renderExerciseLibrary() {
   // Group by muscle
   const groups = {};
   filtered.forEach(ex => {
-    if (!groups[ex.muscle]) groups[ex.muscle] = [];
-    groups[ex.muscle].push(ex);
+    const exMuscle = normaliseMuscle(ex.muscle); if (!groups[exMuscle]) groups[exMuscle] = [];
+    groups[exMuscle].push(ex);
   });
 
   list.innerHTML = Object.entries(groups).sort((a,b) => a[0].localeCompare(b[0])).map(([muscle, exs]) => `
