@@ -1911,22 +1911,23 @@ function saveExerciseLib() {
   if (savedEx) dbSaveExercise(savedEx);
 
   // Propagate name/muscle/unilateral changes to all routines that contain this exercise
+  let routinesUpdated = false;
   if (editingExId) {
     const routines = load(SK.routines) || [];
-    let routinesChanged = false;
     routines.forEach(r => {
       r.exercises.forEach(ex => {
         if (ex.id === editingExId || ex.name === savedEx.name) {
           ex.name = name;
           ex.muscle = selectedMuscle;
           ex.unilateral = unilateral;
-          routinesChanged = true;
+          routinesUpdated = true;
         }
       });
     });
-    if (routinesChanged) {
+    if (routinesUpdated) {
       save(SK.routines, routines);
-      routines.forEach(r => dbSaveRoutine(r));
+      Promise.all(routines.map(r => dbSaveRoutine(r)))
+        .catch(e => console.warn('Routine update failed:', e.message));
     }
   }
 
