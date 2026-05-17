@@ -1171,8 +1171,8 @@ function buildSetRow(s, si, ei, isUni) {
         ${inputDisabled} onchange="updateSet(${ei},${si},'note',this.value)"/>
     </div>
     <div class="set-btn-row">
+      ${durBadge ? `<div style="text-align:center;padding:2px 0 4px;font-size:10px;">${durBadge}</div>` : ''}
       <button class="set-start-btn ${btnClass}" onclick="handleSetBtn(${ei},${si})">${btnLabel}</button>
-      ${durBadge}
     </div>
   </div>`;
 }
@@ -1861,6 +1861,8 @@ function saveRoutine() {
   save(SK.routines, routines);
   dbSaveRoutine(routine);
   closeModal('routine-editor');
+  // Always navigate to routines page and render after saving
+  showPage('routines', document.getElementById('nav-routines'));
   renderRoutines();
   showToast('Routine saved!');
 }
