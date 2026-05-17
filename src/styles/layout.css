@@ -32,14 +32,13 @@
 /* MAIN CONTENT */
 .main{
   flex:1;
-  overflow-y:auto;
-  overflow-x:hidden;
-  padding-bottom:calc(var(--nav-h) + 16px);
-  -webkit-overflow-scrolling:touch;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
 }
 .page{display:none;}
-.page.active{display:block;}
-#page-home.active{display:flex;}
+.page.active{display:block;height:100%;overflow-y:auto;padding-bottom:calc(var(--nav-h) + 16px);-webkit-overflow-scrolling:touch;}
+#page-home.active{display:flex;flex-direction:column;overflow:hidden;padding-bottom:0;}
 
 /* BOTTOM NAV */
 .bottom-nav{
