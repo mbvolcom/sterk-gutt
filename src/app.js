@@ -591,24 +591,9 @@ function renderHome() {
       <div class="recent-right">
         <span class="recent-sets">${totalSets}</span>
         <span style="font-size:9px;color:var(--muted);">sets</span>
-      </div>
-      <button class="recent-delete" title="Delete">✕</button>`;
+      </div>`;
 
-    item.querySelector('.recent-delete').addEventListener('click', e => {
-      e.stopPropagation();
-      showConfirm('Delete Session?', 'This will permanently remove this workout from your history.', async () => {
-        _sessions = _sessions.filter(x => x.id !== s.id);
-        await dbDeleteSession(s.id);
-        renderHome();
-        showToast('Session deleted');
-      });
-    });
-
-    item.addEventListener('click', e => {
-      if (e.target.classList.contains('recent-delete')) return;
-      openSessionEditor(s.id);
-    });
-
+    item.addEventListener('click', () => openSessionEditor(s.id));
     list.appendChild(item);
   });
 }
@@ -697,6 +682,29 @@ function openSessionEditor(sessionId) {
 
   overlay.appendChild(header);
   overlay.appendChild(body);
+
+  // ── Delete button at bottom ───────────────────────────────────────────────
+  const footer = document.createElement('div');
+  footer.style.cssText = 'padding:12px 16px;border-top:1px solid rgba(255,255,255,0.06);flex-shrink:0;';
+  const delBtn = document.createElement('button');
+  delBtn.style.cssText = 'width:100%;padding:12px;background:rgba(255,68,102,0.08);border:1px solid rgba(255,68,102,0.25);border-radius:10px;color:var(--red);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:0.5px;';
+  delBtn.textContent = 'Delete this session';
+  delBtn.addEventListener('click', () => {
+    showConfirm(
+      'Delete session?',
+      `This will permanently remove "${s.routineName}" from your history.`,
+      async () => {
+        overlay.remove();
+        _sessions = _sessions.filter(x => x.id !== s.id);
+        await dbDeleteSession(s.id);
+        renderHome();
+        showToast('Session deleted');
+      }
+    );
+  });
+  footer.appendChild(delBtn);
+  overlay.appendChild(footer);
+
   document.body.appendChild(overlay);
 }
 
@@ -733,9 +741,9 @@ function openWorkoutPicker() {
     </div>`;
 
   if (routines.length === 0) {
-    list.innerHTML = adHoc + '<div class="empty-state"><div class="empty-state-text">No routines yet</div></div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-text">No routines yet</div></div>' + adHoc;
   } else {
-    list.innerHTML = adHoc + routines.map(r => `
+    list.innerHTML = routines.map(r => `
       <div class="routine-pick-item" onclick="startWorkout('${r.id}')">
         <div class="routine-pick-icon">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -745,12 +753,13 @@ function openWorkoutPicker() {
           <div class="routine-pick-meta">${r.exercises.length} exercises</div>
         </div>
       </div>
-    `).join('');
+    `).join('') + adHoc;
   }
   openModal('workout-picker');
 }
 
 function startAdHocWorkout() {
+  closeModal('workout-picker');
   const sessionId = Date.now();
   activeSession = {
     id: sessionId,
@@ -760,15 +769,14 @@ function startAdHocWorkout() {
     duration: null,
     exercises: [],
   };
-  save(SK.activeSession, activeSession);
-  closeModal('workout-picker');
-  showPage('workout', document.getElementById('nav-workout'));
-  renderWorkoutPage();
+  setTimers = {};
   autoSaveSession();
+  renderWorkoutPage();
+  showPage('workout', document.getElementById('nav-workout'));
+  startGlobalTimer();
 }
 
 function promptAdHocName(callback) {
-  // Show a simple name prompt overlay for Ad Hoc workouts
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(7,8,12,0.95);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;';
   overlay.innerHTML = `
@@ -778,13 +786,19 @@ function promptAdHocName(callback) {
       <input id="adhoc-name-input" type="text" placeholder="e.g. Push day, Chest & arms..." value="Ad Hoc"
         style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;margin-bottom:14px;"/>
       <div style="display:flex;gap:10px;">
-        <button onclick="this.closest('div[style*=fixed]').remove();(${callback.toString()})(document.getElementById('adhoc-name-input')?.value||'Ad Hoc')"
-          style="flex:1;padding:12px;background:var(--neon);color:#000;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">Save</button>
-        <button onclick="this.closest('div[style*=fixed]').remove();(${callback.toString()})('Ad Hoc')"
-          style="padding:12px 16px;background:var(--surface2);color:var(--muted2);border:1px solid var(--border);border-radius:10px;font-size:13px;cursor:pointer;font-family:inherit;">Skip</button>
+        <button id="adhoc-save-btn" style="flex:1;padding:12px;background:var(--neon);color:#000;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">Save</button>
+        <button id="adhoc-skip-btn" style="padding:12px 16px;background:var(--surface2);color:var(--muted2);border:1px solid var(--border);border-radius:10px;font-size:13px;cursor:pointer;font-family:inherit;">Skip</button>
       </div>
     </div>`;
-  // Focus input
+  overlay.querySelector('#adhoc-save-btn').addEventListener('click', () => {
+    const name = overlay.querySelector('#adhoc-name-input')?.value?.trim() || 'Ad Hoc';
+    overlay.remove();
+    callback(name);
+  });
+  overlay.querySelector('#adhoc-skip-btn').addEventListener('click', () => {
+    overlay.remove();
+    callback('Ad Hoc');
+  });
   setTimeout(() => overlay.querySelector('input')?.focus(), 100);
   document.body.appendChild(overlay);
 }
@@ -2342,9 +2356,9 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
   const kpiRow = document.createElement('div');
   kpiRow.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;';
   [
-    {val:last.weight+'kg', lbl:'Last top weight', color:'#00b4ff'},
-    {val:last.est1RM+'kg', lbl:'Est. 1RM',        color:'#00ffcc'},
-    {val:points.length,    lbl:'Sessions',         color:'#7c6aff'},
+    {val:last.bestLabel,   lbl:'Best set',     color:'#00b4ff'},
+    {val:last.est1RM+'kg', lbl:'Est. 1RM',     color:'#00ffcc'},
+    {val:points.length,    lbl:'Sessions',      color:'#7c6aff'},
   ].forEach(k=>{
     const c=document.createElement('div');
     c.style.cssText='background:rgba(0,0,0,0.06);border-radius:10px;padding:10px 8px;text-align:center;';
@@ -2373,20 +2387,25 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
     container.appendChild(meta);
   }
 
-  // ── Weight sparkline ─────────────────────────────────────────────────────
-  const sparkTitle = document.createElement('div');
-  sparkTitle.style.cssText = 'font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px;';
-  sparkTitle.textContent = 'Best set weight per session (kg)';
-  container.appendChild(sparkTitle);
+  // ── Est 1RM chart (primary — replaces raw weight sparkline) ─────────────
+  const rmTitle = document.createElement('div');
+  rmTitle.style.cssText = 'font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:4px;';
+  rmTitle.textContent = 'Strength trend — estimated 1RM (kg)';
+  container.appendChild(rmTitle);
 
-  const sparkWrap = document.createElement('div');
-  sparkWrap.style.cssText = 'position:relative;width:100%;height:90px;overflow:hidden;margin-bottom:4px;';
-  const sparkCanvas = document.createElement('canvas');
-  sparkCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
-  sparkWrap.appendChild(sparkCanvas);
-  container.appendChild(sparkWrap);
+  const rmNote = document.createElement('div');
+  rmNote.style.cssText = 'font-size:10px;color:var(--muted);margin-bottom:8px;';
+  rmNote.textContent = 'Accounts for both weight and reps — goes up when you lift heavier or do more reps';
+  container.appendChild(rmNote);
 
-  // Dots below sparkline showing best set label
+  const rmWrap = document.createElement('div');
+  rmWrap.style.cssText = 'position:relative;width:100%;height:120px;overflow:hidden;margin-bottom:4px;';
+  const rmCanvas = document.createElement('canvas');
+  rmCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
+  rmWrap.appendChild(rmCanvas);
+  container.appendChild(rmWrap);
+
+  // Dots below chart showing best set label + date
   const dotRow = document.createElement('div');
   dotRow.style.cssText = 'display:flex;justify-content:space-between;margin-bottom:16px;';
   points.forEach((p,i)=>{
@@ -2399,19 +2418,6 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
   });
   container.appendChild(dotRow);
 
-  // ── Est 1RM chart ─────────────────────────────────────────────────────────
-  const rmTitle = document.createElement('div');
-  rmTitle.style.cssText = 'font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px;';
-  rmTitle.textContent = 'Estimated 1RM trend';
-  container.appendChild(rmTitle);
-
-  const rmWrap = document.createElement('div');
-  rmWrap.style.cssText = 'position:relative;width:100%;height:110px;overflow:hidden;margin-bottom:16px;';
-  const rmCanvas = document.createElement('canvas');
-  rmCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
-  rmWrap.appendChild(rmCanvas);
-  container.appendChild(rmWrap);
-
   // ── Next session suggestion ───────────────────────────────────────────────
   if (hint) {
     const hintCard = document.createElement('div');
@@ -2423,11 +2429,8 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
     container.appendChild(hintCard);
   }
 
-  // Draw charts after DOM paint
+  // Draw chart after DOM paint
   setTimeout(() => {
-    if (sparkCanvas.offsetWidth) {
-      drawProgressLine(sparkCanvas, points.map(p=>p.dateStr), points.map(p=>p.weight), '#00b4ff', true);
-    }
     if (rmCanvas.offsetWidth) {
       drawProgressLine(rmCanvas, points.map(p=>p.dateStr), points.map(p=>p.est1RM), '#00ffcc', false);
     }
@@ -2810,10 +2813,26 @@ function renderWeeklyFreqChart(sessions, fromDate, toDate) {
 function populateExSelect() {
   const allEx = load(SK.exercises) || [];
   const sel = document.getElementById('ex-select');
+  if (!sel) return;
   const current = sel.value;
+
+  // Group by muscle, normalised
+  const grouped = {};
+  allEx.sort((a,b)=>a.name.localeCompare(b.name)).forEach(e => {
+    const m = normaliseMuscle(e.muscle) || 'Other';
+    if (!grouped[m]) grouped[m] = [];
+    grouped[m].push(e);
+  });
+
   sel.innerHTML = '<option value="">— Select exercise —</option>' +
-    allEx.sort((a,b)=>a.name.localeCompare(b.name)).map(e=>`<option value="${e.name}">${e.name}</option>`).join('');
+    MUSCLE_GROUPS.filter(m => grouped[m]).map(m =>
+      `<optgroup label="${m}">${grouped[m].map(e=>`<option value="${e.name}">${e.name}</option>`).join('')}</optgroup>`
+    ).join('');
+
   if (current) sel.value = current;
+
+  // Wire change to immediately render — remove old listener first
+  sel.onchange = () => { if (sel.value) renderExerciseSection(); };
 }
 
 let _exEquipFilter = 'All';
@@ -2824,6 +2843,14 @@ function renderExerciseSection(equipFilter) {
   const body   = document.getElementById('exercise-progress-body');
   if (!body) return;
   if (!exName) { body.innerHTML = ''; return; }
+
+  // Make sure the exercise tab is visible so canvas dimensions work
+  const tabEl = document.getElementById('stats-tab-exercise');
+  if (tabEl && tabEl.style.display === 'none') {
+    // Switch to exercise subtab
+    setStatsSubtab('exercise');
+    return; // setStatsSubtab will call renderExerciseSection again
+  }
 
   const {from: fromDate, to: toDate} = getStatsDates();
   const allSess = (load(SK.sessions)||[]).filter(s => {
