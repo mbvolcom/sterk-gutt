@@ -617,76 +617,81 @@ function openSessionEditor(sessionId) {
   const allSessions = load(SK.sessions)||[];
   const s = allSessions.find(x => x.id === sessionId);
   if (!s) return;
-  const EQUIPMENT = ['Barbell','Dumbbell','Cable','Bodyweight','Machine'];
 
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(7,8,12,0.97);z-index:9999;display:flex;flex-direction:column;overflow:hidden;';
 
+  // ── Header ────────────────────────────────────────────────────────────────
   const header = document.createElement('div');
-  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;';
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;';
   const dateStr = new Date(s.startedAt).toLocaleDateString('no-NO',{weekday:'long',day:'numeric',month:'long'});
-  header.innerHTML = `<div><div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:#f0ede8;">${s.routineName}</div><div style="font-size:11px;color:#4b5563;margin-top:2px;">${dateStr}</div></div>`;
+  const dur = s.duration ? formatDuration(s.duration) : '';
+  const totalSets = (s.exercises||[]).reduce((a,ex)=>a+(ex.sets||[]).filter(st=>st.logged).length,0);
+
+  const titleEl = document.createElement('div');
+  titleEl.innerHTML = `
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:#f0ede8;">${s.routineName}</div>
+    <div style="font-size:11px;color:#4b5563;margin-top:2px;">${dateStr}${dur?' · '+dur:''} · ${totalSets} sets</div>`;
+  header.appendChild(titleEl);
+
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '✕';
-  closeBtn.style.cssText = 'background:none;border:none;color:#9ca3af;font-size:24px;cursor:pointer;padding:4px 8px;line-height:1;';
+  closeBtn.style.cssText = 'background:none;border:none;color:#9ca3af;font-size:24px;cursor:pointer;padding:4px 8px;line-height:1;flex-shrink:0;';
   closeBtn.addEventListener('click', () => overlay.remove());
   header.appendChild(closeBtn);
 
+  // ── Body ──────────────────────────────────────────────────────────────────
   const body = document.createElement('div');
   body.style.cssText = 'overflow-y:auto;flex:1;padding:12px 16px;-webkit-overflow-scrolling:touch;';
 
-  (s.exercises||[]).forEach((ex, ei) => {
+  (s.exercises||[]).forEach(ex => {
     const logged = (ex.sets||[]).filter(st=>st.logged);
-    const maxW = logged.length ? Math.max(...logged.map(st=>parseFloat(st.weight)||0)) : 0;
+    if (!logged.length) return;
+
     const card = document.createElement('div');
-    card.style.cssText = 'background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;margin-bottom:10px;';
+    card.style.cssText = 'background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;margin-bottom:10px;';
 
-    const exHeader = document.createElement('div');
-    exHeader.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
-    exHeader.innerHTML = `<div><div style="font-size:14px;font-weight:600;color:#d1d5db;">${ex.name}</div><div style="font-size:10px;color:#4b5563;margin-top:2px;">${ex.muscle||''} · ${logged.length} sets${maxW?` · best ${maxW}kg`:''}</div></div>`;
+    // Exercise header
+    const maxW = Math.max(...logged.map(st=>parseFloat(st.weight)||0));
+    const totalVol = Math.round(logged.reduce((a,st)=>{
+      const w=parseFloat(st.weight)||0;
+      const r=ex.unilateral?((parseFloat(st.repsL)||0)+(parseFloat(st.repsR)||0)):parseFloat(st.reps)||0;
+      return a+w*r;
+    },0));
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#e8eaf0;">${ex.name}</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">${ex.muscle||''} · ${logged.length} sets · ${maxW}kg top · ${totalVol}kg vol</div>
+        </div>
+        ${ex.equipment ? `<span style="font-size:10px;font-weight:600;padding:3px 9px;border-radius:12px;color:var(--neon);background:rgba(0,180,255,0.1);border:1px solid rgba(0,180,255,0.2);">${ex.equipment}</span>` : ''}
+      </div>`;
 
-    const eqTag = document.createElement('span');
-    eqTag.style.cssText = `font-size:10px;font-weight:600;padding:3px 9px;border-radius:12px;${ex.equipment?'color:var(--neon);background:rgba(0,180,255,0.1);border:1px solid rgba(0,180,255,0.2);':'color:#4b5563;'}`;
-    eqTag.textContent = ex.equipment || 'Untagged';
-    exHeader.appendChild(eqTag);
+    // Set table header
+    const tableHdr = document.createElement('div');
+    tableHdr.style.cssText = 'display:grid;grid-template-columns:28px 1fr 1fr 1fr;gap:4px;padding:0 4px;margin-bottom:4px;';
+    tableHdr.innerHTML = `
+      <span style="font-size:9px;color:#4b5563;letter-spacing:1px;">#</span>
+      <span style="font-size:9px;color:#4b5563;letter-spacing:1px;">KG</span>
+      <span style="font-size:9px;color:#4b5563;letter-spacing:1px;">${ex.unilateral?'L / R':'REPS'}</span>
+      <span style="font-size:9px;color:#4b5563;letter-spacing:1px;">NOTE</span>`;
+    card.appendChild(tableHdr);
 
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
-
-    EQUIPMENT.forEach(eq => {
-      const btn = document.createElement('button');
-      btn.textContent = eq;
-      const isActive = ex.equipment === eq;
-      btn.style.cssText = `padding:5px 12px;border-radius:16px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid ${isActive?'var(--neon)':'rgba(255,255,255,0.1)'};background:${isActive?'rgba(0,180,255,0.12)':'transparent'};color:${isActive?'var(--neon)':'#6b7280'};`;
-
-      btn.addEventListener('click', async () => {
-        ex.equipment = ex.equipment === eq ? null : eq;
-        save(SK.sessions, allSessions);
-        // Also update _sessions cache
-        const cached = _sessions.find(x=>x.id===s.id);
-        if (cached) { const cex=(cached.exercises||[]).find(e=>e.name===ex.name); if(cex) cex.equipment=ex.equipment; }
-        await dbSaveSession(s);
-        eqTag.textContent = ex.equipment || 'Untagged';
-        eqTag.style.color = ex.equipment ? 'var(--neon)' : '#4b5563';
-        eqTag.style.background = ex.equipment ? 'rgba(0,180,255,0.1)' : 'transparent';
-        eqTag.style.border = ex.equipment ? '1px solid rgba(0,180,255,0.2)' : 'none';
-        btnRow.querySelectorAll('button').forEach(b => {
-          const active = b.textContent === ex.equipment;
-          b.style.borderColor = active ? 'var(--neon)' : 'rgba(255,255,255,0.1)';
-          b.style.background  = active ? 'rgba(0,180,255,0.12)' : 'transparent';
-          b.style.color       = active ? 'var(--neon)' : '#6b7280';
-        });
-        // Save equipment pref
-        const prefs = JSON.parse(localStorage.getItem('sg_eq_prefs')||'{}');
-        prefs[ex.name] = ex.equipment;
-        localStorage.setItem('sg_eq_prefs', JSON.stringify(prefs));
-        showToast(ex.equipment ? `Tagged: ${ex.equipment}` : 'Tag removed');
-      });
-      btnRow.appendChild(btn);
+    // Set rows
+    logged.forEach((st, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = `display:grid;grid-template-columns:28px 1fr 1fr 1fr;gap:4px;padding:6px 4px;border-top:1px solid rgba(255,255,255,0.04);align-items:center;`;
+      const repsStr = ex.unilateral
+        ? `${st.repsL||0} / ${st.repsR||0}`
+        : (st.reps||'—');
+      row.innerHTML = `
+        <span style="font-size:11px;color:#4b5563;">${i+1}</span>
+        <span style="font-size:13px;font-weight:700;color:#e8eaf0;">${st.weight||'—'}kg</span>
+        <span style="font-size:13px;font-weight:700;color:var(--neon);">${repsStr}</span>
+        <span style="font-size:10px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${st.note||''}</span>`;
+      card.appendChild(row);
     });
 
-    card.appendChild(exHeader);
-    card.appendChild(btnRow);
     body.appendChild(card);
   });
 
@@ -716,10 +721,21 @@ function openWorkoutPicker() {
   const routines = load(SK.routines) || [];
   const list = document.getElementById('picker-routine-list');
 
+  const adHoc = `
+    <div class="routine-pick-item" onclick="startAdHocWorkout()" style="border-color:rgba(255,159,67,0.3);background:rgba(255,159,67,0.05);">
+      <div class="routine-pick-icon" style="color:var(--orange);">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
+      </div>
+      <div>
+        <div class="routine-pick-name" style="color:var(--orange);">Ad Hoc</div>
+        <div class="routine-pick-meta">Blank workout — add exercises as you go</div>
+      </div>
+    </div>`;
+
   if (routines.length === 0) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-state-text">No routines yet</div></div>';
+    list.innerHTML = adHoc + '<div class="empty-state"><div class="empty-state-text">No routines yet</div></div>';
   } else {
-    list.innerHTML = routines.map(r => `
+    list.innerHTML = adHoc + routines.map(r => `
       <div class="routine-pick-item" onclick="startWorkout('${r.id}')">
         <div class="routine-pick-icon">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -734,9 +750,46 @@ function openWorkoutPicker() {
   openModal('workout-picker');
 }
 
-// ═══════════════════════════════════════════
-// ACTIVE WORKOUT
-// ═══════════════════════════════════════════
+function startAdHocWorkout() {
+  const sessionId = Date.now();
+  activeSession = {
+    id: sessionId,
+    routineId: null,
+    routineName: 'Ad Hoc',
+    startedAt: Date.now(),
+    duration: null,
+    exercises: [],
+  };
+  save(SK.activeSession, activeSession);
+  closeModal('workout-picker');
+  showPage('workout', document.getElementById('nav-workout'));
+  renderWorkoutPage();
+  autoSaveSession();
+}
+
+function promptAdHocName(callback) {
+  // Show a simple name prompt overlay for Ad Hoc workouts
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(7,8,12,0.95);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;width:100%;max-width:320px;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:var(--text);margin-bottom:6px;">NAME THIS WORKOUT</div>
+      <div style="font-size:12px;color:var(--muted2);margin-bottom:16px;">Give your Ad Hoc session a name</div>
+      <input id="adhoc-name-input" type="text" placeholder="e.g. Push day, Chest & arms..." value="Ad Hoc"
+        style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;margin-bottom:14px;"/>
+      <div style="display:flex;gap:10px;">
+        <button onclick="this.closest('div[style*=fixed]').remove();(${callback.toString()})(document.getElementById('adhoc-name-input')?.value||'Ad Hoc')"
+          style="flex:1;padding:12px;background:var(--neon);color:#000;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">Save</button>
+        <button onclick="this.closest('div[style*=fixed]').remove();(${callback.toString()})('Ad Hoc')"
+          style="padding:12px 16px;background:var(--surface2);color:var(--muted2);border:1px solid var(--border);border-radius:10px;font-size:13px;cursor:pointer;font-family:inherit;">Skip</button>
+      </div>
+    </div>`;
+  // Focus input
+  setTimeout(() => overlay.querySelector('input')?.focus(), 100);
+  document.body.appendChild(overlay);
+}
+
+
 let activeSession = null;
 let globalTimerInterval = null;
 // Per-set timers: keyed by "ei-si"
@@ -1430,38 +1483,45 @@ function finishWorkout() {
     Object.values(setTimers).forEach(t => clearInterval(t.interval));
     setTimers = {};
 
-    // Finish exercise durations
     activeSession.exercises.forEach(ex => {
       if (ex.startedAt && !ex.duration) {
         ex.duration = Math.floor((Date.now() - ex.startedAt) / 1000);
       }
     });
 
-    await dbSaveSession(activeSession);
-    _activeSession = null;
-
-    const completedSession = { ...activeSession };
-    activeSession = null;
-
-    // Add to in-memory sessions so home page shows it immediately
-    _sessions.push({
-      id: completedSession.id,
-      routineId: completedSession.routineId,
-      routineName: completedSession.routineName,
-      startedAt: completedSession.startedAt,
-      duration: completedSession.duration,
-      exercises: completedSession.exercises,
-    });
-
-    showToast('Workout saved! 💪');
-    showPage('home', document.getElementById('nav-home'));
-    renderHome();
-
-    // Offer Strava upload if connected
-    if (stravaConnected) {
-      setTimeout(() => showStravaUploadPrompt(completedSession), 800);
+    // For Ad Hoc workouts, ask for a name first
+    if (!activeSession.routineId) {
+      promptAdHocName(async (name) => {
+        activeSession.routineName = name || 'Ad Hoc';
+        await doFinishWorkout(activeSession);
+      });
+    } else {
+      await doFinishWorkout(activeSession);
     }
   });
+}
+
+async function doFinishWorkout(session) {
+  await dbSaveSession(session);
+  _activeSession = null;
+
+  _sessions.push({
+    id: session.id,
+    routineId: session.routineId,
+    routineName: session.routineName,
+    startedAt: session.startedAt,
+    duration: session.duration,
+    exercises: session.exercises,
+  });
+
+  activeSession = null;
+  showToast('Workout saved! 💪');
+  showPage('home', document.getElementById('nav-home'));
+  renderHome();
+
+  if (stravaConnected) {
+    setTimeout(() => showStravaUploadPrompt(session), 800);
+  }
 }
 
 function autoSaveSession() {
@@ -2136,77 +2196,86 @@ function buildSetSuggestions(points, exName, equipment, numSets) {
 
   if (!lastSets.length) return buildNextSessionSuggestion(points, exName, equipment);
 
+  // ── Use the most common (modal) weight as the reference weight ────────────
+  const weightCounts = {};
+  lastSets.forEach(s => { weightCounts[s.weight] = (weightCounts[s.weight]||0) + 1; });
+  const mainWeight = +Object.entries(weightCounts).sort((a,b)=>b[1]-a[1])[0][0];
+
   // ── Check 2-for-2 readiness ───────────────────────────────────────────────
   function allSetsHitTop(perSet) {
     if (!perSet.length) return false;
-    return perSet.every(s => s.reps >= repMax);
+    // Only check sets that used the main weight
+    const mainSets = perSet.filter(s => s.weight >= mainWeight * 0.9);
+    return mainSets.length > 0 && mainSets.every(s => s.reps >= repMax);
   }
   const lastHitTop = allSetsHitTop(lastSets);
   const prevHitTop = prevSets.length ? allSetsHitTop(prevSets) : false;
   const twoForTwo  = lastHitTop && prevHitTop;
 
-  // ── Check if weight is too heavy (set 1 below repMin) ────────────────────
-  const set1Reps   = lastSets[0]?.reps || 0;
-  const tooHeavy   = set1Reps > 0 && set1Reps < repMin;
-
-  // ── Check intra-session fatigue pattern ───────────────────────────────────
-  const set1W      = lastSets[0]?.weight || last.weight;
-  const maxDrop    = Math.floor(set1Reps * fatigueTol);
+  // ── Check if weight is too heavy ──────────────────────────────────────────
+  const mainSets1 = lastSets.filter(s => s.weight >= mainWeight * 0.9);
+  const avgRepsAtMain = mainSets1.length
+    ? mainSets1.reduce((a,s)=>a+s.reps,0) / mainSets1.length
+    : 0;
+  const tooHeavy = avgRepsAtMain > 0 && avgRepsAtMain < repMin;
 
   // ── Determine next weight ─────────────────────────────────────────────────
-  const currentW  = lastSets[0]?.weight || last.weight;
-  const nextStep  = isDB ? nextDBStep(currentW) : currentW + 2;
-  const prevStep  = isDB ? prevDBStep(currentW) : currentW - 2;
-  const stepGap   = nextStep ? nextStep - currentW : null;
-  const bigJump   = stepGap && stepGap > 6;
+  const nextStep = isDB ? nextDBStep(mainWeight) : mainWeight + 2;
+  const prevStep = isDB ? prevDBStep(mainWeight) : mainWeight - 2;
+  const stepGap  = nextStep ? nextStep - mainWeight : null;
+  const bigJump  = stepGap && stepGap > 6;
 
-  // ── Build per-set targets ─────────────────────────────────────────────────
   const n = numSets || Math.max(lastSets.length, 3);
 
-  let overallDecision; // 'step_up' | 'consolidate' | 'drop'
-  if (tooHeavy)    overallDecision = 'drop';
+  let overallDecision;
+  if (tooHeavy)       overallDecision = 'drop';
   else if (twoForTwo) overallDecision = 'step_up';
-  else             overallDecision = 'consolidate';
+  else                overallDecision = 'consolidate';
 
   const sets = [];
   for (let i = 0; i < n; i++) {
-    const prev = lastSets[i] || lastSets[lastSets.length - 1] || { weight: currentW, reps: repMin };
+    // Use actual last set data for this position, or extrapolate from last available
+    const prev = lastSets[i] || lastSets[lastSets.length - 1] || { weight: mainWeight, reps: repMin };
+    // For warmup sets (lower weight), keep same weight and suggest pushing to main weight
+    const isWarmup = prev.weight < mainWeight * 0.9;
+
+    if (isWarmup) {
+      // Warmup set — suggest same weight, +1 rep
+      sets.push({
+        weight: prev.weight,
+        repsMin: prev.reps,
+        repsMax: Math.min(prev.reps + 2, repMax + 4),
+        trend: '↑',
+        note: 'warm-up',
+      });
+      continue;
+    }
 
     if (overallDecision === 'step_up') {
-      // Step up — expect reps to drop back toward bottom of range
-      const targetW    = nextStep || currentW;
-      // Compound press big jump: back off reps more
+      const targetW    = nextStep || mainWeight;
       const repDrop    = bigJump && COMPOUND_PRESS.includes(exName) ? 3 : 2;
-      const targetReps = Math.max(repMin, prev.reps - repDrop - i); // fatigue per set
+      const targetReps = Math.max(repMin, prev.reps - repDrop);
       sets.push({ weight: targetW, repsMin: Math.max(repMin, targetReps-1), repsMax: targetReps+1,
-        trend: '↑', note: i===0 ? `Step up from ${currentW}kg` : '' });
+        trend: '↑', note: i===0 ? `Step up from ${mainWeight}kg` : '' });
 
     } else if (overallDecision === 'drop') {
-      const targetW    = prevStep || currentW;
+      const targetW    = prevStep || mainWeight;
       const targetReps = Math.min(repMax - 1, prev.reps + 2);
       sets.push({ weight: targetW, repsMin: targetReps, repsMax: Math.min(repMax, targetReps+2),
-        trend: '↓', note: i===0 ? `Too heavy at ${currentW}kg — drop down` : '' });
+        trend: '↓', note: i===0 ? `Too heavy at ${mainWeight}kg — drop down` : '' });
 
     } else {
-      // Consolidate — same weight, try to add 1 rep where possible
-      const targetW = prev.weight || currentW;
+      // Consolidate — same weight, +1 rep
+      const targetW = mainWeight;
       let targetReps;
-      if (prev.reps >= repMax) {
-        targetReps = repMax; // already there, hold
-      } else if (prev.reps < repMin) {
-        targetReps = repMin; // below floor, get to minimum
-      } else {
-        // Add 1 rep unless set dropped due to normal fatigue
-        const expectedDrop = Math.floor((lastSets[0]?.reps || prev.reps) * fatigueTol);
-        const normalFatigue = i > 0 && (lastSets[0]?.reps || 0) - prev.reps <= expectedDrop;
-        targetReps = normalFatigue ? prev.reps + 1 : prev.reps + 1;
-      }
-      const atTop = targetReps >= repMax;
+      if (prev.reps >= repMax)      targetReps = repMax;
+      else if (prev.reps < repMin)  targetReps = repMin;
+      else                          targetReps = prev.reps + 1;
       sets.push({
         weight: targetW,
         repsMin: Math.min(targetReps, repMax),
         repsMax: Math.min(targetReps + 1, repMax),
-        trend: atTop ? '→' : '↑',
+        trend: targetReps >= repMax ? '→' : '↑',
         note: '',
       });
     }
@@ -2218,20 +2287,17 @@ function buildSetSuggestions(points, exName, equipment, numSets) {
     summary = `Step up to ${nextStep}kg — you hit ${repMax}+ reps ${twoForTwo ? 'two sessions running' : 'last session'}`;
     subtext = bigJump ? `Big jump (+${stepGap}kg) — expect reps to drop` : `Aim for ${repMin}–${repMax} reps at the new weight`;
   } else if (overallDecision === 'drop') {
-    summary = `Drop to ${prevStep||currentW}kg — ${set1Reps} reps on set 1 is below the floor`;
+    summary = `Drop to ${prevStep||mainWeight}kg — average reps below floor`;
     subtext = `Build back to ${repMin}–${repMax} reps before stepping up again`;
   } else if (lastHitTop) {
-    summary = `Hold ${currentW}kg — hit top range last session, one more to confirm`;
+    summary = `Hold ${mainWeight}kg — hit top range last session, one more to confirm`;
     subtext = `Hit ${repMax}+ reps again this session to earn the step up`;
   } else {
-    const worstSet = lastSets.reduce((a,b) => b.reps<a.reps?b:a, lastSets[0]);
-    summary = `Hold ${currentW}kg — add 1 rep where possible`;
-    subtext = worstSet.reps < repMin
-      ? `Set dropped to ${worstSet.reps} reps — focus on consistency first`
-      : `Closing in on ${repMax} reps across all sets`;
+    summary = `Hold ${mainWeight}kg — add 1 rep where possible`;
+    subtext = `Avg ${avgRepsAtMain.toFixed(1)} reps at ${mainWeight}kg last time — closing in on ${repMax}`;
   }
 
-  return { sets, summary, subtext, overallDecision, repMin, repMax, currentW };
+  return { sets, summary, subtext, overallDecision, repMin, repMax, currentW: mainWeight };
 }
 
 function buildNextSessionSuggestion(points, exName, equipment) {
@@ -3271,7 +3337,7 @@ Object.assign(window, {
   // Nav & pages
   showPage, openModal, closeModal, signInWithGoogle, signInWithMagicLink, signOut,
   // Home
-  openWorkoutPicker, handleStravaHomeBtn,
+  openWorkoutPicker, handleStravaHomeBtn, startAdHocWorkout,
   // Workout
   startWorkout, resumeWorkout, finishWorkout,
   handleSetBtn, addSet, removeLastSet, toggleExCollapse,
