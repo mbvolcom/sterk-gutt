@@ -1516,17 +1516,24 @@ function finishWorkout() {
 }
 
 async function doFinishWorkout(session) {
+  // Mark as inactive and save
+  session.is_active = false;
   await dbSaveSession(session);
+  save(SK.activeSession, null);
   _activeSession = null;
 
-  _sessions.push({
+  // Update in-memory sessions list
+  const existing = _sessions.findIndex(x => x.id === session.id);
+  const sessionRecord = {
     id: session.id,
     routineId: session.routineId,
     routineName: session.routineName,
     startedAt: session.startedAt,
     duration: session.duration,
     exercises: session.exercises,
-  });
+  };
+  if (existing >= 0) _sessions[existing] = sessionRecord;
+  else _sessions.push(sessionRecord);
 
   activeSession = null;
   showToast('Workout saved! 💪');
@@ -2168,17 +2175,20 @@ function buildExercisePoints(sessions, exName, equipFilter) {
 
 function assessProgression(points) {
   if (points.length < 2) return { status:'insufficient', trendPerMonth:0, plateau:false };
-  const weights = points.map(p=>p.weight);
-  const slopePerSession = linearTrend(weights);
+  // Use est1RM — accounts for both weight and reps, so going heavier with fewer reps still shows progress
+  const rm = points.map(p => p.est1RM || p.weight);
+  const slopePerSession = linearTrend(rm);
   const trendPerMonth = Math.round(slopePerSession * 4 * 10) / 10;
   const last3 = points.slice(-3);
-  const last3Weights = last3.map(p=>p.weight);
-  const plateau = last3.length >= 3 && Math.max(...last3Weights) - Math.min(...last3Weights) < 1;
-  const regressing = last3.length >= 3 && last3Weights[last3Weights.length-1] < last3Weights[0] - 0.5;
+  const last3RM = last3.map(p => p.est1RM || p.weight);
+  // Plateau only if <2% variation in est1RM across last 3 sessions
+  const maxRM = Math.max(...last3RM);
+  const minRM = Math.min(...last3RM);
+  const plateau = last3.length >= 3 && (maxRM - minRM) / (maxRM || 1) < 0.02;
+  const regressing = last3.length >= 3 && last3RM[last3RM.length-1] < last3RM[0] * 0.97;
   let status = 'progressing';
   if (regressing) status = 'regressing';
-  else if (plateau) status = 'plateau';
-  else if (slopePerSession <= 0.01) status = 'plateau';
+  else if (plateau && slopePerSession < 0) status = 'plateau';
   return { status, trendPerMonth, plateau, regressing };
 }
 
@@ -2418,8 +2428,45 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
   });
   container.appendChild(dotRow);
 
-  // ── Next session suggestion ───────────────────────────────────────────────
-  if (hint) {
+  // ── Next session suggestion — per-set table ─────────────────────────────
+  const allSess2 = load(SK.sessions)||[];
+  const perSetData = buildSetSuggestions(points, exName, equipment,
+    last.perSet?.length || last.sets || 3);
+
+  if (perSetData) {
+    const hintCard = document.createElement('div');
+    hintCard.style.cssText = 'background:rgba(0,180,255,0.08);border:1px solid rgba(0,180,255,0.2);border-radius:12px;padding:14px 16px;margin-bottom:14px;';
+
+    const summaryEl = document.createElement('div');
+    summaryEl.innerHTML = `
+      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#00b4ff;font-weight:700;margin-bottom:6px;">Next session</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">${perSetData.summary}</div>
+      <div style="font-size:11px;color:var(--muted2);margin-bottom:10px;">${perSetData.subtext}</div>`;
+    hintCard.appendChild(summaryEl);
+
+    if (perSetData.sets?.length) {
+      const colHdr = document.createElement('div');
+      colHdr.style.cssText = 'display:grid;grid-template-columns:32px 1fr 1fr 20px;gap:6px;padding:0 6px;font-size:9px;color:var(--muted2);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;';
+      colHdr.innerHTML = '<span></span><span>Last</span><span>Target</span><span></span>';
+      hintCard.appendChild(colHdr);
+
+      const lastPerSet = last.perSet || [];
+      perSetData.sets.forEach((s, i) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:grid;grid-template-columns:32px 1fr 1fr 20px;align-items:center;gap:6px;padding:5px 6px;background:rgba(255,255,255,0.03);border-radius:6px;font-size:11px;margin-bottom:3px;';
+        const trendColor = s.trend==='↑'?'#00ff96':s.trend==='↓'?'#ff4466':'#6b7280';
+        const repsStr = s.repsMin===s.repsMax ? `${s.repsMin}` : `${s.repsMin}–${s.repsMax}`;
+        const prevStr = lastPerSet[i] ? `${lastPerSet[i].weight}kg×${lastPerSet[i].reps}` : '—';
+        row.innerHTML =
+          `<span style="color:var(--muted2);font-weight:600;">S${i+1}</span>` +
+          `<span style="color:var(--muted2);">${prevStr}</span>` +
+          `<span style="color:#e8eaf0;font-weight:700;">${s.weight}kg × ${repsStr}</span>` +
+          `<span style="color:${trendColor};font-weight:700;">${s.trend}</span>`;
+        hintCard.appendChild(row);
+      });
+    }
+    container.appendChild(hintCard);
+  } else if (hint) {
     const hintCard = document.createElement('div');
     hintCard.style.cssText = 'background:rgba(0,180,255,0.08);border:1px solid rgba(0,180,255,0.2);border-radius:12px;padding:14px 16px;margin-bottom:14px;';
     hintCard.innerHTML = `
