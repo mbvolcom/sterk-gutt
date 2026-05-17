@@ -30,7 +30,7 @@
   border:1px solid var(--border);
   border-radius:12px;
   margin-bottom:12px;
-  overflow:hidden;
+  overflow:visible;
   transition:border-color 0.2s;
 }
 .ex-card.active-ex{border-color:var(--border2);box-shadow:0 0 16px rgba(0,180,255,0.06);}
@@ -486,7 +486,7 @@ canvas.chart{width:100%!important;height:100%!important;}
 
 /* Confirm dialog */
 .confirm-overlay{
-  position:fixed;inset:0;background:rgba(7,8,12,0.92);z-index:2000;
+  position:fixed;inset:0;background:rgba(7,8,12,0.92);z-index:10000;
   display:none;align-items:center;justify-content:center;padding:20px;
 }
 .confirm-overlay.open{display:flex;}
