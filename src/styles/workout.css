@@ -30,7 +30,7 @@
   border:1px solid var(--border);
   border-radius:12px;
   margin-bottom:12px;
-  overflow:visible;
+  overflow:hidden;
   transition:border-color 0.2s;
 }
 .ex-card.active-ex{border-color:var(--border2);box-shadow:0 0 16px rgba(0,180,255,0.06);}
