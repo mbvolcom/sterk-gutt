@@ -901,31 +901,11 @@ function startWorkout(routineId) {
 }
 
 function renderWorkoutPage() {
-  const header = document.querySelector('.workout-header');
-  const body = document.getElementById('workout-body');
-
-  if (!activeSession) {
-    // Idle state
-    if (header) header.style.display = 'none';
-    body.innerHTML = `
-      <div class="wk-idle-wrap">
-        <div class="wk-idle-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#CCFF4C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>
-        </div>
-        <div class="wk-idle-title">No workout<br>in progress</div>
-        <div class="wk-idle-sub">Tap Start Workout on Home, or pick a routine to begin.</div>
-        <button class="wk-idle-cta" onclick="openWorkoutPicker()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CCFF4C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>
-          Start workout
-        </button>
-      </div>`;
-    return;
-  }
-
-  if (header) header.style.display = '';
+  if (!activeSession) return;
   document.getElementById('active-workout-name').textContent = activeSession.routineName;
   document.getElementById('active-workout-date').textContent =
     new Date(activeSession.startedAt).toLocaleDateString('no-NO', { weekday:'long', day:'numeric', month:'long' });
+  // Update save button label based on whether this is Ad Hoc or a routine
   const saveLabel = document.getElementById('save-routine-btn-label');
   if (saveLabel) {
     saveLabel.textContent = activeSession.routineId
@@ -944,8 +924,9 @@ function renderWorkoutBody() {
 
   // Add exercise button at the bottom
   const addExBtn = document.createElement('button');
-  addExBtn.style.cssText = 'width:100%;margin:4px 0;border:1.5px dashed rgba(204,255,76,0.66);background:transparent;color:#CCFF4C;font-family:\'JetBrains Mono\',monospace;font-size:12px;font-weight:700;letter-spacing:0.22em;text-transform:uppercase;padding:14px;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;border-radius:0;-webkit-appearance:none;';
-  addExBtn.innerHTML = '<span style="font-size:14px;">+</span> Add exercise';
+  addExBtn.className = 'btn btn-ghost';
+  addExBtn.style.cssText = 'width:100%;margin:12px 0 4px;border:1.5px dashed rgba(0,180,255,0.3);color:var(--neon);letter-spacing:1px;';
+  addExBtn.textContent = '+ ADD EXERCISE';
   addExBtn.addEventListener('click', () => openAddExerciseDuringWorkout());
   body.appendChild(addExBtn);
 
