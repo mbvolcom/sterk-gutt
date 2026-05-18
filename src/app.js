@@ -862,6 +862,13 @@ function renderWorkoutPage() {
   document.getElementById('active-workout-name').textContent = activeSession.routineName;
   document.getElementById('active-workout-date').textContent =
     new Date(activeSession.startedAt).toLocaleDateString('no-NO', { weekday:'long', day:'numeric', month:'long' });
+  // Update save button label based on whether this is Ad Hoc or a routine
+  const saveLabel = document.getElementById('save-routine-btn-label');
+  if (saveLabel) {
+    saveLabel.textContent = activeSession.routineId
+      ? 'Save exercise changes to routine'
+      : 'Save as new routine';
+  }
   renderWorkoutBody();
 }
 
@@ -1171,8 +1178,7 @@ function buildSetRow(s, si, ei, isUni) {
         ${inputDisabled} onchange="updateSet(${ei},${si},'note',this.value)"/>
     </div>
     <div class="set-btn-row">
-      ${durBadge ? `<div style="text-align:center;padding:2px 0 4px;font-size:10px;">${durBadge}</div>` : ''}
-      <button class="set-start-btn ${btnClass}" onclick="handleSetBtn(${ei},${si})">${btnLabel}</button>
+      <button class="set-start-btn ${btnClass}" onclick="handleSetBtn(${ei},${si})">${btnLabel}${durBadge ? `<span style="display:block;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;opacity:0.7;margin-top:2px;">${durBadge}</span>` : ''}</button>
     </div>
   </div>`;
 }
@@ -1453,7 +1459,31 @@ function toggleExCollapse(ei) {
 
 // ── Save current exercise list back to the routine ─────────
 function saveRoutineChanges() {
-  if (!activeSession || !activeSession.routineId) return;
+  if (!activeSession) return;
+
+  // Ad Hoc — create a brand new routine from current exercises
+  if (!activeSession.routineId) {
+    promptAdHocName(async (name) => {
+      if (!activeSession.exercises.length) { showToast('Add at least one exercise first'); return; }
+      const routine = {
+        id: 'r_' + Date.now(),
+        name: name || activeSession.routineName || 'Ad Hoc',
+        createdAt: Date.now(),
+        exercises: activeSession.exercises.map(ex => ({
+          id: ex.id, name: ex.name, muscle: ex.muscle,
+          unilateral: ex.unilateral, sets: ex.sets.length,
+        })),
+      };
+      const routines = load(SK.routines) || [];
+      routines.push(routine);
+      save(SK.routines, routines);
+      await dbSaveRoutine(routine);
+      showToast(`Routine "${routine.name}" saved ✓`);
+    });
+    return;
+  }
+
+  // Existing routine — update exercises
   showConfirm(
     'Save Routine Changes?',
     'This will update the exercise list and order in the saved routine.',
@@ -1461,16 +1491,10 @@ function saveRoutineChanges() {
       const routines = load(SK.routines) || [];
       const idx = routines.findIndex(r => r.id === activeSession.routineId);
       if (idx < 0) { showToast('Routine not found'); return; }
-
-      // Update exercises — keep original set counts from routine, just sync order/names
       routines[idx].exercises = activeSession.exercises.map(ex => ({
-        id:         ex.id,
-        name:       ex.name,
-        muscle:     ex.muscle,
-        unilateral: ex.unilateral,
-        sets:       ex.sets.length,
+        id: ex.id, name: ex.name, muscle: ex.muscle,
+        unilateral: ex.unilateral, sets: ex.sets.length,
       }));
-
       save(SK.routines, routines);
       dbSaveRoutine(routines[idx]);
       showToast('Routine updated ✓');
