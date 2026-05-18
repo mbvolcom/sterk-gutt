@@ -173,22 +173,29 @@
 
   <!-- ══ WORKOUT PAGE ══ -->
   <div class="page" id="page-workout">
-    <div class="workout-header">
+    <div class="workout-header" style="grid-template-columns:1fr auto auto auto;">
+      <!-- Left: title + date -->
       <div class="workout-title-row">
-        <div>
-          <div class="workout-name" id="active-workout-name">—</div>
-          <div style="font-size:10px;color:var(--muted2);margin-top:2px;" id="active-workout-date"></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div id="rest-timer-badge" style="display:none;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;color:#00b4ff;background:rgba(0,180,255,0.1);border:1px solid rgba(0,180,255,0.2);border-radius:8px;padding:4px 10px;">REST <span id="rest-timer-badge-time">0:00</span></div>
-          <div class="workout-timer-badge" id="workout-global-timer">00:00</div>
-          <button class="workout-finish-btn" onclick="finishWorkout()">FINISH</button>
+        <div class="workout-name" id="active-workout-name">—</div>
+        <div class="workout-date" id="active-workout-date"></div>
+      </div>
+      <!-- REST chip — shown when rest timer is running -->
+      <div id="rest-timer-badge" style="display:none;">
+        <div class="rest-chip">
+          <span class="rest-chip-lbl">REST</span>
+          <span class="rest-chip-time" id="rest-timer-badge-time">0:00</span>
         </div>
       </div>
-      <button class="save-routine-btn" onclick="saveRoutineChanges()">
-        💾 <span id="save-routine-btn-label">Save exercise changes to routine</span>
-      </button>
+      <!-- Elapsed workout timer -->
+      <div class="workout-elapsed" id="workout-global-timer">0:00</div>
+      <!-- Finish -->
+      <button class="workout-finish-btn" onclick="finishWorkout()">FINISH</button>
     </div>
+    <!-- Save banner -->
+    <button class="save-routine-btn" id="save-routine-btn" onclick="saveRoutineChanges()" style="display:none;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      <span id="save-routine-btn-label">Save exercise changes to routine</span>
+    </button>
     <div class="workout-body" id="workout-body"></div>
   </div>
 
