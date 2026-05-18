@@ -125,7 +125,7 @@
     <div class="logo">STERK<span>GUTT</span></div>
   </div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#555552;letter-spacing:0.1em;">v2.13.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#555552;letter-spacing:0.1em;">v2.14.0</div>
     <div id="sync-status" style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.06em;transition:color 0.3s;"></div>
   </div>
 </div>
@@ -298,16 +298,20 @@
 </nav>
 
 <!-- WORKOUT PICKER MODAL -->
-<div class="modal-overlay" id="workout-picker">
-  <div class="modal-header">
-    <div class="modal-title">START WORKOUT</div>
-    <div class="modal-close" onclick="closeModal('workout-picker')">✕</div>
+<div class="modal-overlay" id="workout-picker" style="background:#0f0f0e;padding:0;">
+  <div style="padding:20px 20px 16px;display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0;">
+    <button class="wp-close" onclick="closeModal('workout-picker')">×</button>
+    <button class="wp-new-btn" onclick="closeModal('workout-picker');openRoutineEditor(null)">
+      + <span>NEW</span>
+    </button>
   </div>
-  <div id="picker-routine-list"></div>
-  <button class="new-routine-btn" onclick="closeModal('workout-picker');openRoutineEditor(null)">
-    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
-    Create New Routine
-  </button>
+  <div style="padding:0 20px 12px;flex-shrink:0;">
+    <div class="wp-title">START<br>WORKOUT</div>
+    <div class="wp-subtitle" id="wp-subtitle">—</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+    <div id="picker-routine-list"></div>
+  </div>
 </div>
 
 <!-- ROUTINE EDITOR MODAL -->
