@@ -70,10 +70,10 @@
 .set-row {
   border-radius:8px;
   margin-bottom:6px;
-  overflow:visible;
   border:1px solid var(--border);
   transition:border-color 0.2s;
-  position:relative;
+  overflow:hidden;
+  isolation:isolate;
 }
 .set-row.set-active  { border-color:var(--neon);  box-shadow:0 0 10px rgba(0,180,255,0.1); }
 .set-row.set-logged  { border-color:rgba(0,255,204,0.25); }
@@ -116,16 +116,24 @@
 
 /* START / STOP button row */
 .set-btn-row {
-  padding:8px;display:flex;gap:6px;align-items:center;width:100%;box-sizing:border-box;
+  padding:6px 8px 8px;
 }
 .set-start-btn {
-  flex:1;min-width:0;width:100%;border:none;border-radius:6px;
-  padding:12px 8px;cursor:pointer;
-  font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;
+  display:block;
+  width:100%;
+  border:none;
+  border-radius:6px;
+  padding:13px 8px;
+  cursor:pointer;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:16px;
+  letter-spacing:2px;
   transition:all 0.15s;
   -webkit-tap-highlight-color:transparent;
   touch-action:manipulation;
-  display:block;
+  -webkit-appearance:none;
+  appearance:none;
+  box-sizing:border-box;
 }
 .set-start-btn.state-idle {
   background:#0d2a3e;color:#00b4ff;border:1px solid rgba(0,180,255,0.35);
