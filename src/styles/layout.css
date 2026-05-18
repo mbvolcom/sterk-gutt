@@ -2,12 +2,12 @@
 .app-header{
   min-height:var(--header-h);
   height:auto;
-  background:var(--bg2);
-  border-bottom:1px solid var(--border);
+  background:#0f0f0e;
+  border-bottom:1px solid rgba(255,255,255,0.06);
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:10px 20px 12px;
+  padding:10px 16px 10px;
   flex-shrink:0;
   position:relative;
 }
@@ -16,18 +16,20 @@
   position:absolute;
   bottom:0;left:0;right:0;
   height:1px;
-  background:linear-gradient(90deg,transparent,var(--neon),transparent);
-  opacity:0.4;
+  background:linear-gradient(90deg,transparent,rgba(200,240,110,0.2),transparent);
+  opacity:0.6;
 }
 .logo{
-  font-family:'Bebas Neue',sans-serif;
-  font-size:26px;
-  letter-spacing:4px;
-  color:#fff;
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:22px;
+  font-weight:800;
+  letter-spacing:0.12em;
+  color:#e8e6e0;
   line-height:1;
+  text-transform:uppercase;
 }
-.logo span{color:var(--neon);text-shadow:0 0 12px var(--neon-glow);}
-.header-right{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
+.logo span{color:#c8f06e;}
+.header-right{font-family:'JetBrains Mono',monospace;font-size:10px;color:#555552;letter-spacing:0.1em;text-transform:uppercase;}
 
 /* MAIN CONTENT */
 .main{
@@ -43,10 +45,10 @@
 /* BOTTOM NAV */
 .bottom-nav{
   height:var(--nav-h);
-  background:var(--bg2);
-  border-top:1px solid var(--border);
+  background:#0f0f0e;
+  border-top:1px solid rgba(255,255,255,0.06);
   display:grid;
-  grid-template-columns:repeat(4,1fr);
+  grid-template-columns:repeat(5,1fr);
   flex-shrink:0;
   position:relative;
 }
@@ -55,19 +57,19 @@
   position:absolute;
   top:0;left:0;right:0;
   height:1px;
-  background:linear-gradient(90deg,transparent,var(--neon),transparent);
-  opacity:0.3;
+  background:linear-gradient(90deg,transparent,rgba(200,240,110,0.2),transparent);
 }
 .nav-btn{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:4px;border:none;background:none;cursor:pointer;
-  color:var(--muted);font-family:'DM Mono',monospace;font-size:9px;
-  letter-spacing:1.5px;text-transform:uppercase;
+  gap:3px;border:none;background:none;cursor:pointer;
+  color:#555552;
+  font-family:'JetBrains Mono',monospace;font-size:8px;
+  letter-spacing:0.08em;text-transform:uppercase;
   transition:color 0.2s;padding:8px 0;
 }
 .nav-btn svg{width:20px;height:20px;stroke-width:1.5;transition:filter 0.2s;}
-.nav-btn.active{color:var(--neon);}
-.nav-btn.active svg{filter:drop-shadow(0 0 4px var(--neon-glow));}
+.nav-btn.active{color:#c8f06e;}
+.nav-btn.active svg{filter:drop-shadow(0 0 4px rgba(200,240,110,0.5));}
 
 /* SHARED COMPONENTS */
 .section-title{

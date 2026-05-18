@@ -58,48 +58,142 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
 /* ═══════════════════════════════════════
    HOME PAGE
 ═══════════════════════════════════════ */
-#page-home{padding:20px 16px;padding-bottom:calc(var(--nav-h) + 28px);}
 
-.home-hero{
-  background:var(--bg2);
-  border:1px solid var(--border2);
-  border-radius:16px;
-  padding:24px 20px;
-  margin-bottom:24px;
-  position:relative;
-  overflow:hidden;
-}
-.home-hero::before{
-  content:'';
-  position:absolute;
-  top:-40px;right:-40px;
-  width:200px;height:200px;
-  background:radial-gradient(circle,rgba(0,180,255,0.08) 0%,transparent 70%);
-}
-.home-hero-label{font-size:10px;letter-spacing:3px;color:var(--neon);text-transform:uppercase;margin-bottom:8px;}
-.home-hero-title{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:3px;color:#fff;line-height:1;margin-bottom:4px;}
-.home-hero-sub{font-size:11px;color:var(--muted2);margin-bottom:20px;}
+/* ── Home layout ── */
+#page-home { background:#0f0f0e; }
+.home-fixed { flex-shrink:0; padding:0 16px; }
+.home-scroll { flex:1; overflow-y:auto; padding:0 16px; padding-bottom:calc(var(--nav-h) + 16px); -webkit-overflow-scrolling:touch; }
 
-.recent-item{
-  display:flex;align-items:center;gap:12px;
-  padding:14px 16px;
-  border-bottom:1px solid var(--border);
-  cursor:pointer;
-  transition:background 0.15s;
+/* ── Date card ── */
+.home-date-card {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  background:#1a1a18; border:1px solid rgba(255,255,255,0.06);
+  border-radius:10px; padding:14px 16px; margin-bottom:10px; margin-top:12px;
 }
-.recent-item:last-child{border-bottom:none;}
-.recent-item:active{background:var(--surface2);}
-.recent-dot{
-  width:8px;height:8px;border-radius:50%;
-  background:var(--neon);
-  box-shadow:0 0 6px var(--neon-glow);
+.home-date-left { display:flex; align-items:flex-start; gap:12px; }
+.home-day-num {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:56px; font-weight:800; line-height:1;
+  color:#e8e6e0; letter-spacing:-1px;
+}
+.home-date-info { padding-top:6px; }
+.home-date-line {
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px; font-weight:500; letter-spacing:0.12em;
+  color:#888884; text-transform:uppercase;
+}
+.home-week-line {
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px; font-weight:500; letter-spacing:0.08em;
+  color:#c8f06e; text-transform:uppercase; margin-top:3px;
+}
+.home-strava-btn {
+  background:none; border:none; cursor:pointer;
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px; font-weight:700; letter-spacing:0.1em;
+  color:#888884; text-transform:uppercase; padding:0;
+  white-space:nowrap; flex-shrink:0;
+}
+.home-strava-btn.connected { color:#c8f06e; }
+
+/* ── Status line ── */
+.home-status-line {
+  display:flex; align-items:center; gap:8px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px; font-weight:500; letter-spacing:0.1em;
+  color:#888884; text-transform:uppercase;
+  margin-bottom:12px;
+}
+.home-status-dot {
+  width:6px; height:6px; border-radius:50%;
+  background:#c8f06e; box-shadow:0 0 6px #c8f06e;
   flex-shrink:0;
 }
-.recent-info{flex:1;min-width:0;}
-.recent-name{font-size:13px;color:var(--text);font-weight:500;}
-.recent-meta{font-size:10px;color:var(--muted2);margin-top:2px;}
-.recent-right{font-size:11px;color:var(--muted);text-align:right;}
-.recent-sets{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--neon);display:block;}
+
+/* ── Start workout button ── */
+.home-start-btn {
+  width:100%; background:#c8f06e; color:#0f0f0e;
+  border:none; border-radius:8px;
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:20px; font-weight:800; letter-spacing:0.12em;
+  text-transform:uppercase;
+  padding:16px; margin-bottom:20px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  cursor:pointer; touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+.home-start-btn:active { background:#b8e05e; }
+.home-start-btn svg { fill:#0f0f0e; }
+
+/* ── Training log header ── */
+.home-log-header {
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px; font-weight:700; letter-spacing:0.18em;
+  color:#555552; text-transform:uppercase;
+  padding-bottom:8px;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  margin-bottom:0;
+}
+
+/* ── Session log rows ── */
+.recent-item {
+  display:grid;
+  grid-template-columns:40px 1fr auto;
+  align-items:center; gap:12px;
+  padding:13px 0;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  cursor:pointer;
+  transition:background 0.1s;
+}
+.recent-item:last-child { border-bottom:none; }
+.recent-item:active { opacity:0.7; }
+
+.recent-day-num {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:32px; font-weight:700; line-height:1;
+  color:#e8e6e0; text-align:left;
+}
+.recent-info { min-width:0; }
+.recent-name {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:16px; font-weight:700; letter-spacing:0.02em;
+  color:#e8e6e0; line-height:1.2;
+}
+.recent-meta {
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px; font-weight:500; letter-spacing:0.06em;
+  color:#555552; text-transform:uppercase; margin-top:3px;
+}
+.recent-right { text-align:right; flex-shrink:0; }
+.recent-sets {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:22px; font-weight:700; color:#e8e6e0;
+  line-height:1; display:block;
+}
+.recent-sets-label {
+  font-family:'JetBrains Mono',monospace;
+  font-size:8px; letter-spacing:0.1em;
+  color:#555552; text-transform:uppercase;
+}
+
+/* ── Resume banner ── */
+.resume-banner{
+  background:#1a1a18; border:1px solid rgba(200,240,110,0.2);
+  border-radius:10px; padding:12px 14px;
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; margin:12px 0 0;
+}
+.resume-banner-title{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:15px;font-weight:700;color:#c8f06e;letter-spacing:0.05em;
+}
+.resume-banner-sub{font-family:'JetBrains Mono',monospace;font-size:9px;color:#888884;margin-top:2px;letter-spacing:0.06em;text-transform:uppercase;}
+.resume-btn{
+  background:#c8f06e;color:#0f0f0e;border:none;border-radius:6px;
+  padding:8px 14px;font-family:'Barlow Condensed',sans-serif;
+  font-size:14px;font-weight:800;letter-spacing:0.1em;cursor:pointer;flex-shrink:0;
+}
+
 
 /* ═══════════════════════════════════════
    WORKOUT PICKER MODAL
