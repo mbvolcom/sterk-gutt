@@ -563,7 +563,10 @@ function renderHome() {
   if (statusEl) {
     if (recent.length > 0) {
       const lastDate = new Date(recent[0].startedAt);
-      const daysSince = Math.floor((now - lastDate) / 86400000);
+      // Compare calendar dates, not raw milliseconds
+      const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const lastMidnight  = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate());
+      const daysSince = Math.round((todayMidnight - lastMidnight) / 86400000);
       if (daysSince === 0) statusEl.textContent = 'READY · TRAINED TODAY';
       else if (daysSince === 1) statusEl.textContent = 'READY · 1 DAY SINCE LAST LIFT';
       else statusEl.textContent = `READY · ${daysSince} DAYS SINCE LAST LIFT`;
