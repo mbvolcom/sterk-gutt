@@ -540,34 +540,61 @@ function confirmOk() {
 // ═══════════════════════════════════════════
 function renderHome() {
   const sessions = load(SK.sessions) || [];
-  const recent = [...sessions].reverse(); // all sessions, newest first
-  const list = document.getElementById('recent-list');
-
+  const recent = [...sessions].reverse(); // newest first
   const now = new Date();
-  const hour = now.getHours();
-  const greet = hour < 12 ? 'GOOD MORNING' : hour < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING';
-  document.getElementById('home-greeting').textContent = greet;
 
-  // Resume banner — show if there's an active session saved
-  const heroEl = document.querySelector('.home-hero');
-  const existingBanner = document.getElementById('resume-banner');
-  if (existingBanner) existingBanner.remove();
-  const savedActive = load(SK.activeSession);
-  if (savedActive && !activeSession) {
-    const banner = document.createElement('div');
-    banner.className = 'resume-banner';
-    banner.id = 'resume-banner';
-    const dur = formatDuration(Math.floor((Date.now() - savedActive.startedAt) / 1000));
-    banner.innerHTML = `
-      <div class="resume-banner-text">
-        <div class="resume-banner-title">⚡ Workout in progress</div>
-        <div class="resume-banner-sub">${savedActive.routineName} · started ${dur} ago</div>
-      </div>
-      <button class="resume-btn" onclick="resumeWorkout()">RESUME</button>
-    `;
-    heroEl.parentNode.insertBefore(banner, heroEl);
+  // ── Date card ─────────────────────────────────────────────────────────────
+  const dayNum = now.getDate();
+  const dayName = now.toLocaleDateString('en-GB', { weekday:'long' }).toUpperCase();
+  const monthName = now.toLocaleDateString('en-GB', { month:'long' }).toUpperCase();
+  // ISO week number
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const weekNum = Math.ceil(((now - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+
+  const dayNumEl = document.getElementById('home-day-num');
+  const dateLineEl = document.getElementById('home-date-line');
+  const weekLineEl = document.getElementById('home-week-line');
+  if (dayNumEl) dayNumEl.textContent = dayNum;
+  if (dateLineEl) dateLineEl.textContent = `${dayName} · ${monthName}`;
+  if (weekLineEl) weekLineEl.textContent = `→ TODAY · WEEK ${weekNum}`;
+
+  // ── Days since last lift ───────────────────────────────────────────────────
+  const statusEl = document.getElementById('home-status-text');
+  if (statusEl) {
+    if (recent.length > 0) {
+      const lastDate = new Date(recent[0].startedAt);
+      const daysSince = Math.floor((now - lastDate) / 86400000);
+      if (daysSince === 0) statusEl.textContent = 'READY · TRAINED TODAY';
+      else if (daysSince === 1) statusEl.textContent = 'READY · 1 DAY SINCE LAST LIFT';
+      else statusEl.textContent = `READY · ${daysSince} DAYS SINCE LAST LIFT`;
+    } else {
+      statusEl.textContent = 'READY · LET\'S GET STARTED';
+    }
   }
 
+  // ── Strava button ─────────────────────────────────────────────────────────
+  updateStravaBtn();
+
+  // ── Resume banner ─────────────────────────────────────────────────────────
+  const resumeSlot = document.getElementById('home-resume-slot');
+  if (resumeSlot) {
+    resumeSlot.innerHTML = '';
+    const savedActive = load(SK.activeSession);
+    if (savedActive && !activeSession) {
+      const dur = formatDuration(Math.floor((Date.now() - savedActive.startedAt) / 1000));
+      resumeSlot.innerHTML = `
+        <div class="resume-banner">
+          <div>
+            <div class="resume-banner-title">⚡ WORKOUT IN PROGRESS</div>
+            <div class="resume-banner-sub">${savedActive.routineName} · ${dur} ago</div>
+          </div>
+          <button class="resume-btn" onclick="resumeWorkout()">RESUME</button>
+        </div>`;
+    }
+  }
+
+  // ── Session list ──────────────────────────────────────────────────────────
+  const list = document.getElementById('recent-list');
   if (recent.length === 0) {
     list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💪</div><div class="empty-state-text">No sessions yet</div></div>';
     return;
@@ -577,20 +604,22 @@ function renderHome() {
   recent.forEach(s => {
     const totalSets = (s.exercises||[]).reduce((a,ex)=>a+(ex.sets||[]).filter(st=>st.logged).length, 0);
     const dur = s.duration ? formatDuration(s.duration) : '—';
-    const dateStr = new Date(s.startedAt).toLocaleDateString('no-NO',{weekday:'short',day:'numeric',month:'short'});
+    const d = new Date(s.startedAt);
+    const dayN = d.getDate();
+    const weekday = d.toLocaleDateString('en-GB', { weekday:'short' }).toUpperCase();
+    const metaStr = `${weekday} · ${dur} · ${totalSets} SETS`;
 
     const item = document.createElement('div');
     item.className = 'recent-item';
-    item.style.cursor = 'pointer';
     item.innerHTML = `
-      <div class="recent-dot"></div>
+      <div class="recent-day-num">${dayN}</div>
       <div class="recent-info">
         <div class="recent-name">${s.routineName}</div>
-        <div class="recent-meta">${dateStr} · ${dur}</div>
+        <div class="recent-meta">${metaStr}</div>
       </div>
       <div class="recent-right">
         <span class="recent-sets">${totalSets}</span>
-        <span style="font-size:9px;color:var(--muted);">sets</span>
+        <span class="recent-sets-label">sets</span>
       </div>`;
 
     item.addEventListener('click', () => openSessionEditor(s.id));
@@ -3279,17 +3308,11 @@ function updateStravaBtn() {
   const lbl = document.getElementById('strava-home-label');
   if (!btn) return;
   if (stravaConnected) {
-    btn.style.borderColor = 'rgba(0,255,150,0.35)';
-    btn.style.background  = 'rgba(0,255,150,0.08)';
-    btn.style.color       = 'var(--green)';
-    btn.querySelector('svg').style.fill = 'var(--green)';
-    if (lbl) lbl.textContent = '✓';
+    btn.classList.add('connected');
+    if (lbl) lbl.textContent = '✓ STRAVA';
   } else {
-    btn.style.borderColor = 'rgba(255,255,255,0.1)';
-    btn.style.background  = 'rgba(255,255,255,0.06)';
-    btn.style.color       = 'var(--muted2)';
-    btn.querySelector('svg').style.fill = '#FC4C02';
-    if (lbl) lbl.textContent = '';
+    btn.classList.remove('connected');
+    if (lbl) lbl.textContent = '^ STRAVA';
   }
 }
 
