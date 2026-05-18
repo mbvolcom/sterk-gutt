@@ -926,7 +926,9 @@ function renderWorkoutPage() {
   document.getElementById('active-workout-name').textContent = activeSession.routineName;
   document.getElementById('active-workout-date').textContent =
     new Date(activeSession.startedAt).toLocaleDateString('no-NO', { weekday:'long', day:'numeric', month:'long' });
+  const saveBtn = document.getElementById('save-routine-btn');
   const saveLabel = document.getElementById('save-routine-btn-label');
+  if (saveBtn) saveBtn.style.display = '';
   if (saveLabel) {
     saveLabel.textContent = activeSession.routineId
       ? 'Save exercise changes to routine'
@@ -1202,17 +1204,18 @@ function buildSetRow(s, si, ei, isUni) {
   const inputDisabled = isLogged ? '' : '';
   const inputOpacity  = '';
 
-  let btnLabel, btnClass;
-  if (s.state === 'idle')   { btnLabel = 'START'; btnClass = 'state-idle'; }
-  if (s.state === 'active') { btnLabel = 'STOP';  btnClass = 'state-active'; }
-  if (s.state === 'logged') { btnLabel = '✓ Set done'; btnClass = 'state-logged'; }
-
-  // Set duration badge
-  const durBadge = s.setDuration
-    ? `<span style="font-size:10px;color:var(--muted2);letter-spacing:1px;">${formatMMSS(s.setDuration)}</span>`
-    : s.state === 'active'
-    ? `<span id="set-timer-${ei}-${si}" style="font-size:10px;color:var(--neon);letter-spacing:1px;font-family:'Bebas Neue',sans-serif;">0:00</span>`
-    : '';
+  let btnLabel, btnClass, btnSublabel;
+  if (s.state === 'idle') {
+    btnLabel = 'START'; btnClass = 'state-idle'; btnSublabel = '';
+  } else if (s.state === 'active') {
+    btnLabel = 'STOP'; btnClass = 'state-active';
+    btnSublabel = `<span class="set-btn-sublabel" id="set-timer-${ei}-${si}">0:00</span>`;
+  } else {
+    btnLabel = '✓ SET DONE'; btnClass = 'state-logged';
+    btnSublabel = s.setDuration
+      ? `<span class="set-btn-sublabel">${formatMMSS(s.setDuration)}</span>`
+      : '';
+  }
 
   const inputs = isUni ? `
     <input class="set-input ${gClass(s.weight,s.ghostWeight)}" type="number" inputmode="decimal" min="0" step="0.5"
@@ -1241,7 +1244,7 @@ function buildSetRow(s, si, ei, isUni) {
         ${inputDisabled} onchange="updateSet(${ei},${si},'note',this.value)"/>
     </div>
     <div class="set-btn-row">
-      <button class="set-start-btn ${btnClass}" onclick="handleSetBtn(${ei},${si})">${btnLabel}${durBadge ? `<span style="display:block;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;opacity:0.7;margin-top:2px;">${durBadge}</span>` : ''}</button>
+      <button class="set-start-btn ${btnClass}" onclick="handleSetBtn(${ei},${si})">${btnLabel}${btnSublabel}</button>
     </div>
   </div>`;
 }
