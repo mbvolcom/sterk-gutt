@@ -633,107 +633,103 @@ function openSessionEditor(sessionId) {
   if (!s) return;
 
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(7,8,12,0.97);z-index:9999;display:flex;flex-direction:column;overflow:hidden;';
+  overlay.style.cssText = 'position:fixed;inset:0;background:#0f0f0e;z-index:9999;display:flex;flex-direction:column;overflow:hidden;';
 
   // ── Header ────────────────────────────────────────────────────────────────
-  const header = document.createElement('div');
-  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;';
-  const dateStr = new Date(s.startedAt).toLocaleDateString('no-NO',{weekday:'long',day:'numeric',month:'long'});
+  const d = new Date(s.startedAt);
+  const dateStr = d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}).toUpperCase();
   const dur = s.duration ? formatDuration(s.duration) : '';
   const totalSets = (s.exercises||[]).reduce((a,ex)=>a+(ex.sets||[]).filter(st=>st.logged).length,0);
+  const totalVol = Math.round((s.exercises||[]).reduce((a,ex)=>{
+    return a+(ex.sets||[]).filter(st=>st.logged).reduce((b,st)=>{
+      const w=parseFloat(st.weight)||0;
+      const r=ex.unilateral?((parseFloat(st.repsL)||0)+(parseFloat(st.repsR)||0)):parseFloat(st.reps)||0;
+      return b+w*r;
+    },0);
+  },0)/1000*10)/10;
 
-  const titleEl = document.createElement('div');
-  titleEl.innerHTML = `
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:#f0ede8;">${s.routineName}</div>
-    <div style="font-size:11px;color:#4b5563;margin-top:2px;">${dateStr}${dur?' · '+dur:''} · ${totalSets} sets</div>`;
-  header.appendChild(titleEl);
-
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = '✕';
-  closeBtn.style.cssText = 'background:none;border:none;color:#9ca3af;font-size:24px;cursor:pointer;padding:4px 8px;line-height:1;flex-shrink:0;';
-  closeBtn.addEventListener('click', () => overlay.remove());
-  header.appendChild(closeBtn);
+  const header = document.createElement('div');
+  header.style.cssText = 'padding:20px 20px 16px;flex-shrink:0;';
+  header.innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
+      <div class="sd-title">${s.routineName}</div>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;color:#555552;font-size:20px;cursor:pointer;padding:0;line-height:1;margin-top:4px;">×</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span class="sd-meta">${dateStr}${dur?' · '+dur:''} · ${totalSets} SETS</span>
+      <span class="sd-vol-pill">${totalVol}T VOL</span>
+    </div>`;
+  overlay.appendChild(header);
 
   // ── Body ──────────────────────────────────────────────────────────────────
   const body = document.createElement('div');
-  body.style.cssText = 'overflow-y:auto;flex:1;padding:12px 16px;-webkit-overflow-scrolling:touch;';
+  body.style.cssText = 'overflow-y:auto;flex:1;padding:0 20px 20px;-webkit-overflow-scrolling:touch;';
 
   (s.exercises||[]).forEach(ex => {
     const logged = (ex.sets||[]).filter(st=>st.logged);
     if (!logged.length) return;
 
-    const card = document.createElement('div');
-    card.style.cssText = 'background:#151824;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;margin-bottom:10px;';
-
-    // Exercise header
     const maxW = Math.max(...logged.map(st=>parseFloat(st.weight)||0));
-    const totalVol = Math.round(logged.reduce((a,st)=>{
+    const vol = Math.round(logged.reduce((a,st)=>{
       const w=parseFloat(st.weight)||0;
       const r=ex.unilateral?((parseFloat(st.repsL)||0)+(parseFloat(st.repsR)||0)):parseFloat(st.reps)||0;
       return a+w*r;
     },0));
-    card.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
-        <div>
-          <div style="font-size:14px;font-weight:700;color:#e8eaf0;">${ex.name}</div>
-          <div style="font-size:10px;color:#4b5563;margin-top:2px;">${ex.muscle||''} · ${logged.length} sets · ${maxW}kg top · ${totalVol}kg vol</div>
-        </div>
-        ${ex.equipment ? `<span style="font-size:10px;font-weight:600;padding:3px 9px;border-radius:12px;color:var(--neon);background:rgba(0,180,255,0.1);border:1px solid rgba(0,180,255,0.2);">${ex.equipment}</span>` : ''}
+
+    const block = document.createElement('div');
+    block.style.cssText = 'margin-bottom:28px;';
+
+    // Exercise header
+    const isUni = ex.unilateral;
+    const colLabel = isUni ? 'L / R' : 'REPS';
+
+    block.innerHTML = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
+        <div class="sd-ex-name">${ex.name}</div>
+        ${ex.equipment ? `<span class="sd-eq-tag">${ex.equipment.toUpperCase()}</span>` : ''}
+      </div>
+      <div class="sd-ex-meta">${(ex.muscle||'').toUpperCase()} · ${logged.length} SETS · ${maxW}KG TOP · ${vol}KG VOL</div>
+      <div class="sd-col-hdr">
+        <span>#</span><span>KG</span><span>${colLabel}</span><span>NOTE</span>
+      </div>
+      <div class="sd-rows">
+        ${logged.map((st,i) => {
+          const repsStr = isUni
+            ? `<span class="sd-reps">${st.repsL||0} / ${st.repsR||0}</span>`
+            : `<span class="sd-reps">${st.reps||'—'}</span>`;
+          const noteStr = st.note
+            ? `<span class="sd-note-pill">${st.note}</span>`
+            : '<span></span>';
+          return `<div class="sd-set-row">
+            <span class="sd-set-num">${i+1}</span>
+            <span class="sd-weight">${st.weight||'—'} <span style="font-size:11px;font-weight:400;">kg</span></span>
+            ${repsStr}
+            ${noteStr}
+          </div>`;
+        }).join('')}
       </div>`;
-
-    // Set table header
-    const tableHdr = document.createElement('div');
-    tableHdr.style.cssText = 'display:grid;grid-template-columns:28px 1fr 1fr 1fr;gap:4px;padding:0 4px;margin-bottom:4px;';
-    tableHdr.innerHTML = `
-      <span style="font-size:9px;color:#4b5563;letter-spacing:1px;">#</span>
-      <span style="font-size:9px;color:#4b5563;letter-spacing:1px;">KG</span>
-      <span style="font-size:9px;color:#4b5563;letter-spacing:1px;">${ex.unilateral?'L / R':'REPS'}</span>
-      <span style="font-size:9px;color:#4b5563;letter-spacing:1px;">NOTE</span>`;
-    card.appendChild(tableHdr);
-
-    // Set rows
-    logged.forEach((st, i) => {
-      const row = document.createElement('div');
-      row.style.cssText = `display:grid;grid-template-columns:28px 1fr 1fr 1fr;gap:4px;padding:6px 4px;border-top:1px solid rgba(255,255,255,0.04);align-items:center;`;
-      const repsStr = ex.unilateral
-        ? `${st.repsL||0} / ${st.repsR||0}`
-        : (st.reps||'—');
-      row.innerHTML = `
-        <span style="font-size:11px;color:#4b5563;">${i+1}</span>
-        <span style="font-size:13px;font-weight:700;color:#e8eaf0;">${st.weight||'—'}kg</span>
-        <span style="font-size:13px;font-weight:700;color:var(--neon);">${repsStr}</span>
-        <span style="font-size:10px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${st.note||''}</span>`;
-      card.appendChild(row);
-    });
-
-    body.appendChild(card);
+    body.appendChild(block);
   });
 
-  overlay.appendChild(header);
   overlay.appendChild(body);
 
-  // ── Delete button at bottom ───────────────────────────────────────────────
+  // ── Footer ────────────────────────────────────────────────────────────────
   const footer = document.createElement('div');
-  footer.style.cssText = 'padding:12px 16px;border-top:1px solid rgba(255,255,255,0.06);flex-shrink:0;';
+  footer.style.cssText = 'padding:12px 20px;border-top:1px solid rgba(255,255,255,0.06);flex-shrink:0;';
   const delBtn = document.createElement('button');
-  delBtn.style.cssText = 'width:100%;padding:12px;background:rgba(255,68,102,0.08);border:1px solid rgba(255,68,102,0.25);border-radius:10px;color:var(--red);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:0.5px;';
-  delBtn.textContent = 'Delete this session';
+  delBtn.style.cssText = 'width:100%;padding:13px;background:transparent;border:1px solid rgba(255,68,102,0.25);border-radius:6px;color:#ff4466;font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;';
+  delBtn.textContent = 'DELETE SESSION';
   delBtn.addEventListener('click', () => {
-    showConfirm(
-      'Delete session?',
-      `This will permanently remove "${s.routineName}" from your history.`,
-      async () => {
-        overlay.remove();
-        _sessions = _sessions.filter(x => x.id !== s.id);
-        await dbDeleteSession(s.id);
-        renderHome();
-        showToast('Session deleted');
-      }
-    );
+    showConfirm('Delete session?', `Remove "${s.routineName}" permanently?`, async () => {
+      overlay.remove();
+      _sessions = _sessions.filter(x => x.id !== s.id);
+      await dbDeleteSession(s.id);
+      renderHome();
+      showToast('Session deleted');
+    });
   });
   footer.appendChild(delBtn);
   overlay.appendChild(footer);
-
   document.body.appendChild(overlay);
 }
 
@@ -756,34 +752,49 @@ function resumeWorkout() {
 // ═══════════════════════════════════════════
 function openWorkoutPicker() {
   const routines = load(SK.routines) || [];
+  const sessions = load(SK.sessions) || [];
   const list = document.getElementById('picker-routine-list');
 
-  const adHoc = `
-    <div class="routine-pick-item" onclick="startAdHocWorkout()" style="border-color:rgba(255,159,67,0.3);background:rgba(255,159,67,0.05);">
-      <div class="routine-pick-icon" style="color:var(--orange);">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
+  // Subtitle
+  const now = new Date();
+  const dayStr = now.toLocaleDateString('en-GB',{weekday:'short'}).toUpperCase();
+  const dayNum = now.getDate();
+  const monStr = now.toLocaleDateString('en-GB',{month:'short'}).toUpperCase();
+  const sub = document.getElementById('wp-subtitle');
+  if (sub) sub.textContent = `${dayStr} ${dayNum} ${monStr} · ${routines.length} ROUTINES`;
+
+  // Helper: days since last time this routine was used
+  function daysSince(routineId) {
+    const last = [...sessions].reverse().find(s => s.routineId === routineId);
+    if (!last) return null;
+    return Math.floor((Date.now() - last.startedAt) / 86400000);
+  }
+
+  const routineRows = routines.map(r => {
+    const ds = daysSince(r.id);
+    const daysLabel = ds === null ? 'NEVER' : ds === 0 ? 'TODAY' : `${ds}D AGO`;
+    const exCount = r.exercises?.length || 0;
+    return `
+      <div class="wp-row" onclick="startWorkout('${r.id}')">
+        <div class="wp-row-info">
+          <div class="wp-row-name">${r.name}</div>
+          <div class="wp-row-meta">${exCount} EXERCISES · ${daysLabel}</div>
+        </div>
+        <span class="wp-row-chevron">›</span>
+      </div>`;
+  }).join('');
+
+  const adHocRow = `
+    <div class="wp-row wp-row-adhoc" onclick="startAdHocWorkout()">
+      <div class="wp-adhoc-icon">+</div>
+      <div class="wp-row-info">
+        <div class="wp-row-name" style="color:#c8f06e;">AD HOC</div>
+        <div class="wp-row-meta">Blank workout — add lifts as you go</div>
       </div>
-      <div>
-        <div class="routine-pick-name" style="color:var(--orange);">Ad Hoc</div>
-        <div class="routine-pick-meta">Blank workout — add exercises as you go</div>
-      </div>
+      <span class="wp-row-chevron" style="color:#c8f06e;">›</span>
     </div>`;
 
-  if (routines.length === 0) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-state-text">No routines yet</div></div>' + adHoc;
-  } else {
-    list.innerHTML = routines.map(r => `
-      <div class="routine-pick-item" onclick="startWorkout('${r.id}')">
-        <div class="routine-pick-icon">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-        </div>
-        <div>
-          <div class="routine-pick-name">${r.name}</div>
-          <div class="routine-pick-meta">${r.exercises.length} exercises</div>
-        </div>
-      </div>
-    `).join('') + adHoc;
-  }
+  list.innerHTML = routineRows + adHocRow;
   openModal('workout-picker');
 }
 
