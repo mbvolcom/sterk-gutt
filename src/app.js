@@ -499,6 +499,7 @@ function showPage(name, btn) {
   if (name === 'routines')  renderRoutines();
   if (name === 'exercises') renderExerciseLibrary();
   if (name === 'stats')     { initStatsPage(); renderStats(); }
+  if (name === 'workout')   renderWorkoutPage();
 }
 
 // ═══════════════════════════════════════════
@@ -901,11 +902,30 @@ function startWorkout(routineId) {
 }
 
 function renderWorkoutPage() {
-  if (!activeSession) return;
+  const header = document.querySelector('.workout-header');
+  const body = document.getElementById('workout-body');
+
+  if (!activeSession) {
+    if (header) header.style.display = 'none';
+    body.innerHTML = `
+      <div class="wk-idle-wrap">
+        <div class="wk-idle-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#CCFF4C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+        </div>
+        <div class="wk-idle-title">No workout<br>in progress</div>
+        <div class="wk-idle-sub">Tap Start Workout on Home, or pick a routine to begin.</div>
+        <button class="wk-idle-cta" onclick="openWorkoutPicker()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CCFF4C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+          Start workout
+        </button>
+      </div>`;
+    return;
+  }
+
+  if (header) header.style.display = '';
   document.getElementById('active-workout-name').textContent = activeSession.routineName;
   document.getElementById('active-workout-date').textContent =
     new Date(activeSession.startedAt).toLocaleDateString('no-NO', { weekday:'long', day:'numeric', month:'long' });
-  // Update save button label based on whether this is Ad Hoc or a routine
   const saveLabel = document.getElementById('save-routine-btn-label');
   if (saveLabel) {
     saveLabel.textContent = activeSession.routineId
