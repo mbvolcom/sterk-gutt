@@ -264,3 +264,129 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
 ═══════════════════════════════════════ */
 #page-workout{padding:0;padding-bottom:calc(var(--nav-h) + 28px);}
 
+
+/* ══ WORKOUT PICKER (new design) ══════════════════════════════════════════ */
+.wp-close {
+  background:none;border:1px solid rgba(255,255,255,0.12);border-radius:6px;
+  color:#888884;font-size:18px;cursor:pointer;
+  width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;line-height:1;
+}
+.wp-new-btn {
+  background:#c8f06e;color:#0f0f0e;border:none;border-radius:6px;
+  font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;
+  letter-spacing:0.1em;padding:0 14px;height:36px;
+  display:flex;align-items:center;gap:4px;cursor:pointer;
+}
+.wp-title {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:42px;font-weight:800;line-height:1;
+  color:#e8e6e0;letter-spacing:0.02em;text-transform:uppercase;
+  margin-bottom:6px;
+}
+.wp-subtitle {
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;font-weight:500;letter-spacing:0.1em;
+  color:#555552;text-transform:uppercase;
+}
+.wp-row {
+  display:flex;align-items:center;gap:14px;
+  padding:18px 20px;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  cursor:pointer;transition:background 0.1s;
+}
+.wp-row:active{background:rgba(255,255,255,0.03);}
+.wp-row-info{flex:1;min-width:0;}
+.wp-row-name {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:22px;font-weight:700;color:#e8e6e0;
+  letter-spacing:0.02em;line-height:1.1;
+}
+.wp-row-meta {
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;font-weight:500;letter-spacing:0.08em;
+  color:#555552;text-transform:uppercase;margin-top:4px;
+}
+.wp-row-chevron {
+  font-size:20px;color:#333330;flex-shrink:0;
+}
+.wp-row-adhoc {
+  border:1px solid rgba(200,240,110,0.3);
+  border-left:none;border-right:none;
+  background:rgba(200,240,110,0.03);
+}
+.wp-adhoc-icon {
+  width:32px;height:32px;border:1px solid rgba(200,240,110,0.4);
+  border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;
+  color:#c8f06e;flex-shrink:0;
+}
+
+/* ══ SESSION DETAIL (new design) ════════════════════════════════════════ */
+.sd-title {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:36px;font-weight:800;color:#e8e6e0;
+  letter-spacing:0.02em;text-transform:uppercase;line-height:1;
+}
+.sd-meta {
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;font-weight:500;letter-spacing:0.08em;
+  color:#555552;text-transform:uppercase;
+}
+.sd-vol-pill {
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;font-weight:700;letter-spacing:0.08em;
+  color:#c8f06e;text-transform:uppercase;
+  border:1px solid rgba(200,240,110,0.4);
+  border-radius:4px;padding:2px 6px;
+}
+.sd-ex-name {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:22px;font-weight:700;color:#e8e6e0;
+  letter-spacing:0.02em;line-height:1.1;
+}
+.sd-ex-meta {
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;font-weight:500;letter-spacing:0.06em;
+  color:#555552;text-transform:uppercase;margin-bottom:12px;margin-top:3px;
+}
+.sd-eq-tag {
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;font-weight:700;letter-spacing:0.08em;
+  color:#555552;border:1px solid rgba(255,255,255,0.1);
+  border-radius:4px;padding:3px 6px;flex-shrink:0;white-space:nowrap;
+}
+.sd-col-hdr {
+  display:grid;grid-template-columns:24px 80px 1fr 1fr;
+  gap:8px;padding:0 0 6px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;letter-spacing:0.08em;
+  color:#333330;text-transform:uppercase;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  margin-bottom:6px;
+}
+.sd-rows{}
+.sd-set-row {
+  display:grid;grid-template-columns:24px 80px 1fr 1fr;
+  gap:8px;align-items:center;
+  padding:8px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.sd-set-num {
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;color:#333330;
+}
+.sd-weight {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:18px;font-weight:700;color:#e8e6e0;
+}
+.sd-reps {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:18px;font-weight:700;color:#c8f06e;
+}
+.sd-note-pill {
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;font-weight:700;color:#c8f06e;
+  background:rgba(200,240,110,0.1);border:1px solid rgba(200,240,110,0.25);
+  border-radius:4px;padding:2px 6px;
+}
