@@ -200,7 +200,7 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
 ═══════════════════════════════════════ */
 .modal-overlay{
   position:fixed;inset:0;
-  background:rgba(7,8,12,0.92);
+  background:#0a0907;
   z-index:1000;
   display:none;
   flex-direction:column;
@@ -726,3 +726,97 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
   opacity:0;pointer-events:none;transition:opacity 0.2s,transform 0.2s;
 }
 .toast.show { opacity:1;transform:translateX(-50%) translateY(0); }
+
+
+/* ══ EXERCISES TAB — Iron & Chalk + Signal Lime ══════════════════════════ */
+
+#page-exercises,
+#exercise-lib-editor {
+  --neon:      #c8f06e;
+  --neon2:     #c8f06e;
+  --neon-glow: rgba(200,240,110,0.45);
+  --neon-dim:  rgba(200,240,110,0.10);
+  --border2:   rgba(200,240,110,0.22);
+}
+
+#page-exercises { background:#0a0907; }
+
+/* Page header */
+.exercises-page-header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 16px 14px;flex-shrink:0;
+}
+.exercises-page-title {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:32px;font-weight:800;letter-spacing:0.04em;
+  text-transform:uppercase;color:#f4efe5;line-height:1;
+}
+.exercises-new-btn {
+  display:flex;align-items:center;gap:6px;padding:9px 14px;
+  border:1px solid #c8f06e;background:rgba(200,240,110,0.08);color:#c8f06e;
+  font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;
+  letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+.exercises-new-btn:active { background:rgba(200,240,110,0.16); }
+
+/* Muscle filter chips */
+.exercises-filter-row {
+  display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 14px;
+}
+.filter-btn {
+  padding:5px 12px;
+  border:1px solid rgba(255,255,255,0.08);
+  background:transparent;color:rgba(241,236,226,0.38);
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;
+  letter-spacing:0.10em;text-transform:uppercase;cursor:pointer;
+  transition:all 0.12s;-webkit-tap-highlight-color:transparent;
+}
+.filter-btn.active {
+  border-color:#c8f06e;background:rgba(200,240,110,0.08);color:#c8f06e;
+}
+
+/* Exercise list container */
+#exercises-list { padding:0 12px 32px; }
+
+/* Muscle group header */
+.ex-lib-group-title {
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;
+  letter-spacing:0.18em;text-transform:uppercase;
+  color:rgba(241,236,226,0.28);
+  display:flex;align-items:center;gap:10px;
+  padding:14px 2px 8px;
+}
+.ex-lib-group-title::after {
+  content:'';flex:1;height:1px;background:rgba(255,255,255,0.06);
+}
+
+/* Individual exercise row */
+.ex-lib-item {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+  background:#111113;
+  gap:10px;
+}
+.ex-lib-item:first-of-type { border-top:1px solid rgba(255,255,255,0.04); }
+
+.ex-lib-info { flex:1;min-width:0; }
+.ex-lib-name {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:18px;font-weight:700;color:#e8e4dc;
+  letter-spacing:0.01em;line-height:1.1;
+}
+.ex-lib-tags { display:flex;gap:5px;margin-top:4px; }
+
+/* Edit / delete buttons */
+.ex-lib-actions { display:flex;gap:6px;align-items:center;flex-shrink:0; }
+.ex-lib-actions button {
+  background:none;border:1px solid rgba(255,255,255,0.08);
+  color:rgba(241,236,226,0.40);width:30px;height:30px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:13px;
+  -webkit-tap-highlight-color:transparent;
+}
+.ex-lib-actions button:first-child:active { border-color:#c8f06e;color:#c8f06e; }
+.ex-lib-actions button:last-child:active  { border-color:#ff4466;color:#ff4466; }
