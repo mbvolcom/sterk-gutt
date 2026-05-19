@@ -1996,19 +1996,19 @@ function renderExerciseLibrary() {
   });
 
   list.innerHTML = Object.entries(groups).sort((a,b) => a[0].localeCompare(b[0])).map(([muscle, exs]) => `
-    <div style="margin-bottom:16px;">
-      <div class="section-title" style="margin-bottom:8px;">${muscle}</div>
+    <div style="margin-bottom:4px;">
+      <div class="ex-lib-group-title">${muscle}</div>
       ${exs.map(ex => `
         <div class="ex-lib-item">
           <div class="ex-lib-info">
             <div class="ex-lib-name">${ex.name}</div>
             <div class="ex-lib-tags">
-              ${ex.unilateral ? '<span class="tag unilateral">Unilateral</span>' : ''}
+              ${ex.unilateral ? '<span class="tag unilateral">Uni</span>' : ''}
             </div>
           </div>
           <div class="ex-lib-actions">
-            <button onclick="openExerciseLibEditor('${ex.id}')">✏️</button>
-            <button onclick="deleteExerciseLib('${ex.id}')" style="color:var(--red)!important;">🗑</button>
+            <button onclick="openExerciseLibEditor('${ex.id}')" title="Edit">✏</button>
+            <button onclick="deleteExerciseLib('${ex.id}')" title="Delete">✕</button>
           </div>
         </div>
       `).join('')}
@@ -2028,7 +2028,7 @@ function openExerciseLibEditor(exId) {
   // Clear fields first
   document.getElementById('ex-lib-name').value = '';
   document.getElementById('ex-lib-uni').checked = false;
-  document.getElementById('ex-lib-editor-title').textContent = exId ? 'EDIT EXERCISE' : 'NEW EXERCISE';
+  document.getElementById('ex-lib-editor-title').textContent = exId ? 'Edit Exercise' : 'New Exercise';
 
   if (exId) {
     const allEx = load(SK.exercises) || [];
