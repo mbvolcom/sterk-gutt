@@ -498,7 +498,7 @@ function showPage(name, btn) {
   if (btn) btn.classList.add('active');
   if (name === 'home')      renderHome();
   if (name === 'routines')  renderRoutines();
-  if (name === 'exercises') renderExerciseLibrary();
+  if (name === 'exercises') { renderExerciseLibrary(); renderEquipmentInventory(); }
   if (name === 'stats')     { initStatsPage(); renderStats(); }
   if (name === 'workout')   renderWorkoutPage();
 }
@@ -2130,60 +2130,102 @@ function deleteExerciseLib(exId) {
 
 const EQUIPMENT_TYPES = ['Dumbbell', 'Barbell', 'Cable', 'Machine', 'Bodyweight'];
 
-function openEquipmentSettings() {
-  const overlay = document.createElement('div');
-  overlay.id = 'equipment-overlay';
-  overlay.className = 'modal-overlay open';
-  overlay.style.cssText = '--neon:#c8f06e;--neon2:#c8f06e;--neon-dim:rgba(200,240,110,0.10);--border2:rgba(200,240,110,0.22);';
-
-  overlay.innerHTML = `
-    <div class="modal-header">
-      <div class="modal-title">Equipment</div>
-      <div class="modal-close" onclick="document.getElementById('equipment-overlay').remove()">✕</div>
-    </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.08em;color:rgba(241,236,226,0.38);margin-bottom:20px;line-height:1.6;">
-      Add the weights you own. Suggestions will only use weights from your inventory.
-    </div>
-    <div id="eq-inv-body"></div>
-  `;
-
-  document.body.appendChild(overlay);
-  renderEquipmentInventory();
+// ─── Exercises tab sub-tabs ──────────────────────────────────────────────
+function setExercisesSubtab(tab) {
+  document.getElementById('ex-subpage-library').style.display   = tab === 'library'   ? '' : 'none';
+  document.getElementById('ex-subpage-equipment').style.display = tab === 'equipment' ? '' : 'none';
+  document.getElementById('ex-subtab-library').classList.toggle('active',   tab === 'library');
+  document.getElementById('ex-subtab-equipment').classList.toggle('active', tab === 'equipment');
+  if (tab === 'equipment') renderEquipmentInventory();
 }
+
+// ─── Equipment inventory inline page ─────────────────────────────────────
+
+// Common preset weights per equipment type — shown as quick-add chips
+const EQUIPMENT_PRESETS = {
+  Dumbbell:   [4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40],
+  Barbell:    [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120],
+  Cable:      [5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80],
+  Machine:    [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+  Bodyweight: [],
+};
 
 function renderEquipmentInventory() {
   const body = document.getElementById('eq-inv-body');
   if (!body) return;
 
   body.innerHTML = EQUIPMENT_TYPES.map(type => {
-    const weights = getInventoryWeights(type);
-    const hasWeights = type !== 'Bodyweight';
+    const owned   = getInventoryWeights(type);
+    const presets = (EQUIPMENT_PRESETS[type] || []).filter(w => !owned.includes(w));
+    const isBodyweight = type === 'Bodyweight';
+
     return `
-      <div class="eq-inv-section">
-        <div class="eq-inv-type-header">
-          <span class="eq-inv-type-name">${type}</span>
-          ${hasWeights ? `
-            <div class="eq-inv-add-row">
-              <input class="eq-inv-input" type="number" id="eq-input-${type}"
-                placeholder="kg" step="0.5" min="0.5" inputmode="decimal"/>
-              <button class="eq-inv-add-btn" onclick="addInventoryWeight('${type}')">Add</button>
-            </div>` : `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(241,236,226,0.28);letter-spacing:0.06em;">No weights needed</span>`
-          }
+      <div class="eq-section">
+
+        <!-- Type header -->
+        <div class="eq-section-header">
+          <span class="eq-section-name">${type}</span>
+          ${owned.length ? `<span class="eq-section-count">${owned.length} weight${owned.length !== 1 ? 's' : ''}</span>` : ''}
         </div>
-        ${hasWeights ? `
-          <div class="eq-inv-chips" id="eq-chips-${type}">
-            ${weights.length
-              ? weights.map(w => `
-                  <button class="eq-inv-chip" onclick="removeInventoryWeight('${type}', ${w})">
-                    ${w}kg <span class="eq-inv-chip-x">×</span>
-                  </button>`).join('')
-              : `<span class="eq-inv-empty">No weights added yet</span>`
-            }
-          </div>` : ''
-        }
+
+        ${isBodyweight ? `
+          <div class="eq-bodyweight-note">No weights needed — bodyweight exercises are always available.</div>
+        ` : `
+          <!-- Owned weights -->
+          <div class="eq-owned-row" id="eq-owned-${type}">
+            ${owned.length ? owned.map(w => `
+              <button class="eq-chip eq-chip-owned" onclick="removeInventoryWeight('${type}', ${w})" title="Tap to remove">
+                ${w}kg
+                <span class="eq-chip-remove">×</span>
+              </button>`).join('')
+            : `<span class="eq-none-yet">None added yet</span>`}
+          </div>
+
+          <!-- Manual add -->
+          <div class="eq-add-row">
+            <div class="eq-input-wrap">
+              <input class="eq-input" id="eq-input-${type}" type="number"
+                inputmode="decimal" step="0.5" min="0.5" placeholder="kg"
+                onkeydown="if(event.key==='Enter')addInventoryWeight('${type}')"/>
+              <button class="eq-add-btn" onclick="addInventoryWeight('${type}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 4v16M4 12h16"/></svg>
+                Add
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick-add presets -->
+          ${presets.length ? `
+            <div class="eq-presets-label">Quick add</div>
+            <div class="eq-presets-row" id="eq-presets-${type}">
+              ${presets.map(w => `
+                <button class="eq-chip eq-chip-preset" onclick="addInventoryWeightDirect('${type}', ${w})">
+                  + ${w}kg
+                </button>`).join('')}
+            </div>` : ''}
+        `}
+
       </div>`;
   }).join('');
 }
+
+// Direct add without input field — used by preset chips
+function addInventoryWeightDirect(type, kg) {
+  if (!_inventory[type]) _inventory[type] = [];
+  if (_inventory[type].includes(kg)) return;
+  _inventory[type].push(kg);
+  _inventory[type].sort((a, b) => a - b);
+  saveInventory();
+  renderEquipmentInventory();
+}
+
+function openEquipmentSettings() {
+  // Navigate to exercises tab, equipment sub-tab
+  showPage('exercises', document.getElementById('nav-exercises'));
+  setExercisesSubtab('equipment');
+}
+
+
 
 function addInventoryWeight(type) {
   const input = document.getElementById(`eq-input-${type}`);
@@ -2196,6 +2238,7 @@ function addInventoryWeight(type) {
   _inventory[type].push(kg);
   _inventory[type].sort((a, b) => a - b);
   saveInventory();
+  updateEquipmentSummary();
   input.value = '';
   renderEquipmentInventory();
 }
@@ -2204,6 +2247,7 @@ function removeInventoryWeight(type, kg) {
   if (!_inventory[type]) return;
   _inventory[type] = _inventory[type].filter(w => w !== kg);
   saveInventory();
+  updateEquipmentSummary();
   renderEquipmentInventory();
 }
 
@@ -2292,6 +2336,16 @@ async function loadInventoryFromCloud() {
       loadInventory(); // fall back to local / defaults
     }
   } catch(e) { loadInventory(); }
+  updateEquipmentSummary();
+}
+
+function updateEquipmentSummary() {
+  const el = document.getElementById('eq-summary');
+  if (!el) return;
+  const parts = Object.entries(_inventory)
+    .filter(([, weights]) => weights && weights.length > 0)
+    .map(([type, weights]) => `${type} ×${weights.length}`);
+  el.textContent = parts.length ? parts.join(' · ') : 'Not set up';
 }
 
 // Return sorted weight array for a given equipment type
@@ -3683,5 +3737,6 @@ Object.assign(window, {
   // Stats
   setStatsSubtab, applyCustomRange,
   // Equipment inventory
-  openEquipmentSettings, addInventoryWeight, removeInventoryWeight,
+  openEquipmentSettings, addInventoryWeight, addInventoryWeightDirect,
+  removeInventoryWeight, updateEquipmentSummary, setExercisesSubtab,
 });
