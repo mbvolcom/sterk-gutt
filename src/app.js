@@ -707,7 +707,7 @@ function openSessionEditor(sessionId) {
             : '<span></span>';
           return `<div class="sd-set-row">
             <span class="sd-set-num">${i+1}</span>
-            <span class="sd-weight">${st.weight||'—'} <span style="font-size:11px;font-weight:400;">kg</span></span>
+            <span class="sd-weight">${fmtKg(st.weight)||'—'} <span style="font-size:11px;font-weight:400;">kg</span></span>
             ${repsStr}
             ${noteStr}
           </div>`;
@@ -1067,12 +1067,12 @@ function buildSuggestionCard(ei, exName, equipment) {
 
       const trendColor = s.trend==='↑'?'#c8f06e':s.trend==='↓'?'#ff4466':'rgba(200,240,110,0.45)';
       const repsStr    = s.repsMin===s.repsMax ? `${s.repsMin}` : `${s.repsMin}–${s.repsMax}`;
-      const prevStr    = lastPerSet[i] ? `${lastPerSet[i].weight}kg×${lastPerSet[i].reps}` : '—';
+      const prevStr    = lastPerSet[i] ? `${fmtKg(lastPerSet[i].weight)}kg×${lastPerSet[i].reps}` : '—';
 
       row.innerHTML =
         `<span style="color:var(--muted2);font-weight:600;">S${i+1}</span>` +
         `<span style="color:var(--muted2);font-size:10px;">${prevStr}</span>` +
-        `<span style="color:#e8eaf0;font-weight:700;">${s.weight}kg × ${repsStr}</span>` +
+        `<span style="color:#e8eaf0;font-weight:700;">${fmtKg(s.weight)}kg × ${repsStr}</span>` +
         `<span style="color:${trendColor};font-weight:700;">${s.trend}</span>`;
       table.appendChild(row);
     });
@@ -1219,7 +1219,7 @@ function buildSetRow(s, si, ei, isUni) {
   }
 
   const inputs = isUni ? `
-    <input class="set-input ${gClass(s.weight,s.ghostWeight)}" type="number" inputmode="decimal" min="0" step="0.5"
+    <input class="set-input ${gClass(s.weight,s.ghostWeight)}" type="number" inputmode="decimal" min="0" step="any"
       value="${s.weight}" placeholder="${gPH(s.weight,s.ghostWeight,'kg')}" style="${inputOpacity}"
       ${inputDisabled} oninput="updateSet(${ei},${si},'weight',this.value)" onchange="updateSet(${ei},${si},'weight',this.value)"/>
     <input class="set-input ${gClass(s.repsL,s.ghostRepsL)}" type="number" inputmode="numeric" min="0"
@@ -1228,7 +1228,7 @@ function buildSetRow(s, si, ei, isUni) {
     <input class="set-input ${gClass(s.repsR,s.ghostRepsR)}" type="number" inputmode="numeric" min="0"
       value="${s.repsR}" placeholder="${gPH(s.repsR,s.ghostRepsR,'R')}" style="${inputOpacity}"
       ${inputDisabled} oninput="updateSet(${ei},${si},'repsR',this.value)" onchange="updateSet(${ei},${si},'repsR',this.value)"/>` : `
-    <input class="set-input ${gClass(s.weight,s.ghostWeight)}" type="number" inputmode="decimal" min="0" step="0.5"
+    <input class="set-input ${gClass(s.weight,s.ghostWeight)}" type="number" inputmode="decimal" min="0" step="any"
       value="${s.weight}" placeholder="${gPH(s.weight,s.ghostWeight,'kg')}" style="${inputOpacity}"
       ${inputDisabled} oninput="updateSet(${ei},${si},'weight',this.value)" onchange="updateSet(${ei},${si},'weight',this.value)"/>
     <input class="set-input ${gClass(s.reps,s.ghostReps)}" type="number" inputmode="numeric" min="0"
@@ -2185,7 +2185,7 @@ function renderEquipmentInventory() {
           <div class="eq-add-row">
             <div class="eq-input-wrap">
               <input class="eq-input" id="eq-input-${type}" type="number"
-                inputmode="decimal" step="0.5" min="0.5" placeholder="kg"
+                inputmode="decimal" step="any" min="0" placeholder="kg"
                 onkeydown="if(event.key==='Enter')addInventoryWeight('${type}')"/>
               <button class="eq-add-btn" onclick="addInventoryWeight('${type}')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 4v16M4 12h16"/></svg>
@@ -2229,8 +2229,9 @@ function openEquipmentSettings() {
 
 function addInventoryWeight(type) {
   const input = document.getElementById(`eq-input-${type}`);
-  const kg = parseFloat(input.value);
-  if (!kg || kg <= 0) { showToast('Enter a valid weight'); return; }
+  const raw = parseFloat(input.value);
+  if (!raw || raw <= 0) { showToast('Enter a valid weight'); return; }
+  const kg = Math.round(raw * 10) / 10; // round to 1 decimal
 
   if (!_inventory[type]) _inventory[type] = [];
   if (_inventory[type].includes(kg)) { showToast(`${kg}kg already in inventory`); return; }
@@ -2459,7 +2460,7 @@ function buildExercisePoints(sessions, exName, equipFilter) {
         dateStr: new Date(startedAt).toLocaleDateString('no-NO',{day:'numeric',month:'short'}),
         weight: bestW, reps: bestR, sets: logged.length,
         est1RM: Math.round(best1RM*10)/10, volLoad,
-        bestLabel: bestW>0 ? `${bestW}kg×${bestR}` : '—',
+        bestLabel: bestW>0 ? `${fmtKg(bestW)}kg×${bestR}` : '—',
         equipment: ex.equipment||null,
         // Store full per-set data for hypertrophy logic
         perSet: logged.map(st => ({
@@ -2582,13 +2583,13 @@ function buildSetSuggestions(points, exName, equipment, numSets) {
       const repDrop    = bigJump && COMPOUND_PRESS.includes(exName) ? 3 : 2;
       const targetReps = Math.max(repMin, prev.reps - repDrop);
       sets.push({ weight: targetW, repsMin: Math.max(repMin, targetReps-1), repsMax: targetReps+1,
-        trend: '↑', note: i===0 ? `Step up from ${mainWeight}kg` : '' });
+        trend: '↑', note: i===0 ? `Step up from ${fmtKg(mainWeight)}kg` : '' });
 
     } else if (overallDecision === 'drop') {
       const targetW    = prevStep || mainWeight;
       const targetReps = Math.min(repMax - 1, prev.reps + 2);
       sets.push({ weight: targetW, repsMin: targetReps, repsMax: Math.min(repMax, targetReps+2),
-        trend: '↓', note: i===0 ? `Too heavy at ${mainWeight}kg — drop down` : '' });
+        trend: '↓', note: i===0 ? `Too heavy at ${fmtKg(mainWeight)}kg — drop down` : '' });
 
     } else {
       // Consolidate — same weight, +1 rep
@@ -2610,17 +2611,17 @@ function buildSetSuggestions(points, exName, equipment, numSets) {
   // ── Summary line ──────────────────────────────────────────────────────────
   let summary, subtext;
   if (overallDecision === 'step_up') {
-    summary = `Step up to ${nextStep}kg — you hit ${repMax}+ reps ${twoForTwo ? 'two sessions running' : 'last session'}`;
+    summary = `Step up to ${fmtKg(nextStep)}kg — you hit ${repMax}+ reps ${twoForTwo ? 'two sessions running' : 'last session'}`;
     subtext = bigJump ? `Big jump (+${stepGap}kg) — expect reps to drop` : `Aim for ${repMin}–${repMax} reps at the new weight`;
   } else if (overallDecision === 'drop') {
-    summary = `Drop to ${prevStep||mainWeight}kg — average reps below floor`;
+    summary = `Drop to ${fmtKg(prevStep||mainWeight)}kg — average reps below floor`;
     subtext = `Build back to ${repMin}–${repMax} reps before stepping up again`;
   } else if (lastHitTop) {
-    summary = `Hold ${mainWeight}kg — hit top range last session, one more to confirm`;
+    summary = `Hold ${fmtKg(mainWeight)}kg — hit top range last session, one more to confirm`;
     subtext = `Hit ${repMax}+ reps again this session to earn the step up`;
   } else {
-    summary = `Hold ${mainWeight}kg — add 1 rep where possible`;
-    subtext = `Avg ${avgRepsAtMain.toFixed(1)} reps at ${mainWeight}kg last time — closing in on ${repMax}`;
+    summary = `Hold ${fmtKg(mainWeight)}kg — add 1 rep where possible`;
+    subtext = `Avg ${avgRepsAtMain.toFixed(1)} reps at ${fmtKg(mainWeight)}kg last time — closing in on ${repMax}`;
   }
 
   return { sets, summary, subtext, overallDecision, repMin, repMax, currentW: mainWeight };
@@ -2695,7 +2696,7 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
     const sign = diff > 0 ? '+' : '';
     const meta = document.createElement('div');
     meta.style.cssText = 'font-size:11px;color:var(--muted2);margin-bottom:14px;';
-    meta.textContent = `Top weight: ${first.weight}kg → ${last.weight}kg (${sign}${diff}kg) over ${points.length} sessions`;
+    meta.textContent = `Top weight: ${fmtKg(first.weight)}kg → ${fmtKg(last.weight)}kg (${sign}${diff}kg) over ${points.length} sessions`;
     container.appendChild(meta);
   }
 
@@ -2758,11 +2759,11 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
         row.style.cssText = 'display:grid;grid-template-columns:32px 1fr 1fr 20px;align-items:center;gap:6px;padding:5px 6px;background:rgba(255,255,255,0.03);border-radius:6px;font-size:11px;margin-bottom:3px;';
         const trendColor = s.trend==='↑'?'#c8f06e':s.trend==='↓'?'#ff4466':'rgba(200,240,110,0.45)';
         const repsStr = s.repsMin===s.repsMax ? `${s.repsMin}` : `${s.repsMin}–${s.repsMax}`;
-        const prevStr = lastPerSet[i] ? `${lastPerSet[i].weight}kg×${lastPerSet[i].reps}` : '—';
+        const prevStr = lastPerSet[i] ? `${fmtKg(lastPerSet[i].weight)}kg×${lastPerSet[i].reps}` : '—';
         row.innerHTML =
           `<span style="color:var(--muted2);font-weight:600;">S${i+1}</span>` +
           `<span style="color:var(--muted2);">${prevStr}</span>` +
-          `<span style="color:#e8eaf0;font-weight:700;">${s.weight}kg × ${repsStr}</span>` +
+          `<span style="color:#e8eaf0;font-weight:700;">${fmtKg(s.weight)}kg × ${repsStr}</span>` +
           `<span style="color:${trendColor};font-weight:700;">${s.trend}</span>`;
         hintCard.appendChild(row);
       });
@@ -2790,7 +2791,7 @@ function renderSingleSessionCard(container, point, exName, equipment) {
   const hint = buildNextSessionSuggestion([point], exName, equipment);
   container.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
-      <div style="background:rgba(0,0,0,0.06);border-radius:10px;padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#00b4ff;">${point.weight}kg</div><div style="font-size:9px;color:var(--muted2);margin-top:2px;">TOP WEIGHT</div></div>
+      <div style="background:rgba(0,0,0,0.06);border-radius:10px;padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#00b4ff;">${fmtKg(point.weight)}kg</div><div style="font-size:9px;color:var(--muted2);margin-top:2px;">TOP WEIGHT</div></div>
       <div style="background:rgba(0,0,0,0.06);border-radius:10px;padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#00ffcc;">${point.est1RM}kg</div><div style="font-size:9px;color:var(--muted2);margin-top:2px;">EST. 1RM</div></div>
       <div style="background:rgba(0,0,0,0.06);border-radius:10px;padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#7c6aff;">${point.bestLabel}</div><div style="font-size:9px;color:var(--muted2);margin-top:2px;">BEST SET</div></div>
     </div>
@@ -3484,6 +3485,13 @@ function drawLineChart(ctx, canvas, labels, data, color) {
 // ═══════════════════════════════════════════
 // UTILITIES
 // ═══════════════════════════════════════════
+
+// Format a weight to 1 decimal, dropping trailing zero (e.g. 24.0 → "24", 10.5 → "10.5")
+function fmtKg(kg) {
+  const n = Math.round(parseFloat(kg) * 10) / 10;
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
 function formatMMSS(secs) {
   const m = Math.floor(secs / 60), s = secs % 60;
   return `${m}:${String(s).padStart(2,'0')}`;
