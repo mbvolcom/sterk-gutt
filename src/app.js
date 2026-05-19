@@ -1138,8 +1138,8 @@ function buildExCard(ex, ei) {
   const isUni  = ex.unilateral;
 
   let setHeaderHTML = isUni
-    ? `<div class="set-header-row unilateral"><span>#</span><span style="text-align:center">KG</span><span style="text-align:center">L</span><span style="text-align:center">R</span><span style="text-align:center">NOTE</span></div>`
-    : `<div class="set-header-row bilateral"><span>#</span><span style="text-align:center">KG</span><span style="text-align:center">REPS</span><span style="text-align:center">NOTE</span></div>`;
+    ? `<div class="set-header-row unilateral"><span></span><span style="text-align:center">KG</span><span style="text-align:center">L</span><span style="text-align:center">R</span></div>`
+    : `<div class="set-header-row bilateral"><span></span><span style="text-align:center">KG</span><span style="text-align:center">REPS</span></div>`;
 
   const setsHTML = ex.sets.map((s, si) => buildSetRow(s, si, ei, isUni)).join('');
 
@@ -1226,7 +1226,7 @@ function buildSetRow(s, si, ei, isUni) {
   }
 
   const inputs = isUni ? `
-    <input class="set-input ${gClass(s.weight,s.ghostWeight)}" type="number" inputmode="decimal" min="0" step="any"
+    <input class="set-input ${gClass(s.weight,s.ghostWeight)}" type="text" inputmode="decimal"
       value="${s.weight}" placeholder="${gPH(s.weight,s.ghostWeight,'kg')}" style="${inputOpacity}"
       ${inputDisabled} oninput="updateSet(${ei},${si},'weight',this.value)" onchange="updateSet(${ei},${si},'weight',this.value)"/>
     <input class="set-input ${gClass(s.repsL,s.ghostRepsL)}" type="number" inputmode="numeric" min="0"
@@ -1235,7 +1235,7 @@ function buildSetRow(s, si, ei, isUni) {
     <input class="set-input ${gClass(s.repsR,s.ghostRepsR)}" type="number" inputmode="numeric" min="0"
       value="${s.repsR}" placeholder="${gPH(s.repsR,s.ghostRepsR,'R')}" style="${inputOpacity}"
       ${inputDisabled} oninput="updateSet(${ei},${si},'repsR',this.value)" onchange="updateSet(${ei},${si},'repsR',this.value)"/>` : `
-    <input class="set-input ${gClass(s.weight,s.ghostWeight)}" type="number" inputmode="decimal" min="0" step="any"
+    <input class="set-input ${gClass(s.weight,s.ghostWeight)}" type="text" inputmode="decimal"
       value="${s.weight}" placeholder="${gPH(s.weight,s.ghostWeight,'kg')}" style="${inputOpacity}"
       ${inputDisabled} oninput="updateSet(${ei},${si},'weight',this.value)" onchange="updateSet(${ei},${si},'weight',this.value)"/>
     <input class="set-input ${gClass(s.reps,s.ghostReps)}" type="number" inputmode="numeric" min="0"
@@ -1371,7 +1371,14 @@ function updateExMeta(ei) {
 
 function updateSet(ei, si, field, val) {
   if (!activeSession) return;
-  activeSession.exercises[ei].sets[si][field] = val;
+  // Normalise weight: accept comma as decimal separator, store as number
+  if (field === 'weight') {
+    const normalised = String(val).replace(',', '.');
+    const num = parseFloat(normalised);
+    activeSession.exercises[ei].sets[si][field] = isNaN(num) ? val : num;
+  } else {
+    activeSession.exercises[ei].sets[si][field] = val;
+  }
   autoSaveSession();
 }
 
