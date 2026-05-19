@@ -188,8 +188,11 @@
       </div>
       <!-- Elapsed workout timer -->
       <div class="workout-elapsed" id="workout-global-timer">0:00</div>
-      <!-- Finish -->
-      <button class="workout-finish-btn" onclick="finishWorkout()">FINISH</button>
+      <!-- Finish + Pause stacked -->
+      <div class="workout-header-btns">
+        <button class="workout-finish-btn" onclick="finishWorkout()">FINISH</button>
+        <button class="workout-pause-btn" id="workout-pause-btn" onclick="togglePauseWorkout()">PAUSE</button>
+      </div>
     </div>
     <!-- Save banner -->
     <button class="save-routine-btn" id="save-routine-btn" onclick="saveRoutineChanges()" style="display:none;">
