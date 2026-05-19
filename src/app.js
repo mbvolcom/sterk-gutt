@@ -2388,19 +2388,6 @@ const COMPOUND_PULL  = ['Bent Row','Single Arm DB Row','Chest-Supported Row','Be
 // Isolation — flag if drop >10%
 // Everything else is isolation by default
 
-function nextDBStep(currentKg) {
-  const i = DB_STEPS.findIndex(s => s >= currentKg);
-  if (i === -1) return null;
-  if (DB_STEPS[i] === currentKg) return DB_STEPS[i+1] ?? null;
-  return DB_STEPS[i];
-}
-
-function prevDBStep(currentKg) {
-  let idx = -1;
-  for (let i = 0; i < DB_STEPS.length; i++) { if (DB_STEPS[i] <= currentKg) idx = i; }
-  return idx > 0 ? DB_STEPS[idx-1] : null;
-}
-
 function linearTrend(values) {
   const n = values.length;
   if (n < 2) return 0;
