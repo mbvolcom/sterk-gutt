@@ -720,9 +720,27 @@ function openSessionEditor(sessionId) {
 
   // ── Footer ────────────────────────────────────────────────────────────────
   const footer = document.createElement('div');
-  footer.style.cssText = 'padding:12px 20px;border-top:1px solid rgba(255,255,255,0.06);flex-shrink:0;';
+  footer.style.cssText = 'padding:12px 20px;border-top:1px solid rgba(255,255,255,0.06);flex-shrink:0;display:flex;flex-direction:column;gap:8px;';
+
+  // Strava upload button — only if connected
+  if (stravaConnected) {
+    const alreadyUploaded = !!s.stravaUploaded;
+    const stravaBtn = document.createElement('button');
+    stravaBtn.style.cssText = 'width:100%;padding:13px;background:transparent;border:1px solid #FC4C02;color:#FC4C02;font-family:"Barlow Condensed",sans-serif;font-size:16px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;';
+    // Strava logo SVG (simplified)
+    stravaBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="#FC4C02"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>${alreadyUploaded ? '✓ Uploaded to Strava' : 'Upload to Strava'}`;
+    if (alreadyUploaded) {
+      stravaBtn.style.opacity = '0.45';
+      stravaBtn.style.cursor = 'default';
+      stravaBtn.disabled = true;
+    } else {
+      stravaBtn.addEventListener('click', () => uploadSessionToStrava(s, stravaBtn));
+    }
+    footer.appendChild(stravaBtn);
+  }
+
   const delBtn = document.createElement('button');
-  delBtn.style.cssText = 'width:100%;padding:13px;background:transparent;border:1px solid rgba(255,68,102,0.25);border-radius:6px;color:#ff4466;font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;';
+  delBtn.style.cssText = 'width:100%;padding:13px;background:transparent;border:1px solid rgba(255,68,102,0.25);color:#ff4466;font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;';
   delBtn.textContent = 'DELETE SESSION';
   delBtn.addEventListener('click', () => {
     showConfirm('Delete session?', `Remove "${s.routineName}" permanently?`, async () => {
@@ -3592,6 +3610,50 @@ function init() {
 }
 
 // ═══════════════════════════════════════════
+function buildStravaDescription(session) {
+  return (session.exercises || [])
+    .map(ex => {
+      const logged = (ex.sets || []).filter(s => s.logged);
+      if (!logged.length) return null;
+      const setsStr = logged.map((s, i) => {
+        if (ex.unilateral) {
+          const l = s.repsL || 0, r = s.repsR || 0;
+          return `  Set ${i+1}: ${l}L / ${r}R${s.weight ? ' @ ' + s.weight + 'kg' : ''}`;
+        }
+        return `  Set ${i+1}: ${s.reps || '?'} reps${s.weight ? ' @ ' + s.weight + 'kg' : ''}`;
+      }).join('\n');
+      return `${ex.name}\n${setsStr}`;
+    })
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+async function uploadSessionToStrava(session, btnEl) {
+  if (!stravaConnected) { showToast('Strava not connected'); return; }
+  btnEl.textContent = 'Uploading…';
+  btnEl.disabled = true;
+  try {
+    const desc = buildStravaDescription(session);
+    await uploadToStrava(session, desc);
+    // Mark session as uploaded
+    const allSessions = load(SK.sessions) || [];
+    const idx = allSessions.findIndex(x => x.id === session.id);
+    if (idx >= 0) {
+      allSessions[idx].stravaUploaded = true;
+      save(SK.sessions, allSessions);
+    }
+    btnEl.textContent = '✓ Uploaded to Strava';
+    btnEl.style.opacity = '0.5';
+    btnEl.style.cursor = 'default';
+    btnEl.disabled = true;
+    showToast('Uploaded to Strava!');
+  } catch(e) {
+    btnEl.textContent = '⟳ Retry Upload';
+    btnEl.disabled = false;
+    showToast('Upload failed — ' + (e.message || 'check connection'));
+  }
+}
+
 // STRAVA INTEGRATION
 // ═══════════════════════════════════════════
 const STRAVA_CLIENT_ID = '232651';
@@ -3665,21 +3727,7 @@ async function getStravaToken() {
 
 function showStravaUploadPrompt(session) {
   // Build detailed exercise notes — each exercise with all sets
-  const exerciseSummary = (session.exercises || [])
-    .map(ex => {
-      const logged = (ex.sets || []).filter(s => s.logged);
-      if (!logged.length) return null;
-      const setsStr = logged.map((s, i) => {
-        if (ex.unilateral) {
-          const l = s.repsL || 0, r = s.repsR || 0;
-          return `  Set ${i+1}: ${l}L / ${r}R${s.weight ? ' @ ' + s.weight + 'kg' : ''}`;
-        }
-        return `  Set ${i+1}: ${s.reps || '?'} reps${s.weight ? ' @ ' + s.weight + 'kg' : ''}`;
-      }).join('\n');
-      return `${ex.name}\n${setsStr}`;
-    })
-    .filter(Boolean)
-    .join('\n\n');
+  const exerciseSummary = buildStravaDescription(session);
 
   const name = session.routineName || session.exercises?.[0]?.name || 'Strength workout';
   const dur  = session.duration || 0;
@@ -3730,6 +3778,9 @@ function showStravaUploadPrompt(session) {
     btn.textContent = 'UPLOADING…'; btn.disabled = true;
     try {
       await uploadToStrava(session, exerciseSummary);
+      const allSessions = load(SK.sessions) || [];
+      const idx = allSessions.findIndex(x => x.id === session.id);
+      if (idx >= 0) { allSessions[idx].stravaUploaded = true; save(SK.sessions, allSessions); }
       closeOverlay();
       showToast('Uploaded to Strava! 🧡');
     } catch(e) {
