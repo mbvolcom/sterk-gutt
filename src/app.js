@@ -851,6 +851,9 @@ function promptAdHocName(callback) {
 
 let activeSession = null;
 let globalTimerInterval = null;
+let workoutPaused = false;
+let pausedAt = null;
+let totalPausedMs = 0;
 // Per-set timers: keyed by "ei-si"
 let setTimers = {}; // { "ei-si": { interval, startTime } }
 // Active rest timer
@@ -1166,6 +1169,10 @@ function buildExCard(ex, ei) {
         <button class="btn btn-ghost btn-sm" onclick="addSet(${ei})">+ Set</button>
         <button class="btn btn-danger btn-sm" onclick="removeLastSet(${ei})">− Set</button>
       </div>
+      <button class="ex-collapse-bottom" onclick="toggleExCollapse(${ei})">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+        Minimise
+      </button>
     </div>
   </div>`;
 
@@ -1581,18 +1588,42 @@ function saveRoutineChanges() {
 // ─── Global workout timer ───
 function startGlobalTimer() {
   clearInterval(globalTimerInterval);
+  workoutPaused = false;
+  totalPausedMs = 0;
+  pausedAt = null;
   globalTimerInterval = setInterval(() => {
-    if (!activeSession) return;
-    const elapsed = Math.floor((Date.now() - activeSession.startedAt) / 1000);
-    document.getElementById('workout-global-timer').textContent = formatMMSS(elapsed);
+    if (!activeSession || workoutPaused) return;
+    const elapsed = Math.floor((Date.now() - activeSession.startedAt - totalPausedMs) / 1000);
+    const el = document.getElementById('workout-global-timer');
+    if (el) el.textContent = formatMMSS(elapsed);
   }, 1000);
+}
+
+function togglePauseWorkout() {
+  if (!activeSession) return;
+  const btn = document.getElementById('workout-pause-btn');
+  if (workoutPaused) {
+    // Resume — add paused duration to total
+    if (pausedAt) totalPausedMs += Date.now() - pausedAt;
+    pausedAt = null;
+    workoutPaused = false;
+    if (btn) { btn.textContent = 'PAUSE'; btn.classList.remove('paused'); }
+  } else {
+    // Pause
+    pausedAt = Date.now();
+    workoutPaused = true;
+    if (btn) { btn.textContent = 'RESUME'; btn.classList.add('paused'); }
+  }
 }
 
 function finishWorkout() {
   showConfirm('Finish Workout?', 'This will save your session and return you to the home screen.', async () => {
     if (!activeSession) return;
-    activeSession.duration = Math.floor((Date.now() - activeSession.startedAt) / 1000);
+    // Account for any time still paused
+    const finalPausedMs = totalPausedMs + (workoutPaused && pausedAt ? Date.now() - pausedAt : 0);
+    activeSession.duration = Math.floor((Date.now() - activeSession.startedAt - finalPausedMs) / 1000);
     clearInterval(globalTimerInterval);
+    workoutPaused = false; pausedAt = null; totalPausedMs = 0;
     clearRestBanner();
     Object.values(setTimers).forEach(t => clearInterval(t.interval));
     setTimers = {};
@@ -2517,61 +2548,63 @@ function assessProgression(points) {
 
 // ── HYPERTROPHY PER-SET SUGGESTION ENGINE ────────────────────────────────────
 //
+// Rep ranges:
+//   Compound press/pull: 6–12  (step up when all working sets hit 12)
+//   Isolation:           8–15  (step up when all working sets hit 15)
+//
 // Rules:
-// 1. Default rep range: 8–12 (override per exercise type)
-// 2. Stay at weight until ALL sets hit top of range
-// 3. 2-for-2: only step up after 2 consecutive sessions hitting top on ALL sets
-// 4. Fatigue tolerance: allow % drop from set 1 without flagging
-// 5. If any set is below bottom of range: too heavy → consider dropping weight
+//   1. Each set is assessed against its own weight independently
+//   2. Warmup sets (< 80% of top weight used): suggest same weight, nudge reps up
+//   3. Working sets: apply 2-for-2 rule — step up after 2 consecutive sessions
+//      where ALL working sets hit the top of the rep range
+//   4. If avg working-set reps < repMin: too heavy → suggest dropping
 //
 function buildSetSuggestions(points, exName, equipment, numSets) {
   if (!points.length) return null;
 
-  const isDB       = !equipment || equipment === 'Dumbbell';
   const equipType  = equipment || 'Dumbbell';
   const isCompound = COMPOUND_PRESS.includes(exName) || COMPOUND_PULL.includes(exName);
-  const fatigueTol = getFatigueTolerance(exName);
 
-  // Rep range — compounds tend to be 6–10, isolation 10–15
+  // Wider rep range — step up only when ALL working sets are at the ceiling
   const repMin = isCompound ? 6  : 8;
-  const repMax = isCompound ? 10 : 12;
+  const repMax = isCompound ? 12 : 15;
 
   const last     = points[points.length - 1];
   const prevLast = points.length >= 2 ? points[points.length - 2] : null;
 
-  const lastSets  = last.perSet  || [];
-  const prevSets  = prevLast?.perSet || [];
+  const lastSets = last.perSet  || [];
+  const prevSets = prevLast?.perSet || [];
 
   if (!lastSets.length) return buildNextSessionSuggestion(points, exName, equipment);
 
-  // ── Use the most common (modal) weight as the reference weight ────────────
-  const weightCounts = {};
-  lastSets.forEach(s => { weightCounts[s.weight] = (weightCounts[s.weight]||0) + 1; });
-  const mainWeight = +Object.entries(weightCounts).sort((a,b)=>b[1]-a[1])[0][0];
+  // ── Identify working weight = highest weight used ─────────────────────────
+  const topWeight = Math.max(...lastSets.map(s => s.weight));
 
-  // ── Check 2-for-2 readiness ───────────────────────────────────────────────
-  function allSetsHitTop(perSet) {
-    if (!perSet.length) return false;
-    // Only check sets that used the main weight
-    const mainSets = perSet.filter(s => s.weight >= mainWeight * 0.9);
-    return mainSets.length > 0 && mainSets.every(s => s.reps >= repMax);
+  // Working sets = those at ≥ 80% of top weight
+  function isWorking(s) { return s.weight >= topWeight * 0.80; }
+
+  const lastWorking = lastSets.filter(isWorking);
+  const prevWorking = prevSets.filter(isWorking);
+
+  // ── 2-for-2: did ALL working sets hit repMax? ─────────────────────────────
+  function allHitTop(sets) {
+    return sets.length > 0 && sets.every(s => s.reps >= repMax);
   }
-  const lastHitTop = allSetsHitTop(lastSets);
-  const prevHitTop = prevSets.length ? allSetsHitTop(prevSets) : false;
+  const lastHitTop = allHitTop(lastWorking);
+  const prevHitTop = prevWorking.length ? allHitTop(prevWorking) : false;
   const twoForTwo  = lastHitTop && prevHitTop;
 
-  // ── Check if weight is too heavy ──────────────────────────────────────────
-  const mainSets1 = lastSets.filter(s => s.weight >= mainWeight * 0.9);
-  const avgRepsAtMain = mainSets1.length
-    ? mainSets1.reduce((a,s)=>a+s.reps,0) / mainSets1.length
+  // ── Too heavy? avg working reps below floor ───────────────────────────────
+  const avgWorkingReps = lastWorking.length
+    ? lastWorking.reduce((a, s) => a + s.reps, 0) / lastWorking.length
     : 0;
-  const tooHeavy = avgRepsAtMain > 0 && avgRepsAtMain < repMin;
+  const tooHeavy = avgWorkingReps > 0 && avgWorkingReps < repMin;
 
-  // ── Determine next weight ─────────────────────────────────────────────────
-  const nextStep = nextAvailableWeight(mainWeight, equipType);
-  const prevStep = prevAvailableWeight(mainWeight, equipType);
-  const stepGap  = nextStep != null ? nextStep - mainWeight : null;
-  const bigJump  = stepGap && stepGap > 6;
+  // ── Next/prev step for the working weight ─────────────────────────────────
+  const nextStep = nextAvailableWeight(topWeight, equipType);
+  const prevStep = prevAvailableWeight(topWeight, equipType);
+  const stepGap  = nextStep != null ? nextStep - topWeight : null;
+  const bigJump  = stepGap != null && stepGap > 6;
 
   const n = numSets || Math.max(lastSets.length, 3);
 
@@ -2582,49 +2615,54 @@ function buildSetSuggestions(points, exName, equipment, numSets) {
 
   const sets = [];
   for (let i = 0; i < n; i++) {
-    // Use actual last set data for this position, or extrapolate from last available
-    const prev = lastSets[i] || lastSets[lastSets.length - 1] || { weight: mainWeight, reps: repMin };
-    // For warmup sets (lower weight), keep same weight and suggest pushing to main weight
-    const isWarmup = prev.weight < mainWeight * 0.9;
+    const prev    = lastSets[i] || lastSets[lastSets.length - 1] || { weight: topWeight, reps: repMin };
+    const isWarm  = !isWorking(prev);
 
-    if (isWarmup) {
-      // Warmup set — suggest same weight, +1 rep
+    if (isWarm) {
+      // Warmup — keep same weight, suggest nudging reps up slightly
+      const sugReps = Math.min(prev.reps + 1, repMax - 2);
       sets.push({
-        weight: prev.weight,
-        repsMin: prev.reps,
-        repsMax: Math.min(prev.reps + 2, repMax + 4),
-        trend: '↑',
-        note: 'warm-up',
+        weight:   prev.weight,
+        repsMin:  prev.reps,
+        repsMax:  sugReps,
+        trend:    '↑',
+        note:     'warm-up',
       });
       continue;
     }
 
     if (overallDecision === 'step_up') {
-      const targetW    = nextStep || mainWeight;
-      const repDrop    = bigJump && COMPOUND_PRESS.includes(exName) ? 3 : 2;
-      const targetReps = Math.max(repMin, prev.reps - repDrop);
-      sets.push({ weight: targetW, repsMin: Math.max(repMin, targetReps-1), repsMax: targetReps+1,
-        trend: '↑', note: i===0 ? `Step up from ${fmtKg(mainWeight)}kg` : '' });
+      const targetW    = nextStep ?? topWeight;
+      const repDrop    = bigJump ? 3 : 2;
+      const targetReps = Math.max(repMin, Math.round(prev.reps * 0.85));
+      sets.push({
+        weight:  targetW,
+        repsMin: Math.max(repMin, targetReps - 1),
+        repsMax: Math.min(repMax, targetReps + 1),
+        trend:   '↑',
+        note:    i === 0 ? `Step up from ${fmtKg(topWeight)}kg` : '',
+      });
 
     } else if (overallDecision === 'drop') {
-      const targetW    = prevStep || mainWeight;
-      const targetReps = Math.min(repMax - 1, prev.reps + 2);
-      sets.push({ weight: targetW, repsMin: targetReps, repsMax: Math.min(repMax, targetReps+2),
-        trend: '↓', note: i===0 ? `Too heavy at ${fmtKg(mainWeight)}kg — drop down` : '' });
+      const targetW    = prevStep ?? topWeight;
+      const targetReps = Math.min(repMax - 2, prev.reps + 2);
+      sets.push({
+        weight:  targetW,
+        repsMin: targetReps,
+        repsMax: Math.min(repMax, targetReps + 2),
+        trend:   '↓',
+        note:    i === 0 ? `Too heavy at ${fmtKg(topWeight)}kg — drop down` : '',
+      });
 
     } else {
-      // Consolidate — same weight, +1 rep
-      const targetW = mainWeight;
-      let targetReps;
-      if (prev.reps >= repMax)      targetReps = repMax;
-      else if (prev.reps < repMin)  targetReps = repMin;
-      else                          targetReps = prev.reps + 1;
+      // Consolidate — same weight, aim for +1 rep on each set
+      const targetReps = prev.reps >= repMax ? repMax : prev.reps + 1;
       sets.push({
-        weight: targetW,
+        weight:  prev.weight,
         repsMin: Math.min(targetReps, repMax),
         repsMax: Math.min(targetReps + 1, repMax),
-        trend: targetReps >= repMax ? '→' : '↑',
-        note: '',
+        trend:   targetReps >= repMax ? '→' : '↑',
+        note:    '',
       });
     }
   }
@@ -2632,20 +2670,22 @@ function buildSetSuggestions(points, exName, equipment, numSets) {
   // ── Summary line ──────────────────────────────────────────────────────────
   let summary, subtext;
   if (overallDecision === 'step_up') {
-    summary = `Step up to ${fmtKg(nextStep)}kg — you hit ${repMax}+ reps ${twoForTwo ? 'two sessions running' : 'last session'}`;
-    subtext = bigJump ? `Big jump (+${stepGap}kg) — expect reps to drop` : `Aim for ${repMin}–${repMax} reps at the new weight`;
+    summary = `Step up to ${fmtKg(nextStep)}kg — you hit ${repMax} reps ${twoForTwo ? 'two sessions running' : 'last session'}`;
+    subtext = bigJump
+      ? `Big jump (+${stepGap}kg) — expect reps to drop, aim for ${repMin}+`
+      : `Aim for ${repMin}–${repMax} reps at the new weight`;
   } else if (overallDecision === 'drop') {
-    summary = `Drop to ${fmtKg(prevStep||mainWeight)}kg — average reps below floor`;
+    summary = `Drop to ${fmtKg(prevStep ?? topWeight)}kg — average reps below ${repMin}`;
     subtext = `Build back to ${repMin}–${repMax} reps before stepping up again`;
   } else if (lastHitTop) {
-    summary = `Hold ${fmtKg(mainWeight)}kg — hit top range last session, one more to confirm`;
-    subtext = `Hit ${repMax}+ reps again this session to earn the step up`;
+    summary = `Hold ${fmtKg(topWeight)}kg — hit ${repMax} last session, one more to confirm`;
+    subtext = `Hit ${repMax} reps again this session to earn the step up next time`;
   } else {
-    summary = `Hold ${fmtKg(mainWeight)}kg — add 1 rep where possible`;
-    subtext = `Avg ${avgRepsAtMain.toFixed(1)} reps at ${fmtKg(mainWeight)}kg last time — closing in on ${repMax}`;
+    summary = `Hold ${fmtKg(topWeight)}kg — add 1 rep where possible`;
+    subtext = `Avg ${avgWorkingReps.toFixed(1)} reps at ${fmtKg(topWeight)}kg last time — target is ${repMax}`;
   }
 
-  return { sets, summary, subtext, overallDecision, repMin, repMax, currentW: mainWeight };
+  return { sets, summary, subtext, overallDecision, repMin, repMax, currentW: topWeight };
 }
 
 function buildNextSessionSuggestion(points, exName, equipment) {
@@ -3740,7 +3780,7 @@ Object.assign(window, {
   // Home
   openWorkoutPicker, handleStravaHomeBtn, startAdHocWorkout,
   // Workout
-  startWorkout, resumeWorkout, finishWorkout,
+  startWorkout, resumeWorkout, finishWorkout, togglePauseWorkout,
   handleSetBtn, addSet, removeLastSet, toggleExCollapse,
   setEquipment, updateSet,
   // Routine editor
