@@ -2184,8 +2184,8 @@ function renderEquipmentInventory() {
           <!-- Manual add -->
           <div class="eq-add-row">
             <div class="eq-input-wrap">
-              <input class="eq-input" id="eq-input-${type}" type="number"
-                inputmode="decimal" step="any" min="0" placeholder="kg"
+              <input class="eq-input" id="eq-input-${type}" type="text"
+                inputmode="decimal" placeholder="e.g. 10.5"
                 onkeydown="if(event.key==='Enter')addInventoryWeight('${type}')"/>
               <button class="eq-add-btn" onclick="addInventoryWeight('${type}')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 4v16M4 12h16"/></svg>
@@ -2229,8 +2229,9 @@ function openEquipmentSettings() {
 
 function addInventoryWeight(type) {
   const input = document.getElementById(`eq-input-${type}`);
-  const raw = parseFloat(input.value);
-  if (!raw || raw <= 0) { showToast('Enter a valid weight'); return; }
+  // Accept both . and , as decimal separator
+  const raw = parseFloat(input.value.replace(',', '.'));
+  if (isNaN(raw) || raw <= 0) { showToast('Enter a valid weight'); return; }
   const kg = Math.round(raw * 10) / 10; // round to 1 decimal
 
   if (!_inventory[type]) _inventory[type] = [];
