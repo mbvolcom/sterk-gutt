@@ -3735,6 +3735,8 @@ if (document.readyState === 'loading') {
 Object.assign(window, {
   // Nav & pages
   showPage, openModal, closeModal, signInWithGoogle, signInWithMagicLink, signOut,
+  // Confirm dialog
+  showConfirm, confirmOk, closeConfirm,
   // Home
   openWorkoutPicker, handleStravaHomeBtn, startAdHocWorkout,
   // Workout
