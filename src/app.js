@@ -947,7 +947,7 @@ function renderWorkoutBody() {
   // Add exercise button at the bottom
   const addExBtn = document.createElement('button');
   addExBtn.className = 'btn btn-ghost';
-  addExBtn.style.cssText = 'width:100%;margin:12px 0 4px;border:1.5px dashed rgba(0,180,255,0.3);color:var(--neon);letter-spacing:1px;';
+  addExBtn.style.cssText = 'width:100%;margin:12px 0 4px;border:1.5px dashed rgba(200,240,110,0.25);color:#c8f06e;letter-spacing:1px;';
   addExBtn.textContent = '+ ADD EXERCISE';
   addExBtn.addEventListener('click', () => openAddExerciseDuringWorkout());
   body.appendChild(addExBtn);
@@ -994,10 +994,10 @@ function buildSuggestionCard(ei, exName, equipment) {
 
   const { perSet, prog, last, weights } = data;
   const decisionColor = {
-    step_up:     '#00ff96',
-    consolidate: '#00b4ff',
+    step_up:     '#c8f06e',
+    consolidate: '#c8f06e',
     drop:        '#ff4466',
-  }[perSet.overallDecision] || '#00b4ff';
+  }[perSet.overallDecision] || '#c8f06e';
 
   const decisionIcon = {
     step_up:     '↑',
@@ -1064,7 +1064,7 @@ function buildSuggestionCard(ei, exName, equipment) {
       const row = document.createElement('div');
       row.style.cssText = 'display:grid;grid-template-columns:32px 1fr 1fr 20px;align-items:center;gap:6px;padding:5px 8px;background:rgba(255,255,255,0.03);border-radius:6px;font-size:11px;';
 
-      const trendColor = s.trend==='↑'?'#00ff96':s.trend==='↓'?'#ff4466':'#6b7280';
+      const trendColor = s.trend==='↑'?'#c8f06e':s.trend==='↓'?'#ff4466':'rgba(200,240,110,0.45)';
       const repsStr    = s.repsMin===s.repsMax ? `${s.repsMin}` : `${s.repsMin}–${s.repsMax}`;
       const prevStr    = lastPerSet[i] ? `${lastPerSet[i].weight}kg×${lastPerSet[i].reps}` : '—';
 
@@ -1124,7 +1124,7 @@ function updateHintAfterSet(ei) {
     if (sugg) sugg.textContent = '✓ All targets hit — great session!';
   } else if (anyBeat) {
     const sugg = card.querySelector('.hint-card-suggestion');
-    if (sugg) sugg.style.color = '#00ff96';
+    if (sugg) sugg.style.color = '#c8f06e';
   }
 }
 
@@ -1375,7 +1375,7 @@ function openAddExerciseDuringWorkout() {
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(7,8,12,0.92);z-index:3000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 16px 40px;';
 
   const panel = document.createElement('div');
-  panel.style.cssText = 'background:#151824;border:1px solid rgba(0,180,255,0.18);border-radius:16px;padding:20px;width:100%;max-width:420px;max-height:70vh;display:flex;flex-direction:column;';
+  panel.style.cssText = 'background:#151824;border:1px solid rgba(200,240,110,0.18);border-radius:16px;padding:20px;width:100%;max-width:420px;max-height:70vh;display:flex;flex-direction:column;';
 
   const header = document.createElement('div');
   header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;';
@@ -1384,7 +1384,7 @@ function openAddExerciseDuringWorkout() {
   // Search input
   const search = document.createElement('input');
   search.type = 'text'; search.placeholder = 'Search exercises…';
-  search.style.cssText = 'background:#0d0f17;border:1px solid rgba(0,180,255,0.15);border-radius:8px;padding:10px 12px;font-size:13px;color:#f0ede8;font-family:inherit;outline:none;margin-bottom:10px;width:100%;';
+  search.style.cssText = 'background:#0d0f17;border:1px solid rgba(200,240,110,0.15);border-radius:8px;padding:10px 12px;font-size:13px;color:#f0ede8;font-family:inherit;outline:none;margin-bottom:10px;width:100%;';
 
   // Exercise list
   const list = document.createElement('div');
@@ -2458,7 +2458,7 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
   const kpiRow = document.createElement('div');
   kpiRow.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;';
   [
-    {val:last.bestLabel,   lbl:'Best set',     color:'#00b4ff'},
+    {val:last.bestLabel,   lbl:'Best set',     color:'#c8f06e'},
     {val:last.est1RM+'kg', lbl:'Est. 1RM',     color:'#00ffcc'},
     {val:points.length,    lbl:'Sessions',      color:'#7c6aff'},
   ].forEach(k=>{
@@ -2527,7 +2527,7 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
 
   if (perSetData) {
     const hintCard = document.createElement('div');
-    hintCard.style.cssText = 'background:rgba(0,180,255,0.08);border:1px solid rgba(0,180,255,0.2);border-radius:12px;padding:14px 16px;margin-bottom:14px;';
+    hintCard.style.cssText = 'background:rgba(200,240,110,0.06);border:1px solid rgba(200,240,110,0.20);border-radius:12px;padding:14px 16px;margin-bottom:14px;';
 
     const summaryEl = document.createElement('div');
     summaryEl.innerHTML = `
@@ -2546,7 +2546,7 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
       perSetData.sets.forEach((s, i) => {
         const row = document.createElement('div');
         row.style.cssText = 'display:grid;grid-template-columns:32px 1fr 1fr 20px;align-items:center;gap:6px;padding:5px 6px;background:rgba(255,255,255,0.03);border-radius:6px;font-size:11px;margin-bottom:3px;';
-        const trendColor = s.trend==='↑'?'#00ff96':s.trend==='↓'?'#ff4466':'#6b7280';
+        const trendColor = s.trend==='↑'?'#c8f06e':s.trend==='↓'?'#ff4466':'rgba(200,240,110,0.45)';
         const repsStr = s.repsMin===s.repsMax ? `${s.repsMin}` : `${s.repsMin}–${s.repsMax}`;
         const prevStr = lastPerSet[i] ? `${lastPerSet[i].weight}kg×${lastPerSet[i].reps}` : '—';
         row.innerHTML =
@@ -2560,7 +2560,7 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
     container.appendChild(hintCard);
   } else if (hint) {
     const hintCard = document.createElement('div');
-    hintCard.style.cssText = 'background:rgba(0,180,255,0.08);border:1px solid rgba(0,180,255,0.2);border-radius:12px;padding:14px 16px;margin-bottom:14px;';
+    hintCard.style.cssText = 'background:rgba(200,240,110,0.06);border:1px solid rgba(200,240,110,0.20);border-radius:12px;padding:14px 16px;margin-bottom:14px;';
     hintCard.innerHTML = `
       <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#00b4ff;font-weight:700;margin-bottom:6px;">Next session</div>
       <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">${hint.suggestion}</div>
@@ -2588,7 +2588,7 @@ function renderSingleSessionCard(container, point, exName, equipment) {
 
   if (hint) {
     const hintCard = document.createElement('div');
-    hintCard.style.cssText = 'background:rgba(0,180,255,0.08);border:1px solid rgba(0,180,255,0.2);border-radius:12px;padding:14px 16px;';
+    hintCard.style.cssText = 'background:rgba(200,240,110,0.06);border:1px solid rgba(200,240,110,0.20);border-radius:12px;padding:14px 16px;';
     hintCard.innerHTML = `
       <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#00b4ff;font-weight:700;margin-bottom:6px;">Next session</div>
       <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">${hint.suggestion}</div>
@@ -2800,12 +2800,12 @@ function renderKPIs(sessions, fromDate, toDate) {
   const grid = document.getElementById('stats-kpi-grid');
   if (!grid) return;
   grid.innerHTML = [
-    {val:n,              lbl:'Sessions',       sub:'in period',         color:'#00b4ff'},
+    {val:n,              lbl:'Sessions',       sub:'in period',         color:'#c8f06e'},
     {val:avgSets,        lbl:'Avg sets',        sub:'per session',       color:'#00ffcc'},
     {val:freq,           lbl:'Sessions/week',   sub:`over ${totalWeeks} active week${totalWeeks!==1?'s':''}`, color:'#f0a96e'},
     {val:avgDur+'m',     lbl:'Avg duration',    sub:'per session',       color:'#7c6aff'},
     {val:totalVol.toLocaleString()+'kg', lbl:'Total volume', sub:'sets×reps×kg', color:'#00ffcc'},
-    {val:allSets,        lbl:'Total sets',      sub:'logged',            color:'#00b4ff'},
+    {val:allSets,        lbl:'Total sets',      sub:'logged',            color:'#c8f06e'},
   ].map(k=>`
     <div class="stats-kpi-card">
       <div class="stats-kpi-val" style="color:${k.color}">${k.val}</div>
@@ -2945,7 +2945,7 @@ function renderWeeklyFreqChart(sessions, fromDate, toDate) {
     const canvas = document.getElementById('chart-volume');
     if (!canvas || !canvas.offsetWidth) return;
     const ctx = canvas.getContext('2d');
-    drawBarChart(ctx, canvas, labels.map(l=>l.slice(5)), data, '#00b4ff');
+    drawBarChart(ctx, canvas, labels.map(l=>l.slice(5)), data, '#c8f06e');
   }, 100);
 }
 
@@ -3015,7 +3015,7 @@ function renderExerciseSection(equipFilter) {
       const btn = document.createElement('button');
       btn.textContent = e;
       const active = _exEquipFilter === e;
-      btn.style.cssText = `padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid ${active?'var(--neon)':'var(--border)'};background:${active?'rgba(0,180,255,0.12)':'var(--surface2)'};color:${active?'var(--neon)':'var(--muted2)'};`;
+      btn.style.cssText = `padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid ${active?'var(--neon)':'var(--border)'};background:${active?'rgba(200,240,110,0.10)':'var(--surface2)'};color:${active?'var(--neon)':'var(--muted2)'};`;
       btn.addEventListener('click', () => renderExerciseSection(e));
       filterWrap.appendChild(btn);
     });
@@ -3084,7 +3084,7 @@ async function openTagHistory(exName) {
       info.innerHTML = `<div style="font-size:13px;color:#d1d5db;font-weight:500;">${dateStr}</div><div style="font-size:10px;color:#4b5563;margin-top:2px;">${setsStr}</div>`;
 
       const currentTag = document.createElement('span');
-      currentTag.style.cssText = `font-size:10px;font-weight:600;padding:3px 9px;border-radius:12px;${ex.equipment ? 'color:var(--neon);background:rgba(0,180,255,0.1);border:1px solid rgba(0,180,255,0.2);' : 'color:#4b5563;'}`;
+      currentTag.style.cssText = `font-size:10px;font-weight:600;padding:3px 9px;border-radius:12px;${ex.equipment ? 'color:var(--neon);background:rgba(200,240,110,0.10);border:1px solid rgba(200,240,110,0.20);' : 'color:#4b5563;'}`;
       currentTag.textContent = ex.equipment || 'Untagged';
 
       topRow.appendChild(info);
@@ -3097,7 +3097,7 @@ async function openTagHistory(exName) {
         const btn = document.createElement('button');
         btn.textContent = eq;
         const isActive = ex.equipment === eq;
-        btn.style.cssText = `padding:5px 12px;border-radius:16px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid ${isActive?'var(--neon)':'rgba(255,255,255,0.1)'};background:${isActive?'rgba(0,180,255,0.12)':'transparent'};color:${isActive?'var(--neon)':'#6b7280'};`;
+        btn.style.cssText = `padding:5px 12px;border-radius:16px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid ${isActive?'var(--neon)':'rgba(255,255,255,0.1)'};background:${isActive?'rgba(200,240,110,0.10)':'transparent'};color:${isActive?'var(--neon)':'#6b7280'};`;
 
         btn.addEventListener('click', async () => {
           const allS = load(SK.sessions)||[];
@@ -3114,7 +3114,7 @@ async function openTagHistory(exName) {
           btnRow.querySelectorAll('button').forEach(b => {
             const active = b.textContent === exObj.equipment;
             b.style.borderColor = active ? 'var(--neon)' : 'rgba(255,255,255,0.1)';
-            b.style.background  = active ? 'rgba(0,180,255,0.12)' : 'transparent';
+            b.style.background  = active ? 'rgba(200,240,110,0.10)' : 'transparent';
             b.style.color       = active ? 'var(--neon)' : '#6b7280';
           });
           showToast(exObj.equipment ? `Tagged: ${exObj.equipment}` : 'Tag removed');
@@ -3416,7 +3416,7 @@ function showStravaUploadPrompt(session) {
   overlay.id = 'strava-upload-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(7,8,12,0.92);z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 16px 40px;';
   overlay.innerHTML = `
-    <div style="background:#151824;border:1px solid rgba(0,180,255,0.18);border-radius:16px;padding:24px 20px;width:100%;max-width:400px;">
+    <div style="background:#151824;border:1px solid rgba(200,240,110,0.18);border-radius:16px;padding:24px 20px;width:100%;max-width:400px;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="#FC4C02"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:#fff;">Upload to Strava?</div>
@@ -3426,7 +3426,7 @@ function showStravaUploadPrompt(session) {
       <div style="font-size:10px;color:#4a5068;margin-bottom:12px;letter-spacing:0.5px;">Full sets & reps will be included in the Strava description.</div>
       <div style="display:flex;gap:10px;">
         <button id="strava-upload-yes" style="flex:1;background:#FC4C02;color:#fff;border:none;border-radius:8px;padding:13px;font-family:'DM Mono',monospace;font-size:12px;font-weight:500;letter-spacing:1px;cursor:pointer;">UPLOAD</button>
-        <button id="strava-upload-no" style="flex:1;background:transparent;color:#4a5068;border:1px solid rgba(0,180,255,0.1);border-radius:8px;padding:13px;font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;">SKIP</button>
+        <button id="strava-upload-no" style="flex:1;background:transparent;color:#4a5068;border:1px solid rgba(200,240,110,0.10);border-radius:8px;padding:13px;font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;">SKIP</button>
       </div>
     </div>`;
 
