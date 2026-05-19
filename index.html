@@ -210,14 +210,12 @@
 
   <!-- ══ EXERCISES PAGE ══ -->
   <div class="page" id="page-exercises">
-    <div style="padding:20px 16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <div class="section-title" style="margin-bottom:0;flex:1;">Exercise Library</div>
-        <button class="btn btn-ghost btn-sm" onclick="openExerciseLibEditor(null)">+ New</button>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;" id="lib-muscle-filters"></div>
-      <div id="exercises-list"></div>
+    <div class="exercises-page-header">
+      <div class="exercises-page-title">Exercises</div>
+      <button class="exercises-new-btn" onclick="openExerciseLibEditor(null)">+ New</button>
     </div>
+    <div class="exercises-filter-row" id="lib-muscle-filters"></div>
+    <div id="exercises-list"></div>
   </div>
 
   <!-- ══ STATS PAGE ══ -->
