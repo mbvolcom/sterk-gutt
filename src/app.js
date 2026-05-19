@@ -2317,21 +2317,32 @@ function loadInventory() {
 
 function saveInventory() {
   localStorage.setItem(inventoryKey(), JSON.stringify(_inventory));
-  // Persist to Supabase key/value store
-  supabaseFetch('user_config', 'on_conflict=key', 'POST', {
-    key: `${USER_ID}:equipment_inventory`,
-    value: JSON.stringify(_inventory),
-  }).catch(() => { /* offline — localStorage already saved */ });
+  // Upsert one row per equipment type into user_equipment
+  const upserts = Object.entries(_inventory).map(([equipment_type, weights]) =>
+    supabaseFetch('user_equipment', 'on_conflict=user_id,equipment_type', 'POST', {
+      user_id: USER_ID,
+      equipment_type,
+      weights: weights,
+      updated_at: new Date().toISOString(),
+    })
+  );
+  Promise.all(upserts).catch(() => { /* offline — localStorage already saved */ });
 }
 
 async function loadInventoryFromCloud() {
   try {
     const data = await supabaseFetch(
-      'user_config',
-      `select=value&key=eq.${encodeURIComponent(USER_ID + ':equipment_inventory')}`
+      'user_equipment',
+      `select=equipment_type,weights&user_id=eq.${USER_ID}`
     );
-    if (data && data[0]?.value) {
-      _inventory = JSON.parse(data[0].value);
+    if (data && data.length > 0) {
+      _inventory = {};
+      data.forEach(row => {
+        // weights comes back as a parsed array from jsonb
+        _inventory[row.equipment_type] = Array.isArray(row.weights)
+          ? row.weights
+          : JSON.parse(row.weights || '[]');
+      });
       localStorage.setItem(inventoryKey(), JSON.stringify(_inventory));
     } else {
       loadInventory(); // fall back to local / defaults
