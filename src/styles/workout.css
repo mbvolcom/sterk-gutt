@@ -272,10 +272,11 @@
   font-family:'JetBrains Mono',monospace;font-size:9px;color:rgba(241,236,226,0.25);
   letter-spacing:0.20em;text-transform:uppercase;
 }
+/* Match set-row-top exactly: set-num col + input cols, no extra cols */
 .set-header-row.bilateral,
-.set-entry-headers.bilateral  { grid-template-columns:24px 1fr 1fr 1fr; }
+.set-entry-headers.bilateral  { grid-template-columns:24px 1fr 1fr; }
 .set-header-row.unilateral,
-.set-entry-headers.unilateral { grid-template-columns:24px 1fr 1fr 1fr 1fr; }
+.set-entry-headers.unilateral { grid-template-columns:24px 1fr 1fr 1fr; }
 
 /* ══ SET ROW ════════════════════════════════════════════════════════════ */
 .set-row {
