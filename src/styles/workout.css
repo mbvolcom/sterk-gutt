@@ -1,5 +1,17 @@
 /* ══ WORKOUT — Iron & Chalk + Signal Lime design ══════════════════════════ */
 
+/*
+ * Override the global blue --neon with lime for the entire workout page.
+ * This scopes the change so the rest of the app (stats, routines etc.) is unaffected.
+ */
+#page-workout {
+  --neon:      #c8f06e;
+  --neon2:     #c8f06e;
+  --neon-glow: rgba(200, 240, 110, 0.45);
+  --neon-dim:  rgba(200, 240, 110, 0.10);
+  --border2:   rgba(200, 240, 110, 0.22);
+}
+
 /* ── Workout page layout ── */
 .workout-page {
   display:flex;flex-direction:column;height:100%;overflow:hidden;
