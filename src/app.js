@@ -1458,15 +1458,24 @@ function setEquipment(ei, equipment) {
   const ex = activeSession.exercises[ei];
   ex.equipment = ex.equipment === equipment ? null : equipment; // toggle off if same
   autoSaveSession();
-  // Re-render just the equipment selector and meta
+
   const card = document.getElementById(`ex-card-${ei}`);
   if (card) {
+    // Update equipment button highlights
     card.querySelectorAll('.eq-btn').forEach(btn => {
       btn.classList.toggle('active', btn.textContent === ex.equipment);
     });
+    // Update meta line
     const meta = document.getElementById(`ex-meta-${ei}`);
     if (meta) meta.textContent = `${ex.muscle}${ex.unilateral?' · Uni':''} · ${ex.sets.filter(s=>s.state==='logged').length}/${ex.sets.length} sets${ex.equipment?' · '+ex.equipment:''}`;
+    // Rebuild suggestion card with new equipment context
+    const oldHint = card.querySelector('.hint-card');
+    if (oldHint) {
+      const newHint = buildSuggestionCard(ei, ex.name, ex.equipment);
+      oldHint.replaceWith(newHint);
+    }
   }
+
   // Remember last used equipment for this exercise
   const prefs = JSON.parse(localStorage.getItem('sg_eq_prefs')||'{}');
   prefs[ex.name] = ex.equipment;
