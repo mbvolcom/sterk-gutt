@@ -1720,13 +1720,13 @@ function renderRoutines() {
   list.innerHTML = routines.map(r => `
     <div class="routine-card">
       <div class="routine-card-header" onclick="toggleRoutineCard(this.parentElement)">
-        <div style="flex:1;">
+        <div>
           <div class="routine-card-name">${r.name}</div>
-          <div class="routine-card-meta">${r.exercises.length} exercises</div>
+          <div class="routine-card-meta">${r.exercises.length} exercise${r.exercises.length !== 1 ? 's' : ''}</div>
         </div>
         <div class="routine-card-actions" onclick="event.stopPropagation()">
-          <button onclick="openRoutineEditor('${r.id}')">✏️</button>
-          <button onclick="deleteRoutine('${r.id}')">🗑</button>
+          <button onclick="openRoutineEditor('${r.id}')" title="Edit">✏</button>
+          <button onclick="deleteRoutine('${r.id}')" title="Delete">✕</button>
         </div>
         <span class="routine-chevron">›</span>
       </div>
@@ -1738,11 +1738,15 @@ function renderRoutines() {
               <div class="routine-ex-tags">
                 <span class="tag">${ex.muscle}</span>
                 <span class="tag">${ex.sets} sets</span>
-                ${ex.unilateral ? '<span class="tag unilateral">Unilateral</span>' : ''}
+                ${ex.unilateral ? '<span class="tag unilateral">Uni</span>' : ''}
               </div>
             </div>
           </div>
         `).join('')}
+        <button class="routine-start-btn" onclick="startWorkout('${r.id}')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Start Workout
+        </button>
       </div>
     </div>
   `).join('');
@@ -1783,20 +1787,19 @@ function renderEditorExercises() {
     <div class="routine-ex-item" style="flex-direction:row;align-items:center;gap:8px;" id="re-ex-${i}" data-rei="${i}">
       <span class="re-drag-handle" data-rei="${i}">⠿</span>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:500;color:var(--text);">${ex.name}</div>
+        <div class="routine-ex-name">${ex.name}</div>
         <div class="routine-ex-tags" style="margin-top:4px;">
           <span class="tag">${ex.muscle}</span>
-          ${ex.unilateral ? '<span class="tag unilateral">Unilateral</span>' : ''}
+          ${ex.unilateral ? '<span class="tag unilateral">Uni</span>' : ''}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
         <input type="number" value="${ex.sets}" min="1" max="20"
-          style="width:40px;text-align:center;padding:6px 4px;"
           oninput="updateEditorExSets(${i},this.value)"
           onchange="updateEditorExSets(${i},this.value)"/>
-        <span style="font-size:10px;color:var(--muted2);">sets</span>
+        <span class="sets-label">sets</span>
       </div>
-      <button class="btn-icon" onclick="removeEditorEx(${i})" style="color:var(--red);border-color:var(--red-dim);flex-shrink:0;">✕</button>
+      <button class="btn-icon" onclick="removeEditorEx(${i})">✕</button>
     </div>
   `).join('');
 
@@ -1903,9 +1906,10 @@ function selectExerciseFromPicker(idx) {
 function showNewExForm(name) {
   document.getElementById('ex-picker-new-form').style.display = 'block';
   document.getElementById('ex-picker-search').value = name;
-  document.getElementById('ex-picker-muscle').value = '';
   document.getElementById('ex-picker-uni').checked = false;
   document.getElementById('ex-picker-results').innerHTML = '';
+  selectedMuscle = '';
+  renderMusclePicker('ex-picker-muscle-grid');
 }
 
 function hideNewExForm() {
@@ -2054,7 +2058,7 @@ function openExerciseLibEditor(exId) {
 
 function renderMusclePicker(containerId) {
   document.getElementById(containerId).innerHTML = MUSCLE_GROUPS.map(m => `
-    <button class="muscle-chip ${selectedMuscle === m ? 'selected' : ''}"
+    <button class="muscle-btn ${selectedMuscle === m ? 'active' : ''}"
       onclick="selectMuscle('${m}','${containerId}')">${m}</button>
   `).join('');
 }
