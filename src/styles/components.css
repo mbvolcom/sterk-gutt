@@ -390,3 +390,339 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
   background:rgba(200,240,110,0.1);border:1px solid rgba(200,240,110,0.25);
   border-radius:4px;padding:2px 6px;
 }
+
+
+/* ══ ROUTINES PAGE + MODALS — Iron & Chalk + Signal Lime ═════════════════ */
+
+/* Scoped lime override for routines page and its modals */
+#page-routines,
+#routine-editor,
+#exercise-picker,
+#exercise-lib-editor,
+#workout-picker {
+  --neon:      #c8f06e;
+  --neon2:     #c8f06e;
+  --neon-glow: rgba(200,240,110,0.45);
+  --neon-dim:  rgba(200,240,110,0.10);
+  --border2:   rgba(200,240,110,0.22);
+}
+
+/* ── Page header ── */
+#page-routines { background:#0a0907; }
+.routines-page-header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 16px 14px;flex-shrink:0;
+}
+.routines-page-title {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:32px;font-weight:800;letter-spacing:0.04em;
+  text-transform:uppercase;color:#f4efe5;line-height:1;
+}
+.routines-new-btn {
+  display:flex;align-items:center;gap:6px;
+  padding:9px 14px;
+  border:1px solid #c8f06e;background:rgba(200,240,110,0.08);color:#c8f06e;
+  font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;
+  letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+.routines-new-btn:active { background:rgba(200,240,110,0.16); }
+
+/* ── Routine card ── */
+#routines-list { padding:0 12px 32px; }
+.routine-card {
+  border:1px solid rgba(255,255,255,0.07);
+  background:#111113;margin-bottom:6px;overflow:hidden;
+  transition:border-color 0.15s;
+}
+.routine-card.open { border-color:rgba(200,240,110,0.20); }
+.routine-card-header {
+  display:grid;grid-template-columns:1fr auto auto;
+  align-items:center;gap:10px;padding:14px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+}
+.routine-card-name {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:22px;font-weight:700;color:#f4efe5;
+  letter-spacing:0.02em;line-height:1;
+}
+.routine-card-meta {
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;color:rgba(241,236,226,0.35);
+  letter-spacing:0.06em;margin-top:4px;
+}
+.routine-card-actions { display:flex;gap:6px;align-items:center; }
+.routine-card-actions button {
+  background:none;border:1px solid rgba(255,255,255,0.08);
+  color:rgba(241,236,226,0.40);width:30px;height:30px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:13px;
+  -webkit-tap-highlight-color:transparent;
+}
+.routine-card-actions button:first-child:active { border-color:#c8f06e;color:#c8f06e; }
+.routine-card-actions button:last-child:active  { border-color:#ff4466;color:#ff4466; }
+.routine-chevron {
+  font-size:18px;color:rgba(255,255,255,0.20);
+  transition:transform 0.18s;line-height:1;
+}
+.routine-card.open .routine-chevron { transform:rotate(90deg); }
+.routine-card-body { display:none;border-top:1px solid rgba(255,255,255,0.06);padding:4px 0 8px; }
+.routine-card.open .routine-card-body { display:block; }
+
+/* Exercise rows inside card */
+.routine-ex-item {
+  display:flex;align-items:center;
+  padding:9px 14px;gap:10px;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.routine-ex-item:last-of-type { border-bottom:none; }
+.routine-ex-info { flex:1;min-width:0; }
+.routine-ex-name {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:17px;font-weight:700;color:#e8e4dc;
+  letter-spacing:0.01em;line-height:1.1;
+}
+.routine-ex-tags { display:flex;flex-wrap:wrap;gap:5px;margin-top:5px; }
+.tag {
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;font-weight:600;letter-spacing:0.10em;text-transform:uppercase;
+  color:rgba(241,236,226,0.38);border:1px solid rgba(255,255,255,0.08);padding:2px 7px;
+}
+.tag.unilateral { color:rgba(200,240,110,0.65);border-color:rgba(200,240,110,0.22); }
+
+/* "Start Workout" button inside expanded card */
+.routine-start-btn {
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  margin:8px 14px 4px;padding:12px;width:calc(100% - 28px);
+  border:1px solid rgba(200,240,110,0.40);background:rgba(200,240,110,0.06);color:#c8f06e;
+  font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;
+  letter-spacing:0.16em;text-transform:uppercase;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+.routine-start-btn:active { background:rgba(200,240,110,0.14); }
+
+/* Empty state */
+.empty-state {
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:48px 20px;gap:10px;
+}
+.empty-state-icon { font-size:32px;opacity:0.4; }
+.empty-state-text {
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  letter-spacing:0.12em;text-transform:uppercase;color:rgba(241,236,226,0.30);
+}
+
+/* ── Modal overrides ── */
+.modal-title {
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:28px;font-weight:800;letter-spacing:0.06em;
+  text-transform:uppercase;color:#f4efe5;
+}
+.modal-close {
+  width:34px;height:34px;border:1px solid rgba(255,255,255,0.10);
+  background:transparent;color:rgba(241,236,226,0.45);
+  font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;-webkit-tap-highlight-color:transparent;
+}
+.modal-close:active { border-color:#c8f06e;color:#c8f06e; }
+
+/* Form labels */
+.form-group label, label {
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;
+  color:rgba(241,236,226,0.38);display:block;margin-bottom:8px;
+}
+
+/* Inputs inside routine/exercise modals */
+#routine-editor input[type="text"],
+#routine-editor input[type="number"],
+#exercise-picker input[type="text"],
+#exercise-picker input[type="number"],
+#exercise-lib-editor input[type="text"] {
+  width:100%;background:#111113;border:1px solid rgba(255,255,255,0.10);
+  color:#f4efe5;font-family:'JetBrains Mono',monospace;font-size:14px;
+  padding:11px 14px;outline:none;-webkit-appearance:none;appearance:none;
+  transition:border-color 0.15s;border-radius:0;
+}
+#routine-editor input:focus,
+#exercise-picker input:focus,
+#exercise-lib-editor input:focus { border-color:#c8f06e; }
+#routine-editor input::placeholder,
+#exercise-picker input::placeholder,
+#exercise-lib-editor input::placeholder { color:rgba(241,236,226,0.22); }
+
+/* Checkbox row */
+.checkbox-row { display:flex;align-items:center;gap:10px;cursor:pointer; }
+.checkbox-row input[type="checkbox"] { width:18px;height:18px;accent-color:#c8f06e;cursor:pointer;flex-shrink:0; }
+.checkbox-row label {
+  font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.04em;
+  text-transform:none;color:rgba(241,236,226,0.60);margin-bottom:0;cursor:pointer;
+}
+
+/* Muscle group buttons */
+.muscle-btn {
+  padding:8px 6px;border:1px solid rgba(255,255,255,0.08);
+  background:transparent;color:rgba(241,236,226,0.40);
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;
+  cursor:pointer;text-align:center;transition:all 0.12s;
+  -webkit-tap-highlight-color:transparent;
+}
+.muscle-btn.active {
+  border-color:#c8f06e;background:rgba(200,240,110,0.08);color:#c8f06e;
+}
+
+/* Drag handle in editor */
+.re-drag-handle {
+  font-size:16px;color:rgba(255,255,255,0.18);cursor:grab;
+  user-select:none;letter-spacing:-2px;line-height:1;padding:4px 2px;touch-action:none;
+}
+
+/* Sets input in editor rows */
+.routine-ex-item input[type="number"] {
+  width:44px;background:#0a0907;border:1px solid rgba(255,255,255,0.10);
+  color:#c8f06e;font-family:'JetBrains Mono',monospace;
+  font-size:15px;font-weight:700;text-align:center;padding:6px 4px;
+  outline:none;-webkit-appearance:none;appearance:none;
+}
+.routine-ex-item input[type="number"]:focus { border-color:#c8f06e; }
+.sets-label {
+  font-family:'JetBrains Mono',monospace;font-size:9px;
+  letter-spacing:0.10em;text-transform:uppercase;color:rgba(241,236,226,0.28);
+}
+
+/* Remove button */
+.btn-icon {
+  width:30px;height:30px;border:1px solid rgba(255,68,102,0.22);
+  background:transparent;color:rgba(255,68,102,0.60);font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;flex-shrink:0;
+}
+.btn-icon:active { border-color:#ff4466;color:#ff4466; }
+
+/* Add exercise button */
+.new-routine-btn {
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;padding:13px;
+  border:1.5px dashed rgba(200,240,110,0.28);background:transparent;
+  color:rgba(200,240,110,0.65);font-family:'JetBrains Mono',monospace;
+  font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+.new-routine-btn:active { background:rgba(200,240,110,0.06); }
+
+/* Modal CTA buttons — override component defaults for routines context */
+#routine-editor .btn,
+#exercise-picker .btn,
+#exercise-lib-editor .btn {
+  font-family:'Barlow Condensed',sans-serif;font-weight:800;
+  font-size:16px;letter-spacing:0.16em;text-transform:uppercase;
+  padding:13px 20px;cursor:pointer;border-radius:0;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+#routine-editor .btn-ghost,
+#exercise-picker .btn-ghost,
+#exercise-lib-editor .btn-ghost {
+  background:transparent;border:1px solid rgba(255,255,255,0.12);
+  color:rgba(241,236,226,0.55);box-shadow:none;
+}
+#routine-editor .btn-primary,
+#exercise-picker .btn-primary,
+#exercise-lib-editor .btn-primary {
+  background:#c8f06e;color:#0a0907;border:none;box-shadow:none;width:100%;
+}
+#routine-editor .btn-primary:active,
+#exercise-picker .btn-primary:active,
+#exercise-lib-editor .btn-primary:active { background:#b8e05e; }
+
+/* Exercise search results */
+#ex-picker-results {
+  border:1px solid rgba(255,255,255,0.08) !important;
+  border-radius:0 !important;overflow:hidden;
+}
+.ex-search-item {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 14px;border-bottom:1px solid rgba(255,255,255,0.05);
+  cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background 0.10s;
+}
+.ex-search-item:last-child { border-bottom:none; }
+.ex-search-item:active { background:rgba(200,240,110,0.06); }
+.ex-search-item-name {
+  font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;
+  color:#e8e4dc;letter-spacing:0.01em;
+}
+.ex-search-item-muscle {
+  font-family:'JetBrains Mono',monospace;font-size:9px;
+  letter-spacing:0.08em;text-transform:uppercase;color:rgba(241,236,226,0.30);flex-shrink:0;
+}
+.ex-create-option {
+  padding:11px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;
+  color:#c8f06e;cursor:pointer;display:flex;align-items:center;gap:8px;
+  letter-spacing:0.04em;border-top:1px solid rgba(200,240,110,0.12);
+  background:rgba(200,240,110,0.04);-webkit-tap-highlight-color:transparent;
+}
+.ex-create-option:active { background:rgba(200,240,110,0.10); }
+.ex-create-option strong { color:#c8f06e; }
+
+/* ── Workout picker modal ── */
+#workout-picker { background:#0a0907;padding:0; }
+.wp-close {
+  background:none;border:1px solid rgba(255,255,255,0.10);
+  color:rgba(241,236,226,0.40);font-size:18px;cursor:pointer;
+  width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;-webkit-tap-highlight-color:transparent;
+}
+.wp-close:active { border-color:#c8f06e;color:#c8f06e; }
+.wp-new-btn {
+  background:#c8f06e;color:#0a0907;border:none;
+  font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;
+  letter-spacing:0.12em;padding:0 16px;height:34px;
+  display:flex;align-items:center;gap:4px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.wp-new-btn:active { background:#b8e05e; }
+.wp-title {
+  font-family:'Barlow Condensed',sans-serif;font-size:44px;font-weight:800;
+  line-height:0.95;color:#f4efe5;letter-spacing:0.02em;text-transform:uppercase;margin-bottom:6px;
+}
+.wp-subtitle {
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;
+  letter-spacing:0.10em;color:rgba(241,236,226,0.30);text-transform:uppercase;
+}
+.wp-row {
+  display:flex;align-items:center;gap:14px;padding:16px 20px;
+  border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;
+  -webkit-tap-highlight-color:transparent;transition:background 0.10s;
+}
+.wp-row:active { background:rgba(255,255,255,0.03); }
+.wp-row-info { flex:1;min-width:0; }
+.wp-row-name {
+  font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;
+  color:#e8e4dc;letter-spacing:0.02em;line-height:1.1;
+}
+.wp-row-meta {
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:500;
+  letter-spacing:0.08em;color:rgba(241,236,226,0.28);text-transform:uppercase;margin-top:4px;
+}
+.wp-row-chevron { font-size:20px;color:rgba(241,236,226,0.14);flex-shrink:0; }
+.wp-row-adhoc {
+  border-top:1px solid rgba(200,240,110,0.14);border-bottom:1px solid rgba(200,240,110,0.14);
+  background:rgba(200,240,110,0.03);
+}
+.wp-adhoc-icon {
+  width:32px;height:32px;border:1px solid rgba(200,240,110,0.35);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;
+  color:#c8f06e;flex-shrink:0;
+}
+
+/* ── Toast ── */
+.toast {
+  position:fixed;bottom:calc(var(--nav-h,64px) + 12px);left:50%;
+  transform:translateX(-50%) translateY(20px);
+  background:#1e1e1a;border:1px solid rgba(200,240,110,0.25);color:#f4efe5;
+  font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.04em;
+  padding:10px 18px;white-space:nowrap;z-index:99999;
+  opacity:0;pointer-events:none;transition:opacity 0.2s,transform 0.2s;
+}
+.toast.show { opacity:1;transform:translateX(-50%) translateY(0); }
