@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/src/routines.css"/>
 </head>
 <body>
 
@@ -201,13 +202,11 @@
 
   <!-- ══ ROUTINES PAGE ══ -->
   <div class="page" id="page-routines">
-    <div style="padding:20px 16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-        <div class="section-title" style="margin-bottom:0;flex:1;">My Routines</div>
-        <button class="btn btn-ghost btn-sm" onclick="openRoutineEditor(null)">+ New</button>
-      </div>
-      <div id="routines-list"></div>
+    <div class="routines-page-header">
+      <div class="routines-page-title">Routines</div>
+      <button class="routines-new-btn" onclick="openRoutineEditor(null)">+ New</button>
     </div>
+    <div id="routines-list"></div>
   </div>
 
   <!-- ══ EXERCISES PAGE ══ -->
@@ -334,19 +333,19 @@
   <div class="section-title" style="margin-bottom:12px;">Exercises</div>
   <div id="re-exercises"></div>
   <button class="new-routine-btn" onclick="addExerciseToEditor()">
-    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
+    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16m8-8H4"/></svg>
     Add Exercise
   </button>
-  <div style="margin-top:16px;display:flex;gap:10px;">
+  <div style="margin-top:18px;display:flex;gap:10px;">
     <button class="btn btn-ghost" style="flex:1;" onclick="closeModal('routine-editor')">Cancel</button>
-    <button class="btn btn-primary" style="flex:1;box-shadow:none;" onclick="saveRoutine()">Save Routine</button>
+    <button class="btn btn-primary" style="flex:1;" onclick="saveRoutine()">Save Routine</button>
   </div>
 </div>
 
 <!-- EXERCISE PICKER MODAL (for routine editor) -->
 <div class="modal-overlay" id="exercise-picker">
   <div class="modal-header">
-    <div class="modal-title">ADD EXERCISE</div>
+    <div class="modal-title">Add Exercise</div>
     <div class="modal-close" onclick="closeModal('exercise-picker')">✕</div>
   </div>
   <div class="form-group">
@@ -358,7 +357,7 @@
     <input type="text" id="ex-picker-search" placeholder="e.g. Bench Press"
       oninput="filterExPicker(this.value)" autocomplete="off"/>
   </div>
-  <div id="ex-picker-results" style="border:1px solid var(--border2);border-radius:8px;overflow:hidden;margin-bottom:12px;max-height:240px;overflow-y:auto;"></div>
+  <div id="ex-picker-results" style="margin-bottom:12px;max-height:240px;overflow-y:auto;"></div>
   <div id="ex-picker-new-form" style="display:none;">
     <div class="form-group">
       <label>Muscle Group</label>
@@ -374,7 +373,7 @@
     </div>
     <div style="display:flex;gap:10px;margin-top:8px;">
       <button class="btn btn-ghost" style="flex:1;" onclick="hideNewExForm()">Cancel</button>
-      <button class="btn btn-primary" style="flex:1;box-shadow:none;" onclick="createAndAddExercise()">Create & Add</button>
+      <button class="btn btn-primary" style="flex:1;" onclick="createAndAddExercise()">Create & Add</button>
     </div>
   </div>
 </div>
@@ -382,7 +381,7 @@
 <!-- EXERCISE LIBRARY EDITOR MODAL -->
 <div class="modal-overlay" id="exercise-lib-editor">
   <div class="modal-header">
-    <div class="modal-title" id="ex-lib-editor-title">NEW EXERCISE</div>
+    <div class="modal-title" id="ex-lib-editor-title">New Exercise</div>
     <div class="modal-close" onclick="closeModal('exercise-lib-editor')">✕</div>
   </div>
   <div class="form-group">
@@ -391,7 +390,7 @@
   </div>
   <div class="form-group">
     <label>Muscle Group</label>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px;" id="ex-lib-muscle-grid"></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px;" id="ex-lib-muscle-grid"></div>
   </div>
   <div class="form-group" style="margin-top:12px;">
     <div class="checkbox-row">
@@ -399,9 +398,9 @@
       <label for="ex-lib-uni">Unilateral (single arm/leg)</label>
     </div>
   </div>
-  <div style="display:flex;gap:10px;margin-top:16px;">
+  <div style="display:flex;gap:10px;margin-top:18px;">
     <button class="btn btn-ghost" style="flex:1;" onclick="closeModal('exercise-lib-editor')">Cancel</button>
-    <button class="btn btn-primary" style="flex:1;box-shadow:none;" onclick="saveExerciseLib()">Save</button>
+    <button class="btn btn-primary" style="flex:1;" onclick="saveExerciseLib()">Save</button>
   </div>
 </div>
 
