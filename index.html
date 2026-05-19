@@ -124,14 +124,9 @@
     <span style="width:7px;height:7px;border-radius:50%;background:#c8f06e;box-shadow:0 0 6px #c8f06e;display:inline-block;flex-shrink:0;"></span>
     <div class="logo">STERK<span>GUTT</span></div>
   </div>
-  <div style="display:flex;align-items:center;gap:12px;">
-    <button onclick="openEquipmentSettings()" style="background:none;border:none;cursor:pointer;padding:4px;color:rgba(241,236,226,0.40);display:flex;align-items:center;" title="Equipment inventory">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3-3a1 1 0 000-1.4l-1.6-1.6a1 1 0 00-1.4 0z"/><path d="M6 22h4l9.5-9.5a1.5 1.5 0 000-2.1L17.1 8a1.5 1.5 0 00-2.1 0L5 18v4"/><path d="M2 22l4-1"/></svg>
-    </button>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#555552;letter-spacing:0.1em;">v2.14.2</div>
-      <div id="sync-status" style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.06em;transition:color 0.3s;"></div>
-    </div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#555552;letter-spacing:0.1em;">v2.14.2</div>
+    <div id="sync-status" style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.06em;transition:color 0.3s;"></div>
   </div>
 </div>
 
@@ -215,12 +210,34 @@
 
   <!-- ══ EXERCISES PAGE ══ -->
   <div class="page" id="page-exercises">
-    <div class="exercises-page-header">
-      <div class="exercises-page-title">Exercises</div>
-      <button class="exercises-new-btn" onclick="openExerciseLibEditor(null)">+ New</button>
+
+    <!-- Sub-tab bar -->
+    <div class="ex-subtab-bar">
+      <button class="ex-subtab active" id="ex-subtab-library" onclick="setExercisesSubtab('library')">Library</button>
+      <button class="ex-subtab" id="ex-subtab-equipment" onclick="setExercisesSubtab('equipment')">Equipment</button>
     </div>
-    <div class="exercises-filter-row" id="lib-muscle-filters"></div>
-    <div id="exercises-list"></div>
+
+    <!-- ── LIBRARY sub-page ── -->
+    <div id="ex-subpage-library">
+      <div class="exercises-page-header">
+        <div class="exercises-page-title">Exercises</div>
+        <button class="exercises-new-btn" onclick="openExerciseLibEditor(null)">+ New</button>
+      </div>
+      <div class="exercises-filter-row" id="lib-muscle-filters"></div>
+      <div id="exercises-list"></div>
+    </div>
+
+    <!-- ── EQUIPMENT sub-page ── -->
+    <div id="ex-subpage-equipment" style="display:none;">
+      <div class="exercises-page-header">
+        <div class="exercises-page-title">Equipment</div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;color:rgba(241,236,226,0.35);padding:0 16px 18px;line-height:1.7;">
+        Add the weights you own. The app will only suggest weights that are actually in your inventory.
+      </div>
+      <div id="eq-inv-body" style="padding:0 12px 40px;"></div>
+    </div>
+
   </div>
 
   <!-- ══ STATS PAGE ══ -->
