@@ -368,6 +368,7 @@ async function syncFromCloud() {
     await dbLoadRoutines();
     await dbLoadSessions();
     await dbLoadExercises();
+    await loadInventoryFromCloud();
     setSyncStatus('ok');
   } catch(e) {
     console.error('syncFromCloud error:', e.message, e.stack);
@@ -2123,6 +2124,89 @@ function deleteExerciseLib(exId) {
   });
 }
 
+// ═══════════════════════════════════════════
+// EQUIPMENT INVENTORY UI
+// ═══════════════════════════════════════════
+
+const EQUIPMENT_TYPES = ['Dumbbell', 'Barbell', 'Cable', 'Machine', 'Bodyweight'];
+
+function openEquipmentSettings() {
+  const overlay = document.createElement('div');
+  overlay.id = 'equipment-overlay';
+  overlay.className = 'modal-overlay open';
+  overlay.style.cssText = '--neon:#c8f06e;--neon2:#c8f06e;--neon-dim:rgba(200,240,110,0.10);--border2:rgba(200,240,110,0.22);';
+
+  overlay.innerHTML = `
+    <div class="modal-header">
+      <div class="modal-title">Equipment</div>
+      <div class="modal-close" onclick="document.getElementById('equipment-overlay').remove()">✕</div>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.08em;color:rgba(241,236,226,0.38);margin-bottom:20px;line-height:1.6;">
+      Add the weights you own. Suggestions will only use weights from your inventory.
+    </div>
+    <div id="eq-inv-body"></div>
+  `;
+
+  document.body.appendChild(overlay);
+  renderEquipmentInventory();
+}
+
+function renderEquipmentInventory() {
+  const body = document.getElementById('eq-inv-body');
+  if (!body) return;
+
+  body.innerHTML = EQUIPMENT_TYPES.map(type => {
+    const weights = getInventoryWeights(type);
+    const hasWeights = type !== 'Bodyweight';
+    return `
+      <div class="eq-inv-section">
+        <div class="eq-inv-type-header">
+          <span class="eq-inv-type-name">${type}</span>
+          ${hasWeights ? `
+            <div class="eq-inv-add-row">
+              <input class="eq-inv-input" type="number" id="eq-input-${type}"
+                placeholder="kg" step="0.5" min="0.5" inputmode="decimal"/>
+              <button class="eq-inv-add-btn" onclick="addInventoryWeight('${type}')">Add</button>
+            </div>` : `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(241,236,226,0.28);letter-spacing:0.06em;">No weights needed</span>`
+          }
+        </div>
+        ${hasWeights ? `
+          <div class="eq-inv-chips" id="eq-chips-${type}">
+            ${weights.length
+              ? weights.map(w => `
+                  <button class="eq-inv-chip" onclick="removeInventoryWeight('${type}', ${w})">
+                    ${w}kg <span class="eq-inv-chip-x">×</span>
+                  </button>`).join('')
+              : `<span class="eq-inv-empty">No weights added yet</span>`
+            }
+          </div>` : ''
+        }
+      </div>`;
+  }).join('');
+}
+
+function addInventoryWeight(type) {
+  const input = document.getElementById(`eq-input-${type}`);
+  const kg = parseFloat(input.value);
+  if (!kg || kg <= 0) { showToast('Enter a valid weight'); return; }
+
+  if (!_inventory[type]) _inventory[type] = [];
+  if (_inventory[type].includes(kg)) { showToast(`${kg}kg already in inventory`); return; }
+
+  _inventory[type].push(kg);
+  _inventory[type].sort((a, b) => a - b);
+  saveInventory();
+  input.value = '';
+  renderEquipmentInventory();
+}
+
+function removeInventoryWeight(type, kg) {
+  if (!_inventory[type]) return;
+  _inventory[type] = _inventory[type].filter(w => w !== kg);
+  saveInventory();
+  renderEquipmentInventory();
+}
+
 function deleteRoutine(id) {
   showConfirm('Delete Routine?', 'This cannot be undone.', () => {
     let routines = load(SK.routines) || [];
@@ -2160,10 +2244,90 @@ function createAndAddExercise() {
 // EXERCISE PROGRESSION ENGINE — shared by Sterk Gutt + Calendar stats
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Marius's dumbbell steps in kg
-const DB_STEPS = [6, 10.5, 15, 19.5, 24, 28.5, 33, 40];
+// ── EQUIPMENT INVENTORY ──────────────────────────────────────────────────
+// Stored as { Dumbbell: [kg,...], Barbell: [kg,...], Cable: [kg,...], ... }
+// Weights are always kept sorted ascending.
 
-// Compound presses — expect more inter-set fatigue drop (allow 20%)
+let _inventory = {};
+
+const INVENTORY_DEFAULT = {
+  Dumbbell:   [6, 10.5, 15, 19.5, 24, 28.5, 33, 40],
+  Barbell:    [],   // user fills in their plate combos
+  Cable:      [],
+  Machine:    [],
+  Bodyweight: [],
+};
+
+function inventoryKey() { return `sg_inventory_${USER_ID}`; }
+
+function loadInventory() {
+  try {
+    const raw = localStorage.getItem(inventoryKey());
+    if (raw) { _inventory = JSON.parse(raw); return; }
+  } catch(e) {}
+  // First time — seed with defaults
+  _inventory = JSON.parse(JSON.stringify(INVENTORY_DEFAULT));
+  saveInventory();
+}
+
+function saveInventory() {
+  localStorage.setItem(inventoryKey(), JSON.stringify(_inventory));
+  // Persist to Supabase key/value store
+  supabaseFetch('user_config', 'on_conflict=key', 'POST', {
+    key: `${USER_ID}:equipment_inventory`,
+    value: JSON.stringify(_inventory),
+  }).catch(() => { /* offline — localStorage already saved */ });
+}
+
+async function loadInventoryFromCloud() {
+  try {
+    const data = await supabaseFetch(
+      'user_config',
+      `select=value&key=eq.${encodeURIComponent(USER_ID + ':equipment_inventory')}`
+    );
+    if (data && data[0]?.value) {
+      _inventory = JSON.parse(data[0].value);
+      localStorage.setItem(inventoryKey(), JSON.stringify(_inventory));
+    } else {
+      loadInventory(); // fall back to local / defaults
+    }
+  } catch(e) { loadInventory(); }
+}
+
+// Return sorted weight array for a given equipment type
+function getInventoryWeights(equipType) {
+  const w = _inventory[equipType] || [];
+  return [...w].sort((a, b) => a - b);
+}
+
+// Next available weight above currentKg for the given equipment type.
+// Falls back to currentKg + 2.5 if inventory is empty or no step found.
+function nextAvailableWeight(currentKg, equipType) {
+  const weights = getInventoryWeights(equipType);
+  if (!weights.length) return Math.round((currentKg + 2.5) * 4) / 4;
+  const next = weights.find(w => w > currentKg);
+  return next ?? null; // null = already at max
+}
+
+// Previous available weight below currentKg.
+function prevAvailableWeight(currentKg, equipType) {
+  const weights = getInventoryWeights(equipType);
+  if (!weights.length) return Math.max(0, Math.round((currentKg - 2.5) * 4) / 4);
+  const prev = [...weights].reverse().find(w => w < currentKg);
+  return prev ?? null; // null = already at minimum
+}
+
+// Nearest weight in inventory to a target (for snapping suggestions to real weights)
+function nearestAvailableWeight(targetKg, equipType) {
+  const weights = getInventoryWeights(equipType);
+  if (!weights.length) return targetKg;
+  return weights.reduce((best, w) => Math.abs(w - targetKg) < Math.abs(best - targetKg) ? w : best, weights[0]);
+}
+
+// Legacy alias kept so nothing else breaks
+const DB_STEPS = [6, 10.5, 15, 19.5, 24, 28.5, 33, 40]; // only used as fallback
+function nextDBStep(currentKg) { return nextAvailableWeight(currentKg, 'Dumbbell'); }
+function prevDBStep(currentKg) { return prevAvailableWeight(currentKg, 'Dumbbell'); }
 const COMPOUND_PRESS = ['Bench Press','Incline Bench Press','Dumbbell OHP','Push Up','Floor Press'];
 // Compound pulls — allow 15% drop
 const COMPOUND_PULL  = ['Bent Row','Single Arm DB Row','Chest-Supported Row','Bent-Over Row','Pull-up'];
@@ -2301,6 +2465,7 @@ function buildSetSuggestions(points, exName, equipment, numSets) {
   if (!points.length) return null;
 
   const isDB       = !equipment || equipment === 'Dumbbell';
+  const equipType  = equipment || 'Dumbbell';
   const isCompound = COMPOUND_PRESS.includes(exName) || COMPOUND_PULL.includes(exName);
   const fatigueTol = getFatigueTolerance(exName);
 
@@ -2340,9 +2505,9 @@ function buildSetSuggestions(points, exName, equipment, numSets) {
   const tooHeavy = avgRepsAtMain > 0 && avgRepsAtMain < repMin;
 
   // ── Determine next weight ─────────────────────────────────────────────────
-  const nextStep = isDB ? nextDBStep(mainWeight) : mainWeight + 2;
-  const prevStep = isDB ? prevDBStep(mainWeight) : mainWeight - 2;
-  const stepGap  = nextStep ? nextStep - mainWeight : null;
+  const nextStep = nextAvailableWeight(mainWeight, equipType);
+  const prevStep = prevAvailableWeight(mainWeight, equipType);
+  const stepGap  = nextStep != null ? nextStep - mainWeight : null;
   const bigJump  = stepGap && stepGap > 6;
 
   const n = numSets || Math.max(lastSets.length, 3);
@@ -3517,6 +3682,6 @@ Object.assign(window, {
   openExerciseLibEditor, saveExerciseLib, deleteExerciseLib, setLibFilter,
   // Stats
   setStatsSubtab, applyCustomRange,
-  // Confirm dialog
-  confirmOk, closeConfirm,
+  // Equipment inventory
+  openEquipmentSettings, addInventoryWeight, removeInventoryWeight,
 });
