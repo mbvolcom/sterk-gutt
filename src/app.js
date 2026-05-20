@@ -179,25 +179,6 @@ async function dbLoadExercises() {
     } else {
       await dbSeedExercises();
     }
-    // Recovery: scan routines and sessions for exercises not in library
-    const knownNames = new Set(_exercises.map(e => e.name));
-    const toSave = [];
-    [..._routines, ..._sessions].forEach(item => {
-      (item.exercises || []).forEach(ex => {
-        if (ex.name && !knownNames.has(ex.name)) {
-          knownNames.add(ex.name);
-          const recovered = {
-            id: ex.id || ('ex_' + Date.now() + '_' + Math.random().toString(36).slice(2)),
-            name: ex.name, muscle: ex.muscle || 'Other', unilateral: !!ex.unilateral,
-          };
-          _exercises.push(recovered);
-          toSave.push(recovered);
-        }
-      });
-    });
-    if (toSave.length) {
-      for (const ex of toSave) await dbSaveExercise(ex);
-    }
   } catch(e) { console.warn('Load exercises failed:', e.message); }
 }
 
@@ -384,10 +365,6 @@ async function syncFromCloud() {
     await dbLoadSessions();
     await dbLoadExercises();
     await loadInventoryFromCloud();
-    // Backfill: ensure exercises from all sessions/routines exist in library
-    const allSessionExercises = (_sessions||[]).flatMap(s => s.exercises||[]);
-    const allRoutineExercises = (_routines||[]).flatMap(r => r.exercises||[]);
-    syncWorkoutExercisesToLibrary([...allSessionExercises, ...allRoutineExercises]);
     setSyncStatus('ok');
   } catch(e) {
     console.error('syncFromCloud error:', e.message, e.stack);
@@ -1792,8 +1769,6 @@ function saveRoutineChanges() {
       }));
       save(SK.routines, routines);
       dbSaveRoutine(routines[idx]);
-      // Sync any new exercises to library
-      syncWorkoutExercisesToLibrary(activeSession.exercises);
       showToast('Routine updated ✓');
     }
   );
@@ -1847,8 +1822,6 @@ function finishWorkout() {
         ex.duration = Math.floor((Date.now() - ex.startedAt) / 1000);
       }
     });
-    // Ensure all exercises in this session are in the library
-    syncWorkoutExercisesToLibrary(activeSession.exercises);
 
     // For Ad Hoc workouts, ask for a name first
     if (!activeSession.routineId) {
