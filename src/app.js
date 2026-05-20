@@ -3083,14 +3083,23 @@ function renderMuscleBars(sessions) {
   const container = document.getElementById('muscle-bars');
   if (!container) return;
   const entries = Object.entries(muscles).sort((a,b)=>b[1]-a[1]);
-  if (!entries.length) { container.innerHTML='<div style="color:var(--muted);font-size:11px;padding:8px 0;">No data yet</div>'; return; }
+  if (!entries.length) {
+    container.innerHTML='<div style="color:rgba(241,236,226,0.28);font-family:\'JetBrains Mono\',monospace;font-size:11px;letter-spacing:0.06em;padding:8px 0;">No data yet</div>';
+    return;
+  }
   const max = Math.max(...entries.map(e=>e[1]));
   container.innerHTML = entries.map(([m,v])=>`
     <div class="muscle-bar-row">
       <span class="muscle-bar-label">${m}</span>
-      <div class="muscle-bar-track"><div class="muscle-bar-fill" style="width:${Math.round(v/max*100)}%"></div></div>
+      <div class="muscle-bar-track"><div class="muscle-bar-fill" data-pct="${Math.round(v/max*100)}"></div></div>
       <span class="muscle-bar-val">${v}</span>
     </div>`).join('');
+  // Animate bars in
+  requestAnimationFrame(() => {
+    container.querySelectorAll('.muscle-bar-fill').forEach(el => {
+      el.style.width = el.dataset.pct + '%';
+    });
+  });
 }
 
 function renderKPIs(sessions, fromDate, toDate) {
