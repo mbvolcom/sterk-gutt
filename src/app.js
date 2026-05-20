@@ -32,9 +32,14 @@ async function initAuth() {
           hasSynced = true;
           await migrateDataIfNeeded();
           await syncFromCloud();
+          // Re-render whichever page is currently visible
           renderHome();
           const activePage = document.querySelector('.page.active');
-          if (activePage && activePage.id === 'page-routines') renderRoutines();
+          if (activePage) {
+            if (activePage.id === 'page-routines')  renderRoutines();
+            if (activePage.id === 'page-exercises') { renderExerciseLibrary(); renderEquipmentInventory(); }
+            if (activePage.id === 'page-stats')     renderStats();
+          }
         }
       } catch(e) {
         console.error('Auth flow error:', e.message, e.stack);
@@ -327,11 +332,12 @@ async function dbSaveSession(session) {
 
 async function dbLoadSessions() {
   try {
-    const data = await supabaseFetch('sessions', `select=*&is_active=eq.false&order=started_at`);
+    const data = await supabaseFetch('sessions', `select=*&user_id=eq.${USER_ID}&is_active=eq.false&order=started_at.asc`);
     if (data) {
       _sessions = data.map(s => ({
         id:s.id, routineId:s.routine_id, routineName:s.routine_name,
-        startedAt:new Date(s.started_at).getTime(), duration:s.duration, exercises:s.exercises,
+        startedAt:new Date(s.started_at).getTime(), duration:s.duration,
+        exercises:s.exercises, stravaUploaded:s.strava_uploaded,
       }));
     }
     const list = document.getElementById('recent-list');
@@ -499,7 +505,12 @@ function showPage(name, btn) {
   if (name === 'home')      renderHome();
   if (name === 'routines')  renderRoutines();
   if (name === 'exercises') { renderExerciseLibrary(); renderEquipmentInventory(); }
-  if (name === 'stats')     { initStatsPage(); renderStats(); }
+  if (name === 'stats') {
+    // Reset init flag so presets rebuild with correct active state
+    const row = document.getElementById('stats-presets');
+    if (row) row.dataset.init = '';
+    renderStats();
+  }
   if (name === 'workout')   renderWorkoutPage();
 }
 
@@ -2979,10 +2990,8 @@ let _statsFrom = null, _statsTo = null;
 let _statsSubtab = 'overview';
 
 function initStatsPage() {
-  // Build preset buttons
   const row = document.getElementById('stats-presets');
-  if (!row) return;
-  if (row.dataset.init) return;
+  if (!row || row.dataset.init) return;
   row.dataset.init = '1';
   const presets = [
     {key:'all', label:'All time'},
@@ -3051,8 +3060,18 @@ function setStatsSubtab(tab) {
 
 function renderStats() {
   initStatsPage();
+  const allSessions = load(SK.sessions) || [];
+
+  // If no sessions loaded yet and we're still syncing, show a placeholder
+  if (!allSessions.length && !currentUser) {
+    const grid = document.getElementById('stats-kpi-grid');
+    const bars = document.getElementById('muscle-bars');
+    if (grid) grid.innerHTML = '';
+    if (bars) bars.innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:0.08em;color:rgba(241,236,226,0.28);padding:8px 0;">Loading…</div>';
+    return;
+  }
+
   const {from,to} = getStatsDates();
-  const allSessions = load(SK.sessions)||[];
   const sessions = allSessions.filter(s=>{
     const d=new Date(s.startedAt); return d>=from && d<=to;
   });
@@ -3077,12 +3096,21 @@ function renderMuscleBars(sessions) {
   sessions.forEach(s => {
     (s.exercises||[]).forEach(ex => {
       const sets = (ex.sets||[]).filter(st=>st.logged).length;
-      if (sets) muscles[ex.muscle||'Other'] = (muscles[ex.muscle||'Other']||0) + sets;
+      if (!sets) return;
+      const m = normaliseMuscle(ex.muscle) || 'Other';
+      muscles[m] = (muscles[m]||0) + sets;
     });
   });
   const container = document.getElementById('muscle-bars');
   if (!container) return;
-  const entries = Object.entries(muscles).sort((a,b)=>b[1]-a[1]);
+  const entries = Object.entries(muscles).sort((a,b) => {
+    const ai = MUSCLE_GROUPS.indexOf(a[0]);
+    const bi = MUSCLE_GROUPS.indexOf(b[0]);
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return b[1] - a[1]; // unknown groups sorted by count
+  });
   if (!entries.length) {
     container.innerHTML='<div style="color:rgba(241,236,226,0.28);font-family:\'JetBrains Mono\',monospace;font-size:11px;letter-spacing:0.06em;padding:8px 0;">No data yet</div>';
     return;
