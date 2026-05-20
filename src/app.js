@@ -3138,14 +3138,16 @@ function renderKPIs(sessions, fromDate, toDate) {
   const totalDur = sessions.reduce((a,s)=>a+(s.duration||0),0);
   const avgDur = n ? Math.round(totalDur/n/60) : 0;
 
-  // Sessions/week: count distinct calendar weeks that had sessions
-  const weeksWithSessions = new Set(sessions.map(s=>{
-    const d=new Date(s.startedAt);
-    const mon=new Date(d); mon.setDate(d.getDate()-((d.getDay()+6)%7));
-    return mon.toISOString().slice(0,10);
-  }));
-  const totalWeeks = weeksWithSessions.size || 1;
-  const freq = (n / totalWeeks).toFixed(1);
+  // Sessions/week: count distinct weeks, exclude current week unless 3+ sessions
+  const weekCounts = {};
+  sessions.forEach(s => {
+    const key = getWeekKey(new Date(s.startedAt));
+    weekCounts[key] = (weekCounts[key]||0) + 1;
+  });
+  if (!includeCurrentWeek(weekCounts)) delete weekCounts[currentWeekKey()];
+  const completedSessions = Object.values(weekCounts).reduce((a,b)=>a+b, 0);
+  const totalWeeks = Object.keys(weekCounts).length || 1;
+  const freq = (completedSessions / totalWeeks).toFixed(1);
 
   const grid = document.getElementById('stats-kpi-grid');
   if (!grid) return;
@@ -3271,6 +3273,24 @@ function showRoutineProgress(routineData) {
 }
 
 
+// Get ISO week Monday key (YYYY-MM-DD) for any date
+function getWeekKey(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
+}
+
+// Current week's Monday key
+function currentWeekKey() { return getWeekKey(new Date()); }
+
+// Should the current week be included in frequency stats?
+// Yes only if it has 3+ sessions (i.e. likely a full or near-full week of training)
+function includeCurrentWeek(weeks) {
+  const key = currentWeekKey();
+  return (weeks[key] || 0) >= 3;
+}
+
 function calcSessionVolume(s) {
   return (s.exercises||[]).reduce((a,ex) => a+(ex.sets||[]).reduce((b,st) => {
     if (!st.logged) return b;
@@ -3283,11 +3303,14 @@ function calcSessionVolume(s) {
 function renderWeeklyFreqChart(sessions, fromDate, toDate) {
   const weeks = {};
   sessions.forEach(s => {
-    const d = new Date(s.startedAt);
-    const mon = new Date(d); mon.setDate(d.getDate()-((d.getDay()+6)%7));
-    const key = mon.toISOString().slice(0,10);
-    weeks[key] = (weeks[key]||0)+1;
+    const key = getWeekKey(new Date(s.startedAt));
+    weeks[key] = (weeks[key]||0) + 1;
   });
+
+  // Exclude current week unless it has 3+ sessions
+  const thisWeek = currentWeekKey();
+  if (!includeCurrentWeek(weeks)) delete weeks[thisWeek];
+
   const labels = Object.keys(weeks).sort();
   const data = labels.map(k => weeks[k]);
   // Defer draw so canvas has proper dimensions after paint
