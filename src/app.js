@@ -584,7 +584,10 @@ function renderHome() {
   const resumeSlot = document.getElementById('home-resume-slot');
   if (resumeSlot) {
     resumeSlot.innerHTML = '';
-    const savedActive = load(SK.activeSession);
+    let savedActive = load(SK.activeSession);
+    if (!savedActive) {
+      try { savedActive = JSON.parse(localStorage.getItem(LS_ACTIVE)); } catch(e) {}
+    }
     if (savedActive && !activeSession) {
       const dur = formatDuration(Math.floor((Date.now() - savedActive.startedAt) / 1000));
       resumeSlot.innerHTML = `
@@ -762,9 +765,14 @@ function deleteSession(btn) {
 }
 
 function resumeWorkout() {
-  const saved = load(SK.activeSession);
+  // Try in-memory first, then localStorage fallback
+  let saved = load(SK.activeSession);
+  if (!saved) {
+    try { saved = JSON.parse(localStorage.getItem(LS_ACTIVE)); } catch(e) {}
+  }
   if (!saved) return;
   activeSession = saved;
+  _activeSession = saved;
   renderWorkoutPage();
   showPage('workout', document.getElementById('nav-workout'));
   startGlobalTimer();
@@ -1677,6 +1685,8 @@ async function doFinishWorkout(session) {
   await dbSaveSession(session);
   save(SK.activeSession, null);
   _activeSession = null;
+  // Clear localStorage so resume banner doesn't appear after finishing
+  try { localStorage.removeItem(LS_ACTIVE); } catch(e) {}
 
   // Update in-memory sessions list
   const existing = _sessions.findIndex(x => x.id === session.id);
@@ -1701,9 +1711,15 @@ async function doFinishWorkout(session) {
   }
 }
 
+const LS_ACTIVE = 'sg_active_session';
+
 function autoSaveSession() {
   if (activeSession) {
-    dbSaveSession(activeSession); // Supabase only
+    // Write to localStorage first — survives app kill / swipe-up on iOS
+    try { localStorage.setItem(LS_ACTIVE, JSON.stringify(activeSession)); } catch(e) {}
+    dbSaveSession(activeSession); // Supabase in the background
+  } else {
+    try { localStorage.removeItem(LS_ACTIVE); } catch(e) {}
   }
 }
 
