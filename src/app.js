@@ -166,7 +166,16 @@ async function dbLoadExercises() {
   try {
     const data = await supabaseFetch('exercises', `select=*&user_id=eq.${USER_ID}&order=name`);
     if (data && data.length) {
-      _exercises = data.map(e => ({ id:e.id, name:e.name, muscle:e.muscle, unilateral:!!e.unilateral }));
+      // Deduplicate by name (case-insensitive), keep last entry (most recently created)
+      const seen = new Map();
+      data.forEach(e => seen.set(e.name.toLowerCase(), e));
+      _exercises = Array.from(seen.values()).map(e => ({
+        id:e.id, name:e.name, muscle:e.muscle, unilateral:!!e.unilateral
+      }));
+      // Delete orphaned duplicate rows from Supabase silently
+      const keptIds = new Set(_exercises.map(e => e.id));
+      const dupes = data.filter(e => !keptIds.has(e.id));
+      dupes.forEach(e => supabaseFetch(`exercises?id=eq.${e.id}&user_id=eq.${USER_ID}`, '', 'DELETE').catch(()=>{}));
     } else {
       await dbSeedExercises();
     }
@@ -522,7 +531,11 @@ function showPage(name, btn) {
 // MODALS
 // ═══════════════════════════════════════════
 function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('open');
+  if (id === 'exercise-picker') { _sessionPickerMode = false; _editingSessionPickerMode = false; }
+}
 
 // ═══════════════════════════════════════════
 // TOAST
@@ -809,16 +822,17 @@ function removeSessionExercise(exIdx) {
   });
 }
 
+let _sessionPickerMode = false;
+let _editingSessionPickerMode = false;
+
 function openExPickerForSession() {
   if (!_editingSession) return;
-  // Reuse the existing exercise picker, hooked to add to session
   pickerExIdx = null;
-  _sessionPickerMode = true;
+  _editingSessionPickerMode = true;
+  _sessionPickerMode = false;
   filterExPicker('');
   openModal('exercise-picker');
 }
-
-let _sessionPickerMode = false;
 
 function openSessionEditor(sessionId) {
   const allSessions = load(SK.sessions)||[];
@@ -2194,13 +2208,16 @@ function syncWorkoutExercisesToLibrary(exercises) {
 }
 
 function addExToRoutine(ex) {
-  // Ensure exercise exists in the library
-  const allEx = load(SK.exercises) || [];
-  if (ex.id && !allEx.find(e => e.id === ex.id)) {
-    const libEx = { id: ex.id, name: ex.name, muscle: ex.muscle||'Other', unilateral: !!ex.unilateral };
-    allEx.push(libEx);
-    save(SK.exercises, allEx);
-    dbSaveExercise(libEx);
+  if (_editingSessionPickerMode) {
+    // Adding to a saved session being edited
+    _editingSessionPickerMode = false;
+    if (!_editingSession) return;
+    const sets = parseInt(document.getElementById('ex-picker-sets')?.value) || 3;
+    const newSets = Array.from({length:sets}, () => ({ logged:true, weight:'', reps:'', repsL:'', repsR:'', note:'' }));
+    _editingSession.exercises.push({ ...ex, sets:newSets });
+    closeModal('exercise-picker');
+    renderSessionBody(_editingSession);
+    return;
   }
 
   if (_sessionPickerMode) {
