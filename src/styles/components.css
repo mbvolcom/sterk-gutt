@@ -1,4 +1,14 @@
 /* ══ COMPONENTS: buttons, cards, modals, forms ═════════════════ */
+
+/* ── Global theme override — lime replaces blue throughout the app ── */
+:root {
+  --neon:      #c8f06e;
+  --neon2:     #c8f06e;
+  --neon-glow: rgba(200, 240, 110, 0.45);
+  --neon-dim:  rgba(200, 240, 110, 0.10);
+  --border2:   rgba(200, 240, 110, 0.22);
+}
+
 .btn{
   display:inline-flex;align-items:center;justify-content:center;gap:8px;
   border:none;border-radius:8px;cursor:pointer;
@@ -1078,3 +1088,6 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
   letter-spacing:0.05em;color:rgba(241,236,226,0.30);
   padding:12px 16px 14px;line-height:1.65;
 }
+
+/* ── Fix card-neon blue glow from layout.css ── */
+.card-neon { box-shadow: 0 0 20px rgba(200,240,110,0.05); }
