@@ -646,10 +646,182 @@ function renderHome() {
   });
 }
 
+let _editingSession = null;
+let _sessionEditMode = false;
+
+function toggleSessionEdit() {
+  _sessionEditMode = !_sessionEditMode;
+  const btn = document.getElementById('session-edit-btn');
+  if (btn) btn.textContent = _sessionEditMode ? 'DONE' : 'EDIT';
+  if (btn) btn.style.borderColor = _sessionEditMode ? 'rgba(255,68,102,0.5)' : 'rgba(200,240,110,0.35)';
+  if (btn) btn.style.color = _sessionEditMode ? '#ff4466' : '#c8f06e';
+  renderSessionBody(_editingSession);
+  if (!_sessionEditMode) saveEditedSession();
+}
+
+function saveEditedSession() {
+  if (!_editingSession) return;
+  const allSessions = load(SK.sessions) || [];
+  const idx = allSessions.findIndex(x => x.id === _editingSession.id);
+  if (idx >= 0) {
+    allSessions[idx] = _editingSession;
+    save(SK.sessions, allSessions);
+    dbSaveSession(_editingSession);
+    renderHome();
+    showToast('Session saved');
+  }
+}
+
+function renderSessionBody(s) {
+  const body = document.getElementById('session-edit-body');
+  if (!body || !s) return;
+  body.innerHTML = '';
+
+  (s.exercises||[]).forEach((ex, exIdx) => {
+    const logged = (ex.sets||[]).filter(st => st.logged);
+    if (!logged.length && !_sessionEditMode) return;
+
+    const isUni = ex.unilateral;
+    const colLabel = isUni ? 'L / R' : 'REPS';
+    const block = document.createElement('div');
+    block.style.cssText = 'margin-bottom:24px;';
+
+    // Exercise header
+    let exHeader = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
+        <div class="sd-ex-name">${ex.name}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${ex.equipment ? `<span class="sd-eq-tag">${ex.equipment.toUpperCase()}</span>` : ''}
+          ${_sessionEditMode ? `<button onclick="removeSessionExercise(${exIdx})" style="background:none;border:none;color:#ff4466;font-size:16px;cursor:pointer;padding:0;line-height:1;">✕</button>` : ''}
+        </div>
+      </div>`;
+
+    // Column headers
+    exHeader += `<div class="sd-col-hdr" style="grid-template-columns:${_sessionEditMode?'20px ':''} 24px 80px 1fr 1fr;">
+      ${_sessionEditMode ? '<span></span>' : ''}
+      <span>#</span><span>KG</span><span>${colLabel}</span><span>NOTE</span>
+    </div>`;
+
+    block.innerHTML = exHeader;
+
+    // Set rows
+    const rowsDiv = document.createElement('div');
+    rowsDiv.className = 'sd-rows';
+    (ex.sets||[]).filter(st => st.logged || _sessionEditMode).forEach((st, setIdx) => {
+      const row = document.createElement('div');
+      row.className = 'sd-set-row';
+      row.style.gridTemplateColumns = (_sessionEditMode ? '20px ' : '') + '24px 80px 1fr 1fr';
+
+      if (_sessionEditMode) {
+        // Editable inputs
+        const repsField = isUni
+          ? `<div style="display:flex;gap:4px;">
+               <input type="number" inputmode="numeric" value="${st.repsL||''}" placeholder="L"
+                 style="width:44px;background:#111;border:1px solid rgba(255,255,255,0.10);color:#c8f06e;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;text-align:center;padding:5px 2px;outline:none;"
+                 onchange="updateSavedSet(${exIdx},${setIdx},'repsL',this.value)"/>
+               <input type="number" inputmode="numeric" value="${st.repsR||''}" placeholder="R"
+                 style="width:44px;background:#111;border:1px solid rgba(255,255,255,0.10);color:#c8f06e;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;text-align:center;padding:5px 2px;outline:none;"
+                 onchange="updateSavedSet(${exIdx},${setIdx},'repsR',this.value)"/>
+             </div>`
+          : `<input type="number" inputmode="numeric" value="${st.reps||''}" placeholder="reps"
+               style="width:60px;background:#111;border:1px solid rgba(255,255,255,0.10);color:#c8f06e;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;text-align:center;padding:5px 4px;outline:none;"
+               onchange="updateSavedSet(${exIdx},${setIdx},'reps',this.value)"/>`;
+        row.innerHTML = `
+          <button onclick="removeSavedSet(${exIdx},${setIdx})" style="background:none;border:none;color:rgba(255,68,102,0.6);font-size:14px;cursor:pointer;padding:0;line-height:1;">✕</button>
+          <span class="sd-set-num">${setIdx+1}</span>
+          <input type="text" inputmode="decimal" value="${st.weight||''}" placeholder="kg"
+            style="width:72px;background:#111;border:1px solid rgba(255,255,255,0.10);color:#c8f06e;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;text-align:center;padding:5px 4px;outline:none;"
+            onchange="updateSavedSet(${exIdx},${setIdx},'weight',this.value.replace(',','.'))"/>
+          ${repsField}
+          <input type="text" value="${st.note||''}" placeholder="note"
+            style="background:#111;border:1px solid rgba(255,255,255,0.08);color:rgba(241,236,226,0.5);font-family:'JetBrains Mono',monospace;font-size:11px;padding:5px 6px;outline:none;width:100%;"
+            onchange="updateSavedSet(${exIdx},${setIdx},'note',this.value)"/>`;
+      } else {
+        // Read-only display
+        const repsStr = isUni
+          ? `<span class="sd-reps">${st.repsL||0} / ${st.repsR||0}</span>`
+          : `<span class="sd-reps">${st.reps||'—'}</span>`;
+        const noteStr = st.note ? `<span class="sd-note-pill">${st.note}</span>` : '<span></span>';
+        row.innerHTML = `
+          <span class="sd-set-num">${setIdx+1}</span>
+          <span class="sd-weight">${fmtKg(st.weight)||'—'} <span style="font-size:11px;font-weight:400;">kg</span></span>
+          ${repsStr}${noteStr}`;
+      }
+      rowsDiv.appendChild(row);
+    });
+
+    // Add set button in edit mode
+    if (_sessionEditMode) {
+      const addSetBtn = document.createElement('button');
+      addSetBtn.style.cssText = 'margin-top:8px;padding:7px 14px;background:transparent;border:1px dashed rgba(200,240,110,0.25);color:rgba(200,240,110,0.6);font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;width:100%;';
+      addSetBtn.textContent = '+ Add Set';
+      addSetBtn.onclick = () => addSavedSet(exIdx);
+      rowsDiv.appendChild(addSetBtn);
+    }
+
+    block.appendChild(rowsDiv);
+    body.appendChild(block);
+  });
+
+  // Add exercise button in edit mode
+  if (_sessionEditMode) {
+    const addExBtn = document.createElement('button');
+    addExBtn.style.cssText = 'width:100%;padding:13px;border:1.5px dashed rgba(200,240,110,0.22);background:transparent;color:rgba(200,240,110,0.6);font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;cursor:pointer;margin-top:8px;';
+    addExBtn.textContent = '+ Add Exercise';
+    addExBtn.onclick = () => openExPickerForSession();
+    body.appendChild(addExBtn);
+  }
+}
+
+function updateSavedSet(exIdx, setIdx, field, val) {
+  if (!_editingSession) return;
+  const st = _editingSession.exercises[exIdx].sets[setIdx];
+  if (field === 'weight') st[field] = parseFloat(val) || val;
+  else if (field === 'reps' || field === 'repsL' || field === 'repsR') st[field] = parseInt(val) || 0;
+  else st[field] = val;
+}
+
+function removeSavedSet(exIdx, setIdx) {
+  if (!_editingSession) return;
+  const ex = _editingSession.exercises[exIdx];
+  if (ex.sets.filter(st=>st.logged).length <= 1) { showToast('Need at least one set'); return; }
+  ex.sets.splice(setIdx, 1);
+  renderSessionBody(_editingSession);
+}
+
+function addSavedSet(exIdx) {
+  if (!_editingSession) return;
+  const ex = _editingSession.exercises[exIdx];
+  const last = ex.sets[ex.sets.length-1] || {};
+  ex.sets.push({ logged:true, weight:last.weight||'', reps:last.reps||'', repsL:last.repsL||'', repsR:last.repsR||'', note:'' });
+  renderSessionBody(_editingSession);
+}
+
+function removeSessionExercise(exIdx) {
+  if (!_editingSession) return;
+  showConfirm('Remove exercise?', 'This removes it from this session only.', () => {
+    _editingSession.exercises.splice(exIdx, 1);
+    renderSessionBody(_editingSession);
+  });
+}
+
+function openExPickerForSession() {
+  if (!_editingSession) return;
+  // Reuse the existing exercise picker, hooked to add to session
+  pickerExIdx = null;
+  _sessionPickerMode = true;
+  filterExPicker('');
+  openModal('exercise-picker');
+}
+
+let _sessionPickerMode = false;
+
 function openSessionEditor(sessionId) {
   const allSessions = load(SK.sessions)||[];
-  const s = allSessions.find(x => x.id === sessionId);
-  if (!s) return;
+  const s = JSON.parse(JSON.stringify(allSessions.find(x => x.id === sessionId)||{}));
+  if (!s.id) return;
+  _editingSession = s;
+  _sessionEditMode = false;
 
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:#0f0f0e;z-index:9999;display:flex;flex-direction:column;overflow:hidden;';
@@ -668,11 +840,14 @@ function openSessionEditor(sessionId) {
   },0)/1000*10)/10;
 
   const header = document.createElement('div');
-  header.style.cssText = 'padding:20px 20px 16px;flex-shrink:0;';
+  header.style.cssText = 'padding:20px 20px 16px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.06);';
   header.innerHTML = `
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
       <div class="sd-title">${s.routineName}</div>
-      <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;color:#555552;font-size:20px;cursor:pointer;padding:0;line-height:1;margin-top:4px;">×</button>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button id="session-edit-btn" onclick="toggleSessionEdit()" style="background:none;border:1px solid rgba(200,240,110,0.35);color:#c8f06e;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:5px 12px;cursor:pointer;">EDIT</button>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;color:#555552;font-size:20px;cursor:pointer;padding:0;line-height:1;margin-top:2px;">×</button>
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span class="sd-meta">${dateStr}${dur?' · '+dur:''} · ${totalSets} SETS</span>
@@ -682,55 +857,10 @@ function openSessionEditor(sessionId) {
 
   // ── Body ──────────────────────────────────────────────────────────────────
   const body = document.createElement('div');
+  body.id = 'session-edit-body';
   body.style.cssText = 'overflow-y:auto;flex:1;padding:0 20px 20px;-webkit-overflow-scrolling:touch;';
-
-  (s.exercises||[]).forEach(ex => {
-    const logged = (ex.sets||[]).filter(st=>st.logged);
-    if (!logged.length) return;
-
-    const maxW = Math.max(...logged.map(st=>parseFloat(st.weight)||0));
-    const vol = Math.round(logged.reduce((a,st)=>{
-      const w=parseFloat(st.weight)||0;
-      const r=ex.unilateral?((parseFloat(st.repsL)||0)+(parseFloat(st.repsR)||0)):parseFloat(st.reps)||0;
-      return a+w*r;
-    },0));
-
-    const block = document.createElement('div');
-    block.style.cssText = 'margin-bottom:28px;';
-
-    // Exercise header
-    const isUni = ex.unilateral;
-    const colLabel = isUni ? 'L / R' : 'REPS';
-
-    block.innerHTML = `
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
-        <div class="sd-ex-name">${ex.name}</div>
-        ${ex.equipment ? `<span class="sd-eq-tag">${ex.equipment.toUpperCase()}</span>` : ''}
-      </div>
-      <div class="sd-ex-meta">${(ex.muscle||'').toUpperCase()} · ${logged.length} SETS · ${maxW}KG TOP · ${vol}KG VOL</div>
-      <div class="sd-col-hdr">
-        <span>#</span><span>KG</span><span>${colLabel}</span><span>NOTE</span>
-      </div>
-      <div class="sd-rows">
-        ${logged.map((st,i) => {
-          const repsStr = isUni
-            ? `<span class="sd-reps">${st.repsL||0} / ${st.repsR||0}</span>`
-            : `<span class="sd-reps">${st.reps||'—'}</span>`;
-          const noteStr = st.note
-            ? `<span class="sd-note-pill">${st.note}</span>`
-            : '<span></span>';
-          return `<div class="sd-set-row">
-            <span class="sd-set-num">${i+1}</span>
-            <span class="sd-weight">${fmtKg(st.weight)||'—'} <span style="font-size:11px;font-weight:400;">kg</span></span>
-            ${repsStr}
-            ${noteStr}
-          </div>`;
-        }).join('')}
-      </div>`;
-    body.appendChild(block);
-  });
-
   overlay.appendChild(body);
+  renderSessionBody(s);
 
   // ── Footer ────────────────────────────────────────────────────────────────
   const footer = document.createElement('div');
@@ -1281,7 +1411,10 @@ function buildSetRow(s, si, ei, isUni) {
 
   return `<div class="set-row ${stateClass}" id="set-row-${ei}-${si}">
     <div class="set-row-top ${isUni?'unilateral':'bilateral'}">
-      <div class="set-num">${si+1}</div>
+      <div class="set-num" onclick="removeSet(${ei},${si})" title="Tap to remove set" style="cursor:pointer;position:relative;">
+        <span class="set-num-label">${si+1}</span>
+        <span class="set-num-remove">✕</span>
+      </div>
       ${inputs}
     </div>
     <div class="set-note-row">
@@ -1561,6 +1694,22 @@ function addSet(ei) {
     const div = document.createElement('div');
     div.innerHTML = buildSetRow(ex.sets[newSi], newSi, ei, ex.unilateral);
     container.appendChild(div.firstChild);
+  }
+  updateExMeta(ei);
+}
+
+function removeSet(ei, si) {
+  if (!activeSession) return;
+  const ex = activeSession.exercises[ei];
+  if (ex.sets.length <= 1) { showToast('Need at least one set'); return; }
+  stopSetTimerDisplay(ei, si);
+  ex.sets.splice(si, 1);
+  autoSaveSession();
+  // Re-render just this exercise's sets
+  const container = document.getElementById(`sets-${ei}`);
+  if (container) {
+    const isUni = ex.unilateral;
+    container.innerHTML = ex.sets.map((s, i) => buildSetRow(s, i, ei, isUni)).join('');
   }
   updateExMeta(ei);
 }
@@ -2187,17 +2336,29 @@ function saveExerciseLib() {
     routines.forEach(r => {
       r.exercises.forEach(ex => {
         if (ex.id === editingExId || ex.name === savedEx.name) {
-          ex.name = name;
-          ex.muscle = selectedMuscle;
-          ex.unilateral = unilateral;
+          ex.name = name; ex.muscle = selectedMuscle; ex.unilateral = unilateral;
           routinesUpdated = true;
         }
       });
     });
     if (routinesUpdated) {
       save(SK.routines, routines);
-      Promise.all(routines.map(r => dbSaveRoutine(r)))
-        .catch(e => console.warn('Routine update failed:', e.message));
+      Promise.all(routines.map(r => dbSaveRoutine(r))).catch(e => console.warn('Routine update failed:', e.message));
+    }
+
+    // Propagate to active workout session — re-render exercise card if unilateral changed
+    if (activeSession) {
+      let workoutChanged = false;
+      activeSession.exercises.forEach((ex, ei) => {
+        if (ex.id === editingExId || ex.name === name) {
+          const uniChanged = ex.unilateral !== unilateral;
+          ex.name = name; ex.muscle = selectedMuscle; ex.unilateral = unilateral;
+          workoutChanged = true;
+          // If unilateral flag changed, re-render that exercise card fully
+          if (uniChanged) renderWeekWi(ei);
+        }
+      });
+      if (workoutChanged) autoSaveSession();
     }
   }
 
@@ -2206,11 +2367,42 @@ function saveExerciseLib() {
   showToast(editingExId ? 'Exercise updated' : 'Exercise created');
 }
 
+// Re-render a single exercise card in the active workout (e.g. after unilateral flag change)
+function renderWeekWi(ei) {
+  if (!activeSession) return;
+  const card = document.getElementById(`ex-card-${ei}`);
+  if (!card) return;
+  const ex = activeSession.exercises[ei];
+  const newCard = buildExCard(ex, ei);
+  card.replaceWith(newCard);
+  // Re-inject suggestion card
+  const hintSlot = document.getElementById(`hint-slot-${ei}`);
+  if (hintSlot) {
+    const allSessions = load(SK.sessions) || [];
+    const points = buildProgressionPoints(allSessions, ex.name, ex.equipment);
+    const hint = buildSuggestionCard(ei, ex.name, ex.equipment);
+    hintSlot.appendChild(hint);
+    updateSuggestionCard(ei, points);
+  }
+}
+
 function deleteExerciseLib(exId) {
-  showConfirm('Delete Exercise?', 'This removes it from the library. Existing sessions are unaffected.', () => {
-    let allEx = load(SK.exercises) || [];
-    allEx = allEx.filter(e => e.id !== exId);
-    save(SK.exercises, allEx);
+  showConfirm('Delete Exercise?', 'This removes it from the library and all routines. Existing sessions are unaffected.', () => {
+    // Remove from routines
+    const routines = load(SK.routines) || [];
+    let routinesChanged = false;
+    routines.forEach(r => {
+      const before = r.exercises.length;
+      r.exercises = r.exercises.filter(ex => ex.id !== exId);
+      if (r.exercises.length !== before) routinesChanged = true;
+    });
+    if (routinesChanged) {
+      save(SK.routines, routines);
+      routines.forEach(r => dbSaveRoutine(r));
+      if (document.getElementById('page-routines')?.classList.contains('active')) renderRoutines();
+    }
+    // Remove from library
+    dbDeleteExercise(exId);
     renderExerciseLibrary();
     showToast('Exercise deleted');
   });
@@ -3915,7 +4107,7 @@ Object.assign(window, {
   openWorkoutPicker, handleStravaHomeBtn, startAdHocWorkout,
   // Workout
   startWorkout, resumeWorkout, finishWorkout, togglePauseWorkout,
-  handleSetBtn, addSet, removeLastSet, toggleExCollapse,
+  handleSetBtn, addSet, removeSet, removeLastSet, toggleExCollapse,
   setEquipment, updateSet,
   // Routine editor
   openRoutineEditor, saveRoutine, saveRoutineChanges, deleteRoutine,
@@ -3928,6 +4120,7 @@ Object.assign(window, {
   openExerciseLibEditor, saveExerciseLib, deleteExerciseLib, setLibFilter,
   // Stats
   setStatsSubtab, applyCustomRange,
+  toggleSessionEdit, updateSavedSet, removeSavedSet, addSavedSet, removeSessionExercise, openExPickerForSession,
   // Equipment inventory
   openEquipmentSettings, addInventoryWeight, addInventoryWeightDirect,
   removeInventoryWeight, updateEquipmentSummary, setExercisesSubtab,
