@@ -375,6 +375,10 @@ async function syncFromCloud() {
     await dbLoadSessions();
     await dbLoadExercises();
     await loadInventoryFromCloud();
+    // Backfill: ensure exercises from all sessions/routines exist in library
+    const allSessionExercises = (_sessions||[]).flatMap(s => s.exercises||[]);
+    const allRoutineExercises = (_routines||[]).flatMap(r => r.exercises||[]);
+    syncWorkoutExercisesToLibrary([...allSessionExercises, ...allRoutineExercises]);
     setSyncStatus('ok');
   } catch(e) {
     console.error('syncFromCloud error:', e.message, e.stack);
@@ -860,7 +864,6 @@ function openSessionEditor(sessionId) {
   body.id = 'session-edit-body';
   body.style.cssText = 'overflow-y:auto;flex:1;padding:0 20px 20px;-webkit-overflow-scrolling:touch;';
   overlay.appendChild(body);
-  renderSessionBody(s);
 
   // ── Footer ────────────────────────────────────────────────────────────────
   const footer = document.createElement('div');
@@ -898,6 +901,8 @@ function openSessionEditor(sessionId) {
   footer.appendChild(delBtn);
   overlay.appendChild(footer);
   document.body.appendChild(overlay);
+  // Now the element is in the DOM — safe to render body
+  renderSessionBody(s);
 }
 
 function deleteSession(btn) {
@@ -1773,6 +1778,8 @@ function saveRoutineChanges() {
       }));
       save(SK.routines, routines);
       dbSaveRoutine(routines[idx]);
+      // Sync any new exercises to library
+      syncWorkoutExercisesToLibrary(activeSession.exercises);
       showToast('Routine updated ✓');
     }
   );
@@ -1826,6 +1833,8 @@ function finishWorkout() {
         ex.duration = Math.floor((Date.now() - ex.startedAt) / 1000);
       }
     });
+    // Ensure all exercises in this session are in the library
+    syncWorkoutExercisesToLibrary(activeSession.exercises);
 
     // For Ad Hoc workouts, ask for a name first
     if (!activeSession.routineId) {
@@ -2161,7 +2170,52 @@ function hideNewExForm() {
 
 function createAndAddExercise_UNUSED1() { /* removed duplicate */ }
 
+// Ensure all exercises from a workout are present in the exercise library
+function syncWorkoutExercisesToLibrary(exercises) {
+  const allEx = load(SK.exercises) || [];
+  const knownIds = new Set(allEx.map(e => e.id));
+  const knownNames = new Set(allEx.map(e => e.name.toLowerCase()));
+  let changed = false;
+  (exercises || []).forEach(ex => {
+    if (!ex.name) return;
+    if (!knownIds.has(ex.id) && !knownNames.has(ex.name.toLowerCase())) {
+      const libEx = { id: ex.id || ('ex_' + Date.now() + '_' + Math.random().toString(36).slice(2)), name: ex.name, muscle: ex.muscle || 'Other', unilateral: !!ex.unilateral };
+      allEx.push(libEx);
+      knownIds.add(libEx.id);
+      knownNames.add(libEx.name.toLowerCase());
+      dbSaveExercise(libEx);
+      changed = true;
+    }
+  });
+  if (changed) {
+    save(SK.exercises, allEx);
+    if (document.getElementById('page-exercises')?.classList.contains('active')) renderExerciseLibrary();
+  }
+}
+
 function addExToRoutine(ex) {
+  // Ensure exercise exists in the library
+  const allEx = load(SK.exercises) || [];
+  if (ex.id && !allEx.find(e => e.id === ex.id)) {
+    const libEx = { id: ex.id, name: ex.name, muscle: ex.muscle||'Other', unilateral: !!ex.unilateral };
+    allEx.push(libEx);
+    save(SK.exercises, allEx);
+    dbSaveExercise(libEx);
+  }
+
+  if (_sessionPickerMode) {
+    // Adding to active workout session
+    _sessionPickerMode = false;
+    if (!activeSession) return;
+    const sets = parseInt(document.getElementById('ex-picker-sets')?.value)||3;
+    const newSets = Array.from({length:sets}, () => ({ state:'idle', weight:'', reps:'', repsL:'', repsR:'', note:'' }));
+    activeSession.exercises.push({ ...ex, sets:newSets, collapsed:false });
+    autoSaveSession();
+    closeModal('exercise-picker');
+    renderWorkoutBody();
+    return;
+  }
+
   if (pickerExIdx !== null) {
     editorExercises[pickerExIdx] = ex;
   } else {
