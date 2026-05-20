@@ -2844,7 +2844,7 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
 
     const summaryEl = document.createElement('div');
     summaryEl.innerHTML = `
-      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#00b4ff;font-weight:700;margin-bottom:6px;">Next session</div>
+      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#c8f06e;font-weight:700;margin-bottom:6px;">Next session</div>
       <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">${perSetData.summary}</div>
       <div style="font-size:11px;color:var(--muted2);margin-bottom:10px;">${perSetData.subtext}</div>`;
     hintCard.appendChild(summaryEl);
@@ -2875,7 +2875,7 @@ function renderExerciseAnalysis(container, points, exName, equipment) {
     const hintCard = document.createElement('div');
     hintCard.style.cssText = 'background:rgba(200,240,110,0.06);border:1px solid rgba(200,240,110,0.20);border-radius:12px;padding:14px 16px;margin-bottom:14px;';
     hintCard.innerHTML = `
-      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#00b4ff;font-weight:700;margin-bottom:6px;">Next session</div>
+      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#c8f06e;font-weight:700;margin-bottom:6px;">Next session</div>
       <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">${hint.suggestion}</div>
       <div style="font-size:11px;color:var(--muted2);">${hint.subtext}</div>`;
     container.appendChild(hintCard);
@@ -2893,9 +2893,9 @@ function renderSingleSessionCard(container, point, exName, equipment) {
   const hint = buildNextSessionSuggestion([point], exName, equipment);
   container.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
-      <div style="background:rgba(0,0,0,0.06);border-radius:10px;padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#00b4ff;">${fmtKg(point.weight)}kg</div><div style="font-size:9px;color:var(--muted2);margin-top:2px;">TOP WEIGHT</div></div>
-      <div style="background:rgba(0,0,0,0.06);border-radius:10px;padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#00ffcc;">${point.est1RM}kg</div><div style="font-size:9px;color:var(--muted2);margin-top:2px;">EST. 1RM</div></div>
-      <div style="background:rgba(0,0,0,0.06);border-radius:10px;padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#7c6aff;">${point.bestLabel}</div><div style="font-size:9px;color:var(--muted2);margin-top:2px;">BEST SET</div></div>
+      <div style="background:rgba(0,0,0,0.06);border-radius:10px;padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#c8f06e;">${fmtKg(point.weight)}kg</div><div style="font-size:9px;color:var(--muted2);margin-top:2px;">TOP WEIGHT</div></div>
+      <div style="background:rgba(0,0,0,0.06);border-radius:10px;padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#c8f06e;">${point.est1RM}kg</div><div style="font-size:9px;color:var(--muted2);margin-top:2px;">EST. 1RM</div></div>
+      <div style="background:rgba(0,0,0,0.06);border-radius:10px;padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#c8f06e;">${point.bestLabel}</div><div style="font-size:9px;color:var(--muted2);margin-top:2px;">BEST SET</div></div>
     </div>
     <div style="font-size:10px;color:var(--muted2);margin-bottom:12px;text-align:center;">First session — do more to see trends</div>`;
 
@@ -2903,7 +2903,7 @@ function renderSingleSessionCard(container, point, exName, equipment) {
     const hintCard = document.createElement('div');
     hintCard.style.cssText = 'background:rgba(200,240,110,0.06);border:1px solid rgba(200,240,110,0.20);border-radius:12px;padding:14px 16px;';
     hintCard.innerHTML = `
-      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#00b4ff;font-weight:700;margin-bottom:6px;">Next session</div>
+      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#c8f06e;font-weight:700;margin-bottom:6px;">Next session</div>
       <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">${hint.suggestion}</div>
       <div style="font-size:11px;color:var(--muted2);">${hint.subtext}</div>`;
     container.appendChild(hintCard);
@@ -3212,7 +3212,7 @@ function showRoutineProgress(routineData) {
     const [,m]=wk.split('-');
     const col=document.createElement('div'); col.style.cssText='flex:1;display:flex;flex-direction:column;align-items:stretch;';
     const bar=document.createElement('div'); bar.style.cssText=`display:flex;flex-direction:column;justify-content:flex-end;height:72px;`;
-    const fill=document.createElement('div'); fill.style.cssText=`height:${h}px;background:#00b4ff88;border-radius:2px 2px 0 0;`;
+    const fill=document.createElement('div'); fill.style.cssText=`height:${h}px;background:#c8f06e88;border-radius:2px 2px 0 0;`;
     bar.appendChild(fill);
     const lbl=document.createElement('div'); lbl.style.cssText='font-size:7px;color:#4b5563;text-align:center;margin-top:2px;overflow:hidden;';
     lbl.textContent=MONTHS[parseInt(m,10)-1];
