@@ -1094,3 +1094,14 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
 
 /* ── Fix card-neon blue glow from layout.css ── */
 .card-neon { box-shadow: 0 0 20px rgba(200,240,110,0.05); }
+
+/* ── Exercise picker — muscle group label ── */
+.ex-picker-group-label {
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;
+  color:rgba(200,240,110,0.55);
+  padding:10px 14px 5px;
+  border-top:1px solid rgba(255,255,255,0.05);
+  background:#0d0d0f;
+}
+.ex-picker-group-label:first-child { border-top:none; }
