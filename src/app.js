@@ -1963,7 +1963,7 @@ function renderRoutines() {
           <div class="routine-card-meta">${r.exercises.length} exercise${r.exercises.length !== 1 ? 's' : ''}</div>
         </div>
         <div class="routine-card-actions" onclick="event.stopPropagation()">
-          <button onclick="openRoutineEditor('${r.id}')" title="Edit">✏</button>
+          <button onclick="openRoutineEditor('${r.id}')" title="Edit">✎</button>
           <button onclick="deleteRoutine('${r.id}')" title="Delete">✕</button>
         </div>
         <span class="routine-chevron">›</span>
@@ -2321,7 +2321,7 @@ function renderExerciseLibrary() {
             </div>
           </div>
           <div class="ex-lib-actions">
-            <button onclick="openExerciseLibEditor('${ex.id}')" title="Edit">✏</button>
+            <button onclick="openExerciseLibEditor('${ex.id}')" title="Edit">✎</button>
             <button onclick="deleteExerciseLib('${ex.id}')" title="Delete">✕</button>
           </div>
         </div>
