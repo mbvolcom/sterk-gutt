@@ -2113,15 +2113,43 @@ function openExercisePicker(idx) {
 function filterExPicker(query) {
   const allEx = load(SK.exercises) || [];
   const q = query.toLowerCase().trim();
-  _pickerFiltered = q ? allEx.filter(e => e.name.toLowerCase().includes(q)) : allEx;
-  const results = document.getElementById('ex-picker-results');
+  _pickerFiltered = q
+    ? allEx.filter(e => e.name.toLowerCase().includes(q) || (e.muscle||'').toLowerCase().includes(q))
+    : [...allEx].sort((a,b) => {
+        const ai = MUSCLE_GROUPS.indexOf(a.muscle), bi = MUSCLE_GROUPS.indexOf(b.muscle);
+        if (ai !== bi) return (ai<0?99:ai) - (bi<0?99:bi);
+        return a.name.localeCompare(b.name);
+      });
 
-  let html = _pickerFiltered.map((ex, i) => `
-    <div class="ex-search-item" onclick="selectExerciseFromPicker(${i})">
-      <span class="ex-search-item-name">${ex.name}</span>
-      <span class="ex-search-item-muscle">${ex.muscle}${ex.unilateral ? ' · Uni' : ''}</span>
-    </div>
-  `).join('');
+  const results = document.getElementById('ex-picker-results');
+  let html = '';
+
+  if (!q) {
+    // Grouped by muscle
+    const groups = {};
+    _pickerFiltered.forEach((ex, i) => {
+      const m = normaliseMuscle(ex.muscle) || 'Other';
+      if (!groups[m]) groups[m] = [];
+      groups[m].push({ ex, i });
+    });
+    const order = [...MUSCLE_GROUPS, 'Other'];
+    order.forEach(muscle => {
+      if (!groups[muscle]) return;
+      html += `<div class="ex-picker-group-label">${muscle}</div>`;
+      html += groups[muscle].map(({ ex, i }) => `
+        <div class="ex-search-item" onclick="selectExerciseFromPicker(${i})">
+          <span class="ex-search-item-name">${ex.name}</span>
+          ${ex.unilateral ? '<span class="ex-search-item-muscle">Uni</span>' : ''}
+        </div>`).join('');
+    });
+  } else {
+    // Flat filtered list
+    html = _pickerFiltered.map((ex, i) => `
+      <div class="ex-search-item" onclick="selectExerciseFromPicker(${i})">
+        <span class="ex-search-item-name">${ex.name}</span>
+        <span class="ex-search-item-muscle">${ex.muscle||''}${ex.unilateral ? ' · Uni' : ''}</span>
+      </div>`).join('');
+  }
 
   const exactMatch = allEx.find(e => e.name.toLowerCase() === q);
   if (q && !exactMatch) {
