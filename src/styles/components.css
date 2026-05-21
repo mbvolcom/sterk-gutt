@@ -466,13 +466,15 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
 }
 .routine-card-actions { display:flex;gap:6px;align-items:center; }
 .routine-card-actions button {
-  background:none;border:1px solid rgba(255,255,255,0.08);
-  color:rgba(241,236,226,0.40);width:30px;height:30px;
+  background:none;border:1px solid rgba(255,255,255,0.07);
+  color:rgba(200,240,110,0.35);width:30px;height:30px;
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;font-size:13px;
   -webkit-tap-highlight-color:transparent;
+  transition:border-color 0.12s,color 0.12s;
 }
 .routine-card-actions button:first-child:active { border-color:#c8f06e;color:#c8f06e; }
+.routine-card-actions button:last-child { color:rgba(255,68,102,0.35); }
 .routine-card-actions button:last-child:active  { border-color:#ff4466;color:#ff4466; }
 .routine-chevron {
   font-size:18px;color:rgba(255,255,255,0.20);
@@ -825,13 +827,15 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
 /* Edit / delete buttons */
 .ex-lib-actions { display:flex;gap:6px;align-items:center;flex-shrink:0; }
 .ex-lib-actions button {
-  background:none;border:1px solid rgba(255,255,255,0.08);
-  color:rgba(241,236,226,0.40);width:30px;height:30px;
+  background:none;border:1px solid rgba(255,255,255,0.07);
+  color:rgba(200,240,110,0.35);width:30px;height:30px;
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;font-size:13px;
   -webkit-tap-highlight-color:transparent;
+  transition:border-color 0.12s,color 0.12s;
 }
 .ex-lib-actions button:first-child:active { border-color:#c8f06e;color:#c8f06e; }
+.ex-lib-actions button:last-child { color:rgba(255,68,102,0.35); }
 .ex-lib-actions button:last-child:active  { border-color:#ff4466;color:#ff4466; }
 
 
