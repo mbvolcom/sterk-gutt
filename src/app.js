@@ -133,14 +133,16 @@ let USER_ID = localStorage.getItem('sg_user_id') || 'pending';
 // In-memory cache — loaded from Supabase on init
 let _exercises = [];
 let _routines  = [];
+let _splits    = [];  // { id, name }[]
 let _sessions  = [];
 let _activeSession = null;
 
 // Shim for legacy load() calls that still exist
-const SK = { routines:'_r', sessions:'_s', activeSession:'_a', exercises:'_e' };
+const SK = { routines:'_r', sessions:'_s', activeSession:'_a', exercises:'_e', splits:'_splits' };
 function load(key) {
   if (key === SK.exercises)     return _exercises.length ? _exercises : null;
   if (key === SK.routines)      return _routines.length  ? _routines  : null;
+  if (key === SK.splits)        return _splits;
   if (key === SK.sessions)      return _sessions.length  ? _sessions  : null;
   if (key === SK.activeSession) return _activeSession;
   return null;
@@ -148,6 +150,7 @@ function load(key) {
 function save(key, val) {
   if (key === SK.exercises)     { _exercises = val || []; return; }
   if (key === SK.routines)      { _routines  = val || []; return; }
+  if (key === SK.splits)        { _splits    = val || []; return; }
   if (key === SK.sessions)      { _sessions  = val || []; return; }
   if (key === SK.activeSession) { _activeSession = val;   return; }
 }
@@ -365,6 +368,7 @@ async function syncFromCloud() {
     await dbLoadSessions();
     await dbLoadExercises();
     await loadInventoryFromCloud();
+    await dbLoadSplits();
     setSyncStatus('ok');
   } catch(e) {
     console.error('syncFromCloud error:', e.message, e.stack);
@@ -496,12 +500,8 @@ function showPage(name, btn) {
   if (name === 'routines')  renderRoutines();
   if (name === 'exercises') { renderExerciseLibrary(); renderEquipmentInventory(); }
   if (name === 'stats') {
-    // Reset init flag so presets rebuild with correct active state
-    const row = document.getElementById('stats-presets');
-    if (row) row.dataset.init = '';
     renderStats();
   }
-  if (name === 'workout')   renderWorkoutPage();
 }
 
 // ═══════════════════════════════════════════
@@ -1948,14 +1948,96 @@ let editingRoutineId = null;
 let editorExercises = []; // exercises in the routine being edited
 let pickerExIdx = null;   // which slot in editorExercises we're picking for (null = new)
 
+function saveSplits() {
+  // Save to localStorage for instant local access
+  localStorage.setItem(`sg_splits_${USER_ID}`, JSON.stringify(_splits));
+  // Sync all splits to Supabase
+  _splits.forEach(split => {
+    supabaseFetch('user_splits', 'on_conflict=id', 'POST', {
+      id: split.id,
+      user_id: USER_ID,
+      name: split.name,
+    }).catch(() => {});
+  });
+}
+
+async function dbLoadSplits() {
+  try {
+    const data = await supabaseFetch('user_splits', `select=id,name&user_id=eq.${USER_ID}&order=created_at.asc`);
+    if (data && data.length) {
+      _splits = data.map(s => ({ id: s.id, name: s.name }));
+      localStorage.setItem(`sg_splits_${USER_ID}`, JSON.stringify(_splits));
+    } else {
+      // Fall back to localStorage
+      try {
+        const raw = localStorage.getItem(`sg_splits_${USER_ID}`);
+        _splits = raw ? JSON.parse(raw) : [];
+      } catch(e) { _splits = []; }
+    }
+  } catch(e) {
+    // Offline — use localStorage
+    try {
+      const raw = localStorage.getItem(`sg_splits_${USER_ID}`);
+      _splits = raw ? JSON.parse(raw) : [];
+    } catch(e2) { _splits = []; }
+  }
+}
+
+function createSplit() {
+  const name = prompt('Split name (e.g. ULUL, PPL, Full Body):', '');
+  if (!name || !name.trim()) return;
+  const split = { id: 'split_' + Date.now(), name: name.trim() };
+  _splits.push(split);
+  saveSplits();
+  renderRoutines();
+}
+
+function renameSplit(splitId) {
+  const split = _splits.find(s => s.id === splitId);
+  if (!split) return;
+  const name = prompt('Rename split:', split.name);
+  if (!name || !name.trim()) return;
+  split.name = name.trim();
+  saveSplits();
+  renderRoutines();
+}
+
+function deleteSplit(splitId) {
+  showConfirm('Delete split?', 'Routines in this split will be moved to ungrouped.', () => {
+    _splits = _splits.filter(s => s.id !== splitId);
+    // Unassign routines from this split
+    const routines = load(SK.routines) || [];
+    routines.forEach(r => { if (r.splitId === splitId) delete r.splitId; });
+    save(SK.routines, routines);
+    routines.forEach(r => dbSaveRoutine(r));
+    // Delete from Supabase and localStorage
+    supabaseFetch(`user_splits?id=eq.${splitId}&user_id=eq.${USER_ID}`, '', 'DELETE').catch(() => {});
+    localStorage.setItem(`sg_splits_${USER_ID}`, JSON.stringify(_splits));
+    renderRoutines();
+  });
+}
+
+function assignRoutineToSplit(routineId, splitId) {
+  const routines = load(SK.routines) || [];
+  const r = routines.find(x => x.id === routineId);
+  if (!r) return;
+  r.splitId = splitId || null;
+  save(SK.routines, routines);
+  dbSaveRoutine(r);
+  renderRoutines();
+}
+
 function renderRoutines() {
   const routines = load(SK.routines) || [];
+  const splits   = _splits || [];
   const list = document.getElementById('routines-list');
-  if (routines.length === 0) {
+
+  if (routines.length === 0 && splits.length === 0) {
     list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">No routines yet</div></div>';
     return;
   }
-  list.innerHTML = routines.map(r => `
+
+  const makeRoutineCard = (r) => `
     <div class="routine-card">
       <div class="routine-card-header" onclick="toggleRoutineCard(this.parentElement)">
         <div>
@@ -1963,6 +2045,10 @@ function renderRoutines() {
           <div class="routine-card-meta">${r.exercises.length} exercise${r.exercises.length !== 1 ? 's' : ''}</div>
         </div>
         <div class="routine-card-actions" onclick="event.stopPropagation()">
+          ${splits.length ? `<select class="routine-split-select" onchange="assignRoutineToSplit('${r.id}',this.value)" onclick="event.stopPropagation()">
+            <option value="">No split</option>
+            ${splits.map(s=>`<option value="${s.id}" ${r.splitId===s.id?'selected':''}>${s.name}</option>`).join('')}
+          </select>` : ''}
           <button onclick="openRoutineEditor('${r.id}')" title="Edit">✎</button>
           <button onclick="deleteRoutine('${r.id}')" title="Delete">✕</button>
         </div>
@@ -1986,8 +2072,42 @@ function renderRoutines() {
           Start Workout
         </button>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+
+  let html = '';
+
+  // Render splits with their routines
+  splits.forEach(split => {
+    const splitRoutines = routines.filter(r => r.splitId === split.id);
+    html += `
+      <div class="split-group">
+        <div class="split-group-header">
+          <span class="split-group-name">${split.name}</span>
+          <span class="split-group-count">${splitRoutines.length} routine${splitRoutines.length !== 1 ? 's' : ''}</span>
+          <div class="split-group-actions">
+            <button onclick="renameSplit('${split.id}')" title="Rename">✎</button>
+            <button onclick="deleteSplit('${split.id}')" title="Delete">✕</button>
+          </div>
+        </div>
+        ${splitRoutines.length
+          ? splitRoutines.map(makeRoutineCard).join('')
+          : '<div class="split-empty">No routines in this split yet — assign one using the dropdown on a routine.</div>'}
+      </div>`;
+  });
+
+  // Ungrouped routines
+  const ungrouped = routines.filter(r => !r.splitId || !splits.find(s => s.id === r.splitId));
+  if (ungrouped.length) {
+    if (splits.length) {
+      html += `<div class="split-group-header" style="margin-top:8px;">
+        <span class="split-group-name" style="color:rgba(241,236,226,0.35);">Ungrouped</span>
+        <span class="split-group-count">${ungrouped.length}</span>
+      </div>`;
+    }
+    html += ungrouped.map(makeRoutineCard).join('');
+  }
+
+  list.innerHTML = html;
 }
 
 function toggleRoutineCard(card) {
@@ -3255,7 +3375,9 @@ let _statsSubtab = 'overview';
 
 function initStatsPage() {
   const row = document.getElementById('stats-presets');
-  if (!row || row.dataset.init) return;
+  if (!row) return;
+  // Always clear and rebuild — prevents duplicate buttons on re-visit
+  row.innerHTML = '';
   row.dataset.init = '1';
   const presets = [
     {key:'all', label:'All time'},
@@ -3315,14 +3437,24 @@ function applyCustomRange() {
 function setStatsSubtab(tab) {
   _statsSubtab = tab;
   document.querySelectorAll('.stats-subtab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  ['overview','routines','exercise'].forEach(t=>{
+  ['overview','routines','exercise','coach'].forEach(t=>{
     const el=document.getElementById('stats-tab-'+t);
-    if(el) el.style.display=t===tab?'':'none';
+    if (!el) return;
+    if (t === 'coach') {
+      el.style.display = t===tab ? 'flex' : 'none';
+    } else {
+      el.style.display = t===tab ? '' : 'none';
+    }
   });
+  if (tab === 'coach') {
+    initCoachPage();
+    return; // don't call renderStats for coach tab
+  }
   renderStats();
 }
 
 function renderStats() {
+  if (_statsSubtab === 'coach') return; // handled by initCoachPage
   initStatsPage();
   const allSessions = load(SK.sessions) || [];
 
@@ -4170,7 +4302,266 @@ if (document.readyState === 'loading') {
   init(); // DOM already ready
 }
 
+// ═══════════════════════════════════════════
+// COACH — AI training assistant
+// ═══════════════════════════════════════════
+
+let _coachHistory = [];   // { role, content }[]
+let _coachInitialised = false;
+
+const COACH_SUGGESTIONS = [
+  'Create me a routine',
+  'What should I work on today?',
+  'How is my progress looking?',
+  'Am I training enough?',
+  'Suggest a deload week',
+  'Fix muscle imbalances',
+];
+
+function initCoachPage() {
+  if (_coachInitialised) return;
+  _coachInitialised = true;
+  // Render suggestion chips
+  const chips = document.getElementById('coach-suggestions');
+  if (chips) {
+    chips.innerHTML = COACH_SUGGESTIONS.map(s =>
+      `<button class="coach-chip" onclick="coachChip(this)">${s}</button>`
+    ).join('');
+  }
+  // Show welcome message
+  appendCoachMsg('assistant', `Hey! I'm your personal training coach. I have full visibility of your routines, recent sessions, exercises, and equipment — so my advice is specific to *you*.
+
+Ask me anything, or tell me to create a new routine and I'll build one from scratch.`);
+}
+
+function coachChip(btn) {
+  const text = btn.textContent;
+  const input = document.getElementById('coach-input');
+  if (input) { input.value = text; input.style.height = 'auto'; }
+  sendCoachMessage();
+}
+
+function buildCoachContext() {
+  const routines   = load(SK.routines)   || [];
+  const sessions   = (load(SK.sessions)  || []).slice(-20); // last 20 sessions
+  const exercises  = load(SK.exercises)  || [];
+
+  const inventory  = Object.entries(_inventory||{})
+    .filter(([,w]) => w && w.length)
+    .map(([t,w]) => `${t}: ${w.join(', ')}kg`)
+    .join('; ');
+
+  const recentStr  = sessions.map(s => {
+    const date = new Date(s.startedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    const exStr = (s.exercises||[]).map(ex => {
+      const logged = (ex.sets||[]).filter(st=>st.logged);
+      const topW   = Math.max(0,...logged.map(st=>parseFloat(st.weight)||0));
+      const reps   = logged.map(st=>st.reps||`${st.repsL||0}/${st.repsR||0}`).join(', ');
+      return `  ${ex.name} (${logged.length} sets, top ${topW}kg, reps: ${reps})`;
+    }).join('\n');
+    return `${date} — ${s.routineName}\n${exStr}`;
+  }).join('\n\n');
+
+  const routineStr = routines.map(r =>
+    `${r.name}: ${(r.exercises||[]).map(e=>`${e.name} ×${e.sets}`).join(', ')}`
+  ).join('\n');
+
+  const exStr = exercises.map(e=>`${e.name} (${e.muscle}${e.unilateral?' Uni':''})`).join(', ');
+
+  return `You are an expert strength and hypertrophy coach for the Sterk Gutt app.
+The user trains with dumbbells and uses a split routine. Always give specific, actionable advice based on their actual data.
+
+EQUIPMENT INVENTORY:
+${inventory || 'Not set up'}
+
+CURRENT ROUTINES:
+${routineStr || 'None'}
+
+EXERCISE LIBRARY:
+${exStr || 'None'}
+
+RECENT SESSIONS (last 20):
+${recentStr || 'No sessions yet'}
+
+When asked to CREATE A ROUTINE, respond with a JSON block inside triple backticks tagged as "routine_json" in this exact format:
+\`\`\`routine_json
+{
+  "name": "Routine Name",
+  "exercises": [
+    {"name": "Exercise Name", "sets": 3, "muscle": "Chest", "unilateral": false},
+    ...
+  ]
+}
+\`\`\`
+Then add a brief explanation outside the JSON.
+For all other questions, respond in plain conversational text. Keep responses concise and direct.`;
+}
+
+async function sendCoachMessage() {
+  const input   = document.getElementById('coach-input');
+  const sendBtn = document.getElementById('coach-send-btn');
+  const text    = input?.value?.trim();
+  if (!text) return;
+
+  input.value   = '';
+  input.style.height = 'auto';
+  sendBtn.disabled   = true;
+
+  appendCoachMsg('user', text);
+  _coachHistory.push({ role:'user', content:text });
+
+  // Typing indicator
+  const typingId = 'coach-typing-' + Date.now();
+  const msgEl = document.getElementById('coach-messages');
+  if (msgEl) {
+    const typing = document.createElement('div');
+    typing.id = typingId;
+    typing.className = 'coach-msg assistant';
+    typing.innerHTML = `
+      <div class="coach-avatar">AI</div>
+      <div class="coach-msg-bubble">
+        <div class="coach-typing"><span></span><span></span><span></span></div>
+      </div>`;
+    msgEl.appendChild(typing);
+    msgEl.scrollTop = msgEl.scrollHeight;
+  }
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: buildCoachContext(),
+        messages: _coachHistory,
+      }),
+    });
+
+    const data = await response.json();
+    const content = data.content?.[0]?.text || 'Sorry, something went wrong.';
+
+    // Remove typing indicator
+    document.getElementById(typingId)?.remove();
+
+    // Check for routine JSON
+    const routineMatch = content.match(/```routine_json\s*([\s\S]*?)```/);
+    if (routineMatch) {
+      try {
+        const routineData = JSON.parse(routineMatch[1].trim());
+        const textWithoutJson = content.replace(/```routine_json[\s\S]*?```/, '').trim();
+        if (textWithoutJson) appendCoachMsg('assistant', textWithoutJson);
+        appendRoutinePreview(routineData);
+      } catch(e) {
+        appendCoachMsg('assistant', content);
+      }
+    } else {
+      appendCoachMsg('assistant', content);
+    }
+
+    _coachHistory.push({ role:'assistant', content });
+
+    // Keep history to last 20 turns
+    if (_coachHistory.length > 40) _coachHistory = _coachHistory.slice(-40);
+
+  } catch(e) {
+    document.getElementById(typingId)?.remove();
+    appendCoachMsg('assistant', 'Failed to connect. Check your internet and try again.');
+  }
+
+  sendBtn.disabled = false;
+  input?.focus();
+}
+
+function appendCoachMsg(role, text) {
+  const container = document.getElementById('coach-messages');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = `coach-msg ${role}`;
+  // Convert markdown-ish *text* to <em> and **text** to <strong>
+  const html = text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+  div.innerHTML = role === 'assistant'
+    ? `<div class="coach-avatar">AI</div><div class="coach-msg-bubble">${html}</div>`
+    : `<div class="coach-msg-bubble">${html}</div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendRoutinePreview(routine) {
+  const container = document.getElementById('coach-messages');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'coach-msg assistant';
+  const exRows = (routine.exercises||[]).map(ex =>
+    `<div class="coach-routine-preview-ex">
+      <strong>${ex.name}</strong> &nbsp;·&nbsp; ${ex.sets} sets &nbsp;·&nbsp; ${ex.muscle}${ex.unilateral?' · Uni':''}
+    </div>`
+  ).join('');
+  const safeRoutine = JSON.stringify(routine).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  div.innerHTML = `
+    <div class="coach-avatar">AI</div>
+    <div class="coach-msg-bubble" style="padding:0;overflow:hidden;background:transparent;border:none;">
+      <div class="coach-routine-preview">
+        <div class="coach-routine-preview-header">
+          <span class="coach-routine-preview-name">${routine.name}</span>
+          <button class="coach-routine-preview-save" onclick="saveCoachRoutine(this)">Save</button>
+        </div>
+        ${exRows}
+      </div>
+    </div>`;
+  div.querySelector('.coach-routine-preview-save').dataset.routine = JSON.stringify(routine);
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function saveCoachRoutine(btn) {
+  try {
+    const routine = JSON.parse(btn.dataset.routine);
+    // Ensure exercises exist in library
+    const allEx = load(SK.exercises) || [];
+    const knownNames = new Set(allEx.map(e => e.name.toLowerCase()));
+    routine.exercises.forEach(ex => {
+      if (!knownNames.has(ex.name.toLowerCase())) {
+        const newEx = { id:'ex_'+Date.now()+'_'+Math.random().toString(36).slice(2), name:ex.name, muscle:ex.muscle||'Other', unilateral:!!ex.unilateral };
+        allEx.push(newEx);
+        knownNames.add(ex.name.toLowerCase());
+        dbSaveExercise(newEx);
+      }
+    });
+    save(SK.exercises, allEx);
+    // Save routine
+    const newRoutine = {
+      id: 'r_'+Date.now(),
+      name: routine.name,
+      exercises: routine.exercises.map(ex => ({
+        id: allEx.find(e=>e.name.toLowerCase()===ex.name.toLowerCase())?.id || 'ex_'+Date.now(),
+        name: ex.name, muscle: ex.muscle||'Other',
+        unilateral: !!ex.unilateral, sets: ex.sets || 3,
+      })),
+    };
+    const routines = load(SK.routines) || [];
+    routines.push(newRoutine);
+    save(SK.routines, routines);
+    dbSaveRoutine(newRoutine);
+    // Update button
+    btn.textContent = '✓ Saved';
+    btn.disabled = true;
+    btn.style.background = 'rgba(200,240,110,0.20)';
+    btn.style.color = '#c8f06e';
+    btn.style.border = '1px solid #c8f06e';
+    showToast(`"${routine.name}" added to routines`);
+  } catch(e) {
+    showToast('Failed to save routine');
+    console.error(e);
+  }
+}
+
 Object.assign(window, {
+  // Coach
+  initCoachPage, sendCoachMessage, coachChip, saveCoachRoutine,
   // Nav & pages
   showPage, openModal, closeModal, signInWithGoogle, signInWithMagicLink, signOut,
   // Confirm dialog
@@ -4182,6 +4573,7 @@ Object.assign(window, {
   handleSetBtn, addSet, removeSet, removeLastSet, toggleExCollapse,
   setEquipment, updateSet,
   // Routine editor
+  createSplit, renameSplit, deleteSplit, assignRoutineToSplit,
   openRoutineEditor, saveRoutine, saveRoutineChanges, deleteRoutine,
   addExerciseToEditor, removeEditorEx, toggleRoutineCard,
   updateEditorExSets: (i, v) => { if (editorExercises[i]) editorExercises[i].sets = Math.max(1, +v || 1); },
