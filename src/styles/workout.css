@@ -483,7 +483,13 @@
 
 /* ══ STATS PAGE ═══════════════════════════════════════════════════════════ */
 
-#page-stats { background:#0a0907; }
+#page-stats {
+  background:#0a0907;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#stats-tab-coach {
+  flex:1;overflow:hidden;
+}
 
 /* ── Time period filter bar ── */
 .stats-filter-bar {
