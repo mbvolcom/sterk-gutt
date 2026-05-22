@@ -483,9 +483,10 @@
 
 /* ══ STATS PAGE ═══════════════════════════════════════════════════════════ */
 
-#page-stats {
-  background:#0a0907;
+#page-stats { background:#0a0907; }
+#page-stats.active {
   display:flex;flex-direction:column;overflow:hidden;
+  padding-bottom:0;
 }
 #stats-tab-coach {
   flex:1;overflow:hidden;
