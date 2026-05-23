@@ -369,7 +369,7 @@ async function syncFromCloud() {
     await dbLoadSessions();
     await dbLoadExercises();
     await loadInventoryFromCloud();
-    await dbLoadSplits();
+    await dbLoadSplits(); // splits load last, renderRoutines called inside
     setSyncStatus('ok');
   } catch(e) {
     console.error('syncFromCloud error:', e.message, e.stack);
@@ -1980,10 +1980,8 @@ async function dbLoadSplits() {
     console.warn('dbLoadSplits Supabase failed:', e.message);
   }
 
-  // Re-render routines page if it's currently visible so splits appear
-  if (document.getElementById('page-routines')?.classList.contains('active')) {
-    renderRoutines();
-  }
+  // Re-render routines so splits always appear after load
+  renderRoutines();
 }
 
 function createSplit() {
@@ -4447,7 +4445,7 @@ async function sendCoachMessage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5',
         max_tokens: 1000,
         system: buildCoachContext(),
         messages: _coachHistory,
