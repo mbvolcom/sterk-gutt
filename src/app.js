@@ -27,6 +27,7 @@ async function initAuth() {
       try {
         currentUser = session.user;
         USER_ID = session.user.id;
+        localStorage.setItem('sg_user_id', USER_ID);
         hideLoginScreen();
         if (!hasSynced) {
           hasSynced = true;
@@ -1949,9 +1950,8 @@ let editorExercises = []; // exercises in the routine being edited
 let pickerExIdx = null;   // which slot in editorExercises we're picking for (null = new)
 
 function saveSplits() {
-  // Save to localStorage for instant local access
+  if (!USER_ID || USER_ID === 'pending') return; // don't save before auth
   localStorage.setItem(`sg_splits_${USER_ID}`, JSON.stringify(_splits));
-  // Sync all splits to Supabase
   _splits.forEach(split => {
     supabaseFetch('user_splits', 'on_conflict=id', 'POST', {
       id: split.id,
@@ -4427,7 +4427,8 @@ async function sendCoachMessage() {
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Call through Cloudflare Worker proxy (keeps API key server-side)
+    const response = await fetch('/api/coach', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4466,7 +4467,7 @@ async function sendCoachMessage() {
 
   } catch(e) {
     document.getElementById(typingId)?.remove();
-    appendCoachMsg('assistant', 'Failed to connect. Check your internet and try again.');
+    appendCoachMsg('assistant', `Something went wrong: ${e.message || 'Unknown error'}. Please try again.`);
   }
 
   sendBtn.disabled = false;
