@@ -686,6 +686,26 @@ function renderSessionBody(s) {
   if (!body || !s) return;
   body.innerHTML = '';
 
+  // Build muscle data from this session
+  const allEx = load(SK.exercises) || [];
+  const muscleData = {};
+  (s.exercises||[]).forEach(ex => {
+    const libEx = allEx.find(e => e.id === ex.id || e.name === ex.name);
+    const pm = libEx?.primaryMuscle || ex.primaryMuscle;
+    if (!pm) return;
+    const logged = Array.isArray(ex.sets) ? ex.sets.filter(st => st.logged).length : 1;
+    muscleData[pm] = (muscleData[pm] || 0) + logged;
+  });
+
+  // Body map card
+  if (Object.keys(muscleData).length > 0) {
+    const mapDiv = document.createElement('div');
+    mapDiv.id = 'session-body-map';
+    mapDiv.style.cssText = 'margin-bottom:20px;';
+    body.appendChild(mapDiv);
+    setTimeout(() => renderMuscleMap('session-body-map', muscleData, true), 0);
+  }
+
   (s.exercises||[]).forEach((ex, exIdx) => {
     const logged = (ex.sets||[]).filter(st => st.logged);
     if (!logged.length && !_sessionEditMode) return;
@@ -1972,29 +1992,29 @@ const PM_TO_BODY_IDS = {
   'Pecs':                  ['chest-upper-left','chest-upper-right','chest-lower-left','chest-lower-right'],
   'Upper Pecs':            ['chest-upper-left','chest-upper-right'],
   'Lower Pecs':            ['chest-lower-left','chest-lower-right'],
-  'Front Delts':           ['deltoid-anterior-left','deltoid-anterior-right'],
-  'Side Delts':            ['deltoid-lateral-left','deltoid-lateral-right'],
-  'Rear Delts':            ['deltoid-posterior-left','deltoid-posterior-right'],
+  'Front Delts':           ['shoulder-front-left','shoulder-front-right'],
+  'Side Delts':            ['shoulder-side-left','shoulder-side-right'],
+  'Rear Delts':            ['deltoid-rear-left','deltoid-rear-right'],
   'Biceps':                ['biceps-left','biceps-right'],
-  'Brachialis':            ['brachialis-left','brachialis-right'],
-  'Brachioradialis':       ['forearm-left','forearm-right'],
+  'Brachialis':            ['biceps-left','biceps-right'],
+  'Brachioradialis':       ['forearm-left','forearm-right','forearm-flexors-left','forearm-flexors-right'],
   'Abs':                   ['abs-upper-left','abs-upper-right','abs-lower-left','abs-lower-right'],
   'Obliques':              ['obliques-left','obliques-right'],
   'Transverse Abdominis':  ['abs-lower-left','abs-lower-right'],
-  'Quads':                 ['quadriceps-left','quadriceps-right'],
-  'Hip Flexors':           ['hip-flexors-left','hip-flexors-right'],
+  'Quads':                 ['quads-left','quads-right'],
+  'Hip Flexors':           ['hip-flexor-left','hip-flexor-right'],
   'Adductors':             ['adductors-left','adductors-right'],
-  'Calves':                ['calves-left','calves-right'],
-  'Lats':                  ['latissimus-dorsi-left','latissimus-dorsi-right'],
-  'Traps':                 ['trapezius-upper-left','trapezius-upper-right','trapezius-lower-left','trapezius-lower-right'],
-  'Rhomboids':             ['rhomboids-left','rhomboids-right'],
-  'Erectors':              ['erector-spinae-left','erector-spinae-right'],
-  'Triceps':               ['triceps-left','triceps-right'],
-  'Triceps Long Head':     ['triceps-left','triceps-right'],
-  'Triceps Lateral Head':  ['triceps-left','triceps-right'],
-  'Triceps Medial Head':   ['triceps-left','triceps-right'],
-  'Glutes':                ['gluteus-maximus-left','gluteus-maximus-right'],
-  'Hamstrings':            ['hamstrings-left','hamstrings-right'],
+  'Calves':                ['calves-gastroc-medial-left','calves-gastroc-lateral-left','calves-gastroc-medial-right','calves-gastroc-lateral-right'],
+  'Lats':                  ['lats-upper-left','lats-mid-left','lats-lower-left','lats-upper-right','lats-mid-right','lats-lower-right'],
+  'Traps':                 ['traps-upper-left','traps-mid-left','traps-lower-left','traps-upper-right','traps-mid-right','traps-lower-right'],
+  'Rhomboids':             ['traps-mid-left','traps-mid-right'],
+  'Erectors':              ['lower-back-erectors-left','lower-back-erectors-right'],
+  'Triceps':               ['triceps-long-left','triceps-lateral-left','triceps-long-right','triceps-lateral-right'],
+  'Triceps Long Head':     ['triceps-long-left','triceps-long-right'],
+  'Triceps Lateral Head':  ['triceps-lateral-left','triceps-lateral-right'],
+  'Triceps Medial Head':   ['triceps-lateral-left','triceps-lateral-right'],
+  'Glutes':                ['gluteus-maximus-left','gluteus-maximus-right','gluteus-medius-left','gluteus-medius-right'],
+  'Hamstrings':            ['hamstrings-medial-left','hamstrings-lateral-left','hamstrings-medial-right','hamstrings-lateral-right'],
 };
 
 let _bodyMusclesLib = null;
