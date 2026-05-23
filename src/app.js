@@ -2003,12 +2003,6 @@ function getBodyMusclesLib() {
     _bodyMusclesLib = window.BodyMuscles;
     return _bodyMusclesLib;
   }
-  // Try named import from bundled module
-  try {
-    const m = require('body-muscles');
-    _bodyMusclesLib = m;
-    return _bodyMusclesLib;
-  } catch(e) {}
   return null;
 }
 
@@ -2213,6 +2207,8 @@ function buildMusclDataFromExercises(exercises, heatMode = false) {
   });
   return data;
 }
+
+function saveSplits() {
   if (!USER_ID || USER_ID === 'pending') return;
   localStorage.setItem(`sg_splits_${USER_ID}`, JSON.stringify(_splits));
   // Upsert each split individually and log any errors
