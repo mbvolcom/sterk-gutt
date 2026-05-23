@@ -174,7 +174,7 @@ async function dbLoadExercises() {
       const seen = new Map();
       data.forEach(e => seen.set(e.name.toLowerCase(), e));
       _exercises = Array.from(seen.values()).map(e => ({
-        id:e.id, name:e.name, muscle:e.muscle, unilateral:!!e.unilateral
+        id:e.id, name:e.name, muscle:e.muscle, primaryMuscle:e.primary_muscle||null, unilateral:!!e.unilateral
       }));
       // Delete orphaned duplicate rows from Supabase silently
       const keptIds = new Set(_exercises.map(e => e.id));
@@ -193,16 +193,14 @@ async function dbSeedExercises() {
 }
 
 async function dbSaveExercise(ex) {
-  // Update in-memory immediately so UI reflects change right away
-  const clean = { id: ex.id, name: ex.name, muscle: ex.muscle||'', unilateral: !!ex.unilateral };
+  const clean = { id: ex.id, name: ex.name, muscle: ex.muscle||'', primaryMuscle: ex.primaryMuscle||null, unilateral: !!ex.unilateral };
   const idx = _exercises.findIndex(e => e.id === ex.id);
   if (idx >= 0) _exercises[idx] = clean;
   else          _exercises.push(clean);
-  // Refresh exercises tab if visible
   if (document.getElementById('page-exercises')?.classList.contains('active')) renderExerciseLibrary();
 
   try {
-    const row = { id: ex.id, name: ex.name, muscle: ex.muscle||'', unilateral: !!ex.unilateral, user_id: USER_ID };
+    const row = { id: ex.id, name: ex.name, muscle: ex.muscle||'', primary_muscle: ex.primaryMuscle||null, unilateral: !!ex.unilateral, user_id: USER_ID };
     await supabaseFetch('exercises', 'on_conflict=id', 'POST', row);
     setSyncStatus('ok');
   } catch(e) {
@@ -485,6 +483,17 @@ function getLastPerformance(exName) {
 // CONSTANTS
 // ═══════════════════════════════════════════
 const MUSCLE_GROUPS = ['Abs','Back','Biceps','Chest','Legs','Shoulders','Triceps'];
+
+// Primary muscles per muscle group
+const PRIMARY_MUSCLES = {
+  Abs:       ['Abs', 'Obliques', 'Transverse Abdominis'],
+  Back:      ['Lats', 'Traps', 'Rhomboids', 'Rear Delts', 'Erectors'],
+  Biceps:    ['Biceps', 'Brachialis', 'Brachioradialis'],
+  Chest:     ['Pecs', 'Upper Pecs', 'Lower Pecs'],
+  Legs:      ['Quads', 'Hamstrings', 'Glutes', 'Calves', 'Hip Flexors', 'Adductors'],
+  Shoulders: ['Front Delts', 'Side Delts', 'Rear Delts'],
+  Triceps:   ['Triceps Long Head', 'Triceps Lateral Head', 'Triceps Medial Head'],
+};
 
 const MUSCLE_NORMALISE = {
   'Quads': 'Legs', 'Hamstrings': 'Legs', 'Glutes': 'Legs', 'Calves': 'Legs',
@@ -2074,6 +2083,7 @@ function renderRoutines() {
               <div class="routine-ex-name">${ex.name}</div>
               <div class="routine-ex-tags">
                 <span class="tag">${ex.muscle}</span>
+                ${ex.primaryMuscle ? `<span class="tag" style="color:rgba(200,240,110,0.7);border-color:rgba(200,240,110,0.25);">${ex.primaryMuscle}</span>` : ''}
                 <span class="tag">${ex.sets} sets</span>
                 ${ex.unilateral ? '<span class="tag unilateral">Uni</span>' : ''}
               </div>
@@ -2414,6 +2424,33 @@ function saveRoutine() {
 let libMuscleFilter = 'All';
 let editingExId = null;
 let selectedMuscle = '';
+let selectedPrimaryMuscle = '';
+
+function selectMuscle(muscle, containerId) {
+  selectedMuscle = muscle;
+  selectedPrimaryMuscle = '';
+  renderMusclePicker(containerId);
+  // Re-render primary muscle picker if present
+  const primaryId = containerId.replace('muscle-grid', 'primary-grid');
+  const primaryEl = document.getElementById(primaryId);
+  if (primaryEl) renderPrimaryMusclePicker(primaryId, containerId);
+}
+
+function selectPrimaryMuscle(muscle, containerId) {
+  selectedPrimaryMuscle = muscle;
+  renderPrimaryMusclePicker(containerId.replace('primary-grid','primary-grid'), containerId);
+}
+
+function renderPrimaryMusclePicker(containerId, parentContainerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const options = PRIMARY_MUSCLES[selectedMuscle] || [];
+  if (!options.length) { el.innerHTML = ''; return; }
+  el.innerHTML = options.map(m => `
+    <button class="muscle-btn ${selectedPrimaryMuscle === m ? 'active' : ''}"
+      onclick="selectPrimaryMuscle('${m}','${containerId}')">${m}</button>
+  `).join('');
+}
 
 function renderExerciseLibrary() {
   const allEx = load(SK.exercises) || [];
@@ -2450,6 +2487,7 @@ function renderExerciseLibrary() {
           <div class="ex-lib-info">
             <div class="ex-lib-name">${ex.name}</div>
             <div class="ex-lib-tags">
+              ${ex.primaryMuscle ? `<span class="tag" style="color:rgba(200,240,110,0.7);border-color:rgba(200,240,110,0.25);">${ex.primaryMuscle}</span>` : ''}
               ${ex.unilateral ? '<span class="tag unilateral">Uni</span>' : ''}
             </div>
           </div>
@@ -2483,37 +2521,44 @@ function openExerciseLibEditor(exId) {
     if (ex) {
       document.getElementById('ex-lib-name').value = ex.name;
       selectedMuscle = ex.muscle || '';
-      // Set checkbox after muscle picker renders to avoid iOS DOM reflow reset
+      selectedPrimaryMuscle = ex.primaryMuscle || '';
       const isUni = !!ex.unilateral;
       renderMusclePicker('ex-lib-muscle-grid');
+      const wrap = document.getElementById('ex-lib-primary-wrap');
+      if (wrap) wrap.style.display = selectedMuscle ? '' : 'none';
+      renderPrimaryMusclePicker('ex-lib-primary-grid', 'ex-lib-muscle-grid');
       openModal('exercise-lib-editor');
-      // Use setTimeout to set after the modal is fully painted
       setTimeout(() => {
         const cb = document.getElementById('ex-lib-uni');
-        if (cb) {
-          cb.checked = isUni;
-          cb.defaultChecked = isUni;
-        }
+        if (cb) { cb.checked = isUni; cb.defaultChecked = isUni; }
       }, 50);
       return;
     }
   }
 
+  selectedMuscle = '';
+  selectedPrimaryMuscle = '';
   renderMusclePicker('ex-lib-muscle-grid');
+  const wrap = document.getElementById('ex-lib-primary-wrap');
+  if (wrap) wrap.style.display = 'none';
   openModal('exercise-lib-editor');
 }
 
 function renderMusclePicker(containerId) {
-  document.getElementById(containerId).innerHTML = MUSCLE_GROUPS.map(m => `
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = MUSCLE_GROUPS.map(m => `
     <button class="muscle-btn ${selectedMuscle === m ? 'active' : ''}"
       onclick="selectMuscle('${m}','${containerId}')">${m}</button>
   `).join('');
+  // Show/update primary muscle picker for lib editor
+  if (containerId === 'ex-lib-muscle-grid') {
+    const wrap = document.getElementById('ex-lib-primary-wrap');
+    if (wrap) wrap.style.display = selectedMuscle ? '' : 'none';
+    renderPrimaryMusclePicker('ex-lib-primary-grid', containerId);
+  }
 }
 
-function selectMuscle(muscle, containerId) {
-  selectedMuscle = muscle;
-  renderMusclePicker(containerId);
-}
 
 function saveExerciseLib() {
   const name = document.getElementById('ex-lib-name').value.trim();
@@ -2526,9 +2571,9 @@ function saveExerciseLib() {
   let savedEx;
   if (editingExId) {
     const idx = allEx.findIndex(e => e.id === editingExId);
-    if (idx >= 0) { allEx[idx] = { ...allEx[idx], name, muscle: selectedMuscle, unilateral }; savedEx = allEx[idx]; }
+    if (idx >= 0) { allEx[idx] = { ...allEx[idx], name, muscle: selectedMuscle, primaryMuscle: selectedPrimaryMuscle||null, unilateral }; savedEx = allEx[idx]; }
   } else {
-    savedEx = { id: 'ex_' + Date.now(), name, muscle: selectedMuscle, unilateral };
+    savedEx = { id: 'ex_' + Date.now(), name, muscle: selectedMuscle, primaryMuscle: selectedPrimaryMuscle||null, unilateral };
     allEx.push(savedEx);
   }
   save(SK.exercises, allEx);
@@ -4608,7 +4653,7 @@ Object.assign(window, {
   updateEditorExSets: (i, v) => { if (editorExercises[i]) editorExercises[i].sets = Math.max(1, +v || 1); },
   // Exercise picker
   selectExerciseFromPicker, showNewExForm, hideNewExForm,
-  createAndAddExercise, selectMuscle,
+  createAndAddExercise, selectMuscle, selectPrimaryMuscle,
   // Exercise library
   openExerciseLibEditor, saveExerciseLib, deleteExerciseLib, setLibFilter,
   // Stats
