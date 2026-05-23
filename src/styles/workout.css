@@ -547,7 +547,7 @@
 .stats-subtab.active { color:#c8f06e;border-bottom-color:#c8f06e; }
 
 /* ── Tab body ── */
-.stats-tab-body { padding:14px 12px 40px; }
+.stats-tab-body { padding:14px 12px 40px; overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; }
 
 /* ── KPI grid — 3 columns ── */
 .stats-kpi-grid {
