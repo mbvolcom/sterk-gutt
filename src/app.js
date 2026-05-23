@@ -223,7 +223,7 @@ async function dbSaveRoutine(routine) {
       id: routine.id, user_id: USER_ID, name: routine.name,
       exercises: routine.exercises,
       split_id: routine.splitId || null,
-      created_at: new Date(routine.createdAt).toISOString(),
+      created_at: routine.createdAt ? new Date(routine.createdAt).toISOString() : new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
     await supabaseFetch('routines', 'on_conflict=id', 'POST', row);
@@ -4610,6 +4610,7 @@ async function saveCoachRoutine(btn) {
     const newRoutine = {
       id: 'r_'+Date.now(),
       name: routine.name,
+      createdAt: Date.now(),
       exercises: routine.exercises.map(ex => ({
         id: allEx.find(e=>e.name.toLowerCase()===ex.name.toLowerCase())?.id || 'ex_'+Date.now(),
         name: ex.name, muscle: ex.muscle||'Other',
