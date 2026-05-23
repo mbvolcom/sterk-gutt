@@ -2537,8 +2537,6 @@ function hideNewExForm() {
   filterExPicker(document.getElementById('ex-picker-search').value);
 }
 
-function createAndAddExercise_UNUSED1() { /* removed duplicate */ }
-
 // Ensure all exercises from a workout are present in the exercise library
 function syncWorkoutExercisesToLibrary(exercises) {
   const allEx = load(SK.exercises) || [];
