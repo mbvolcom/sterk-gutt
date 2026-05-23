@@ -224,6 +224,7 @@ async function dbSaveRoutine(routine) {
     const row = {
       id: routine.id, user_id: USER_ID, name: routine.name,
       exercises: routine.exercises,
+      split_id: routine.splitId || null,
       created_at: new Date(routine.createdAt).toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -293,7 +294,7 @@ async function dbLoadRoutines() {
     const data = await supabaseFetch('routines', `select=*&user_id=eq.${USER_ID}&order=created_at`);
 
     if (data && data.length) {
-      _routines = data.map(r => ({ id:r.id, name:r.name, exercises:r.exercises, createdAt:new Date(r.created_at).getTime() }));
+      _routines = data.map(r => ({ id:r.id, name:r.name, exercises:r.exercises, createdAt:new Date(r.created_at).getTime(), splitId:r.split_id||null }));
     } else {
       try {
         for (const r of DEFAULT_ROUTINES) await dbSaveRoutine(r);
