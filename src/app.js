@@ -369,7 +369,9 @@ async function syncFromCloud() {
     await dbLoadSessions();
     await dbLoadExercises();
     await loadInventoryFromCloud();
-    await dbLoadSplits(); // splits load last, renderRoutines called inside
+    await dbLoadSplits();
+    // Render routines AFTER splits are loaded so groups show correctly
+    renderRoutines();
     setSyncStatus('ok');
   } catch(e) {
     console.error('syncFromCloud error:', e.message, e.stack);
@@ -1963,13 +1965,13 @@ function saveSplits() {
 }
 
 async function dbLoadSplits() {
-  // Always load from localStorage first for instant display
+  // Load from localStorage first for instant display
   try {
     const raw = localStorage.getItem(`sg_splits_${USER_ID}`);
     if (raw) _splits = JSON.parse(raw);
   } catch(e) {}
 
-  // Then sync from Supabase
+  // Sync from Supabase
   try {
     const data = await supabaseFetch('user_splits', `select=id,name&user_id=eq.${USER_ID}&order=created_at.asc`);
     if (data && data.length) {
@@ -1979,9 +1981,6 @@ async function dbLoadSplits() {
   } catch(e) {
     console.warn('dbLoadSplits Supabase failed:', e.message);
   }
-
-  // Re-render routines so splits always appear after load
-  renderRoutines();
 }
 
 function createSplit() {
@@ -4544,19 +4543,24 @@ function appendRoutinePreview(routine) {
 function saveCoachRoutine(btn) {
   try {
     const routine = JSON.parse(btn.dataset.routine);
-    // Ensure exercises exist in library
     const allEx = load(SK.exercises) || [];
     const knownNames = new Set(allEx.map(e => e.name.toLowerCase()));
+
+    // Save any new exercises to library AND Supabase
+    const newExercises = [];
     routine.exercises.forEach(ex => {
       if (!knownNames.has(ex.name.toLowerCase())) {
         const newEx = { id:'ex_'+Date.now()+'_'+Math.random().toString(36).slice(2), name:ex.name, muscle:ex.muscle||'Other', unilateral:!!ex.unilateral };
         allEx.push(newEx);
         knownNames.add(ex.name.toLowerCase());
-        dbSaveExercise(newEx);
+        newExercises.push(newEx);
       }
     });
     save(SK.exercises, allEx);
-    // Save routine
+    // Persist each new exercise to Supabase
+    await Promise.all(newExercises.map(ex => dbSaveExercise(ex)));
+
+    // Build and save routine
     const newRoutine = {
       id: 'r_'+Date.now(),
       name: routine.name,
@@ -4569,8 +4573,8 @@ function saveCoachRoutine(btn) {
     const routines = load(SK.routines) || [];
     routines.push(newRoutine);
     save(SK.routines, routines);
-    dbSaveRoutine(newRoutine);
-    // Update button
+    await dbSaveRoutine(newRoutine); // await to confirm it saved
+
     btn.textContent = '✓ Saved';
     btn.disabled = true;
     btn.style.background = 'rgba(200,240,110,0.20)';
@@ -4578,7 +4582,7 @@ function saveCoachRoutine(btn) {
     btn.style.border = '1px solid #c8f06e';
     showToast(`"${routine.name}" added to routines`);
   } catch(e) {
-    showToast('Failed to save routine');
+    showToast('Failed to save: ' + e.message);
     console.error(e);
   }
 }
