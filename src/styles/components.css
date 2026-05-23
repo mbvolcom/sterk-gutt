@@ -1321,3 +1321,85 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
   max-width:80px;
 }
 .routine-split-select:focus { border-color:#c8f06e; }
+
+/* ══ MUSCLE BODY MAP ═════════════════════════════════════════════════════ */
+
+.routine-muscle-map {
+  max-width: 200px;
+  margin: 0 auto 14px;
+  opacity: 0.95;
+}
+
+.stats-body-map {
+  max-width: 220px;
+  margin: 0 auto 10px;
+}
+
+.stats-map-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  color: rgba(241,236,226,0.38);
+  text-transform: uppercase;
+}
+
+.stats-map-legend .legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ══ BODY-MUSCLES LIBRARY THEME OVERRIDE ════════════════════════════════ */
+
+/* Override the library's default red intensity colours with lime theme */
+.routine-muscle-map,
+.stats-body-map {
+  --bm-color-0:  #111113;
+  --bm-color-1:  rgba(200,240,110,0.12);
+  --bm-color-2:  rgba(200,240,110,0.24);
+  --bm-color-3:  rgba(200,240,110,0.36);
+  --bm-color-4:  rgba(200,240,110,0.48);
+  --bm-color-5:  rgba(200,240,110,0.58);
+  --bm-color-6:  rgba(200,240,110,0.68);
+  --bm-color-7:  rgba(200,240,110,0.76);
+  --bm-color-8:  rgba(200,240,110,0.84);
+  --bm-color-9:  rgba(200,240,110,0.92);
+  --bm-color-10: #c8f06e;
+}
+
+/* Routine map size */
+.routine-muscle-map {
+  max-width: 240px;
+  margin: 0 auto 14px;
+}
+
+/* Stats map size */
+.stats-body-map {
+  max-width: 280px;
+  margin: 0 auto 10px;
+}
+
+/* Legend */
+.stats-map-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  color: rgba(241,236,226,0.38);
+  text-transform: uppercase;
+}
+.stats-map-legend .legend-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
