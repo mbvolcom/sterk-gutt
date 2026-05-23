@@ -33,11 +33,11 @@ async function initAuth() {
           hasSynced = true;
           await migrateDataIfNeeded();
           await syncFromCloud();
-          // Re-render whichever page is currently visible
+          // Re-render all visible pages with fresh data
           renderHome();
+          renderRoutines(); // always re-render routines so splits show up
           const activePage = document.querySelector('.page.active');
           if (activePage) {
-            if (activePage.id === 'page-routines')  renderRoutines();
             if (activePage.id === 'page-exercises') { renderExerciseLibrary(); renderEquipmentInventory(); }
             if (activePage.id === 'page-stats')     renderStats();
           }
@@ -1950,36 +1950,39 @@ let editorExercises = []; // exercises in the routine being edited
 let pickerExIdx = null;   // which slot in editorExercises we're picking for (null = new)
 
 function saveSplits() {
-  if (!USER_ID || USER_ID === 'pending') return; // don't save before auth
+  if (!USER_ID || USER_ID === 'pending') return;
   localStorage.setItem(`sg_splits_${USER_ID}`, JSON.stringify(_splits));
+  // Upsert each split individually and log any errors
   _splits.forEach(split => {
     supabaseFetch('user_splits', 'on_conflict=id', 'POST', {
       id: split.id,
       user_id: USER_ID,
       name: split.name,
-    }).catch(() => {});
+    }).catch(e => console.warn('saveSplits error:', e.message));
   });
 }
 
 async function dbLoadSplits() {
+  // Always load from localStorage first for instant display
+  try {
+    const raw = localStorage.getItem(`sg_splits_${USER_ID}`);
+    if (raw) _splits = JSON.parse(raw);
+  } catch(e) {}
+
+  // Then sync from Supabase
   try {
     const data = await supabaseFetch('user_splits', `select=id,name&user_id=eq.${USER_ID}&order=created_at.asc`);
     if (data && data.length) {
       _splits = data.map(s => ({ id: s.id, name: s.name }));
       localStorage.setItem(`sg_splits_${USER_ID}`, JSON.stringify(_splits));
-    } else {
-      // Fall back to localStorage
-      try {
-        const raw = localStorage.getItem(`sg_splits_${USER_ID}`);
-        _splits = raw ? JSON.parse(raw) : [];
-      } catch(e) { _splits = []; }
     }
   } catch(e) {
-    // Offline — use localStorage
-    try {
-      const raw = localStorage.getItem(`sg_splits_${USER_ID}`);
-      _splits = raw ? JSON.parse(raw) : [];
-    } catch(e2) { _splits = []; }
+    console.warn('dbLoadSplits Supabase failed:', e.message);
+  }
+
+  // Re-render routines page if it's currently visible so splits appear
+  if (document.getElementById('page-routines')?.classList.contains('active')) {
+    renderRoutines();
   }
 }
 
@@ -1988,7 +1991,19 @@ function createSplit() {
   if (!name || !name.trim()) return;
   const split = { id: 'split_' + Date.now(), name: name.trim() };
   _splits.push(split);
-  saveSplits();
+  // Save to localStorage immediately
+  localStorage.setItem(`sg_splits_${USER_ID}`, JSON.stringify(_splits));
+  // Upsert to Supabase with visible error if it fails
+  supabaseFetch('user_splits', 'on_conflict=id', 'POST', {
+    id: split.id,
+    user_id: USER_ID,
+    name: split.name,
+  }).then(() => {
+    console.log('Split saved to Supabase:', split.name);
+  }).catch(e => {
+    console.warn('Split Supabase save failed:', e.message);
+    showToast('Split saved locally — sync failed: ' + e.message);
+  });
   renderRoutines();
 }
 
@@ -4440,10 +4455,20 @@ async function sendCoachMessage() {
     });
 
     const data = await response.json();
-    const content = data.content?.[0]?.text || 'Sorry, something went wrong.';
 
     // Remove typing indicator
     document.getElementById(typingId)?.remove();
+
+    // Handle API errors (e.g. invalid key, quota exceeded)
+    if (!response.ok || data.error) {
+      const errMsg = data.error?.message || JSON.stringify(data.error) || `HTTP ${response.status}`;
+      appendCoachMsg('assistant', `API error: ${errMsg}`);
+      sendBtn.disabled = false;
+      input?.focus();
+      return;
+    }
+
+    const content = data.content?.[0]?.text || 'Sorry, something went wrong.';
 
     // Check for routine JSON
     const routineMatch = content.match(/```routine_json\s*([\s\S]*?)```/);
