@@ -1961,7 +1961,258 @@ let editingRoutineId = null;
 let editorExercises = []; // exercises in the routine being edited
 let pickerExIdx = null;   // which slot in editorExercises we're picking for (null = new)
 
-function saveSplits() {
+// ═══════════════════════════════════════════
+// MUSCLE BODY MAP — powered by body-muscles
+// ═══════════════════════════════════════════
+
+// Map our primaryMuscle names → body-muscles IDs (both left+right)
+const PM_TO_BODY_IDS = {
+  'Pecs':                  ['chest-upper-left','chest-upper-right','chest-lower-left','chest-lower-right'],
+  'Upper Pecs':            ['chest-upper-left','chest-upper-right'],
+  'Lower Pecs':            ['chest-lower-left','chest-lower-right'],
+  'Front Delts':           ['deltoid-anterior-left','deltoid-anterior-right'],
+  'Side Delts':            ['deltoid-lateral-left','deltoid-lateral-right'],
+  'Rear Delts':            ['deltoid-posterior-left','deltoid-posterior-right'],
+  'Biceps':                ['biceps-left','biceps-right'],
+  'Brachialis':            ['brachialis-left','brachialis-right'],
+  'Brachioradialis':       ['forearm-left','forearm-right'],
+  'Abs':                   ['abs-upper-left','abs-upper-right','abs-lower-left','abs-lower-right'],
+  'Obliques':              ['obliques-left','obliques-right'],
+  'Transverse Abdominis':  ['abs-lower-left','abs-lower-right'],
+  'Quads':                 ['quadriceps-left','quadriceps-right'],
+  'Hip Flexors':           ['hip-flexors-left','hip-flexors-right'],
+  'Adductors':             ['adductors-left','adductors-right'],
+  'Calves':                ['calves-left','calves-right'],
+  'Lats':                  ['latissimus-dorsi-left','latissimus-dorsi-right'],
+  'Traps':                 ['trapezius-upper-left','trapezius-upper-right','trapezius-lower-left','trapezius-lower-right'],
+  'Rhomboids':             ['rhomboids-left','rhomboids-right'],
+  'Erectors':              ['erector-spinae-left','erector-spinae-right'],
+  'Triceps':               ['triceps-left','triceps-right'],
+  'Triceps Long Head':     ['triceps-left','triceps-right'],
+  'Triceps Lateral Head':  ['triceps-left','triceps-right'],
+  'Triceps Medial Head':   ['triceps-left','triceps-right'],
+  'Glutes':                ['gluteus-maximus-left','gluteus-maximus-right'],
+  'Hamstrings':            ['hamstrings-left','hamstrings-right'],
+};
+
+let _bodyMusclesLib = null;
+
+function getBodyMusclesLib() {
+  if (_bodyMusclesLib) return _bodyMusclesLib;
+  if (typeof window.BodyMuscles !== 'undefined') {
+    _bodyMusclesLib = window.BodyMuscles;
+    return _bodyMusclesLib;
+  }
+  // Try named import from bundled module
+  try {
+    const m = require('body-muscles');
+    _bodyMusclesLib = m;
+    return _bodyMusclesLib;
+  } catch(e) {}
+  return null;
+}
+
+/**
+ * Build a bodyState object for body-muscles library from muscle data.
+ * @param {Object} muscleData - { 'Quads': 24, 'Pecs': 12, ... }
+ * @param {boolean} heatMode - scale 0-10 by relative volume, or binary 0/10
+ */
+function buildBodyState(muscleData, heatMode) {
+  const bodyState = {};
+  const vals = Object.values(muscleData).filter(v => v > 0);
+  const maxVal = vals.length ? Math.max(...vals) : 1;
+
+  Object.entries(muscleData).forEach(([pm, val]) => {
+    if (!val) return;
+    const ids = PM_TO_BODY_IDS[pm];
+    if (!ids) return;
+    const intensity = heatMode
+      ? Math.max(1, Math.round((val / maxVal) * 10))
+      : 10;
+    ids.forEach(id => {
+      // Take the max if multiple muscles map to same ID
+      if (!bodyState[id] || bodyState[id].intensity < intensity) {
+        bodyState[id] = { intensity, selected: false };
+      }
+    });
+  });
+  return bodyState;
+}
+
+/**
+ * Render a muscle map into a container div using body-muscles library.
+ * Returns { frontChart, backChart } or null if library not available.
+ */
+function renderMuscleMap(containerId, muscleData, heatMode = false) {
+  const container = document.getElementById(containerId);
+  if (!container) return null;
+
+  const lib = getBodyMusclesLib();
+  if (!lib) {
+    container.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(241,236,226,0.28);letter-spacing:0.06em;padding:12px 0;text-align:center;">Set primary muscles on exercises to enable the body map</div>`;
+    return null;
+  }
+
+  const bodyState = buildBodyState(muscleData, heatMode);
+  container.innerHTML = '';
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;gap:4px;justify-content:center;';
+
+  const frontEl = document.createElement('div');
+  frontEl.style.cssText = 'flex:1;max-width:48%;';
+  const backEl = document.createElement('div');
+  backEl.style.cssText = 'flex:1;max-width:48%;';
+
+  wrap.appendChild(frontEl);
+  wrap.appendChild(backEl);
+  container.appendChild(wrap);
+
+  const frontChart = new lib.BodyChart(frontEl, {
+    view: lib.ViewSide.FRONT,
+    bodyState,
+    enableTransitions: false,
+  });
+  const backChart = new lib.BodyChart(backEl, {
+    view: lib.ViewSide.BACK,
+    bodyState,
+    enableTransitions: false,
+  });
+
+  return { frontChart, backChart };
+}
+
+// Legacy shim — keep old call signature working
+function buildMuscleMapSVG() { return ''; }
+function buildMusclDataFromExercises(exercises, heatMode) {
+  const data = {};
+  (exercises || []).forEach(ex => {
+    const pm = ex.primaryMuscle;
+    if (!pm) return;
+    if (heatMode) {
+      const sets = Array.isArray(ex.sets)
+        ? ex.sets.filter(s => s.logged || s.state === 'logged').length || 1
+        : (ex.sets || 1);
+      data[pm] = (data[pm] || 0) + sets;
+    } else {
+      data[pm] = 1;
+    }
+  });
+  return data;
+}
+
+const MUSCLE_MAP_REGIONS = {
+  'Upper Pecs':          { cx:78,  cy:106, rx:17, ry:11, side:'front' },
+  'Lower Pecs':          { cx:78,  cy:120, rx:14, ry:8,  side:'front' },
+  'Pecs':                { cx:78,  cy:112, rx:17, ry:16, side:'front' },
+  'Front Delts':         { cx:44,  cy:100, rx:10, ry:10, side:'front' },
+  'Side Delts':          { cx:38,  cy:109, rx:9,  ry:10, side:'front' },
+  'Biceps':              { cx:36,  cy:130, rx:8,  ry:14, side:'front' },
+  'Brachialis':          { cx:36,  cy:145, rx:7,  ry:7,  side:'front' },
+  'Brachioradialis':     { cx:35,  cy:157, rx:6,  ry:8,  side:'front' },
+  'Abs':                 { cx:78,  cy:145, rx:12, ry:20, side:'front' },
+  'Obliques':            { cx:63,  cy:148, rx:8,  ry:16, side:'front' },
+  'Transverse Abdominis':{ cx:78,  cy:155, rx:10, ry:10, side:'front' },
+  'Quads':               { cx:72,  cy:218, rx:14, ry:27, side:'front' },
+  'Hip Flexors':         { cx:78,  cy:185, rx:10, ry:9,  side:'front' },
+  'Adductors':           { cx:84,  cy:218, rx:7,  ry:20, side:'front' },
+  'Calves':              { cx:72,  cy:288, rx:9,  ry:17, side:'front' },
+  'Lats':                { cx:128, cy:128, rx:15, ry:22, side:'back' },
+  'Traps':               { cx:122, cy:97,  rx:17, ry:11, side:'back' },
+  'Rhomboids':           { cx:122, cy:111, rx:11, ry:9,  side:'back' },
+  'Rear Delts':          { cx:158, cy:100, rx:10, ry:10, side:'back' },
+  'Erectors':            { cx:122, cy:148, rx:7,  ry:18, side:'back' },
+  'Triceps Long Head':   { cx:162, cy:128, rx:7,  ry:13, side:'back' },
+  'Triceps Lateral Head':{ cx:156, cy:133, rx:6,  ry:11, side:'back' },
+  'Triceps Medial Head': { cx:160, cy:143, rx:5,  ry:7,  side:'back' },
+  'Triceps':             { cx:160, cy:133, rx:8,  ry:16, side:'back' },
+  'Hamstrings':          { cx:126, cy:218, rx:14, ry:27, side:'back' },
+  'Glutes':              { cx:122, cy:184, rx:17, ry:15, side:'back' },
+};
+
+const BODY_SVG_FRONT = `
+  <ellipse cx="74" cy="72" rx="12" ry="13" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <rect x="70" y="83" width="8" height="8" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M55,90 Q50,95 50,150 L50,175 Q55,180 74,180 Q93,180 98,175 L98,150 Q98,95 93,90 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M55,175 Q48,185 50,200 L98,200 Q100,185 93,175 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M55,92 Q44,95 40,120 Q38,140 38,165 Q42,168 46,165 Q48,140 50,120 Q52,100 58,95 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M93,92 Q104,95 108,120 Q110,140 110,165 Q106,168 102,165 Q100,140 98,120 Q96,100 90,95 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M40,162 Q38,180 40,200 Q43,202 46,200 Q48,180 46,162 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M108,162 Q110,180 108,200 Q105,202 102,200 Q100,180 102,162 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M56,198 Q52,210 52,260 Q54,275 60,275 Q66,275 68,260 Q70,210 70,198 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M82,198 Q86,210 96,260 Q94,275 88,275 Q82,275 80,260 Q78,210 78,198 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M52,272 Q50,295 54,312 Q58,316 63,312 Q67,295 66,272 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M82,272 Q80,295 84,312 Q88,316 93,312 Q97,295 96,272 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>`;
+
+const BODY_SVG_BACK = `
+  <ellipse cx="128" cy="72" rx="12" ry="13" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <rect x="124" y="83" width="8" height="8" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M109,90 Q104,95 104,150 L104,175 Q109,180 128,180 Q147,180 152,175 L152,150 Q152,95 147,90 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M109,175 Q102,185 104,200 L152,200 Q154,185 147,175 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M109,92 Q98,95 94,120 Q92,140 92,165 Q96,168 100,165 Q102,140 104,120 Q106,100 112,95 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M147,92 Q158,95 162,120 Q164,140 164,165 Q160,168 156,165 Q154,140 152,120 Q150,100 144,95 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M94,162 Q92,180 94,200 Q97,202 100,200 Q102,180 100,162 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M162,162 Q164,180 162,200 Q159,202 156,200 Q154,180 156,162 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M110,198 Q106,210 106,260 Q108,275 114,275 Q120,275 122,260 Q124,210 124,198 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M146,198 Q150,210 150,260 Q148,275 142,275 Q136,275 134,260 Q132,210 132,198 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M106,272 Q104,295 108,312 Q112,316 117,312 Q121,295 120,272 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
+  <path d="M136,272 Q134,295 138,312 Q142,316 147,312 Q151,295 150,272 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>`;
+
+/**
+ * Build muscle map SVG string.
+ * @param {Object} muscleData - { 'Quads': 1 } for binary, or { 'Quads': 24 } for heat
+ * @param {boolean} heatMode - if true, scale opacity by value magnitude
+ */
+function buildMuscleMapSVG(muscleData, heatMode = false) {
+  const vals = Object.values(muscleData).filter(v => v > 0);
+  const maxVal = vals.length ? Math.max(...vals) : 1;
+
+  function fillOpacity(val) {
+    if (!val) return 0.06;
+    if (!heatMode) return 0.75;
+    return 0.15 + (val / maxVal) * 0.75;
+  }
+  function strokeOpacity(val) {
+    if (!val) return 0.10;
+    if (!heatMode) return 0.60;
+    return 0.20 + (val / maxVal) * 0.50;
+  }
+
+  const ellipses = Object.entries(MUSCLE_MAP_REGIONS).map(([name, r]) => {
+    const val = muscleData[name] || 0;
+    const fo = fillOpacity(val);
+    const so = strokeOpacity(val);
+    const sw = val > 0 ? '1.2' : '0.5';
+    return `<ellipse cx="${r.cx}" cy="${r.cy}" rx="${r.rx}" ry="${r.ry}" fill="rgba(200,240,110,${fo})" stroke="rgba(200,240,110,${so})" stroke-width="${sw}"/>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 200 335" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <text x="74" y="52" text-anchor="middle" fill="rgba(241,236,226,0.25)" font-size="8" font-family="JetBrains Mono,monospace" letter-spacing="1.5">FRONT</text>
+    <text x="128" y="52" text-anchor="middle" fill="rgba(241,236,226,0.25)" font-size="8" font-family="JetBrains Mono,monospace" letter-spacing="1.5">BACK</text>
+    ${BODY_SVG_FRONT}${BODY_SVG_BACK}${ellipses}
+  </svg>`;
+}
+
+/**
+ * Build muscle data object from a list of exercises.
+ * Returns { primaryMuscle: count } for heat mode, or { primaryMuscle: 1 } for binary.
+ */
+function buildMusclDataFromExercises(exercises, heatMode = false) {
+  const data = {};
+  (exercises || []).forEach(ex => {
+    const pm = ex.primaryMuscle;
+    if (!pm) return;
+    if (heatMode) {
+      const sets = Array.isArray(ex.sets)
+        ? ex.sets.filter(s => s.logged || s.state === 'logged').length || ex.sets
+        : (ex.sets || 1);
+      data[pm] = (data[pm] || 0) + (typeof sets === 'number' ? sets : 1);
+    } else {
+      data[pm] = 1;
+    }
+  });
+  return data;
+}
   if (!USER_ID || USER_ID === 'pending') return;
   localStorage.setItem(`sg_splits_${USER_ID}`, JSON.stringify(_splits));
   // Upsert each split individually and log any errors
@@ -2077,6 +2328,22 @@ function renderRoutines() {
         <span class="routine-chevron">›</span>
       </div>
       <div class="routine-card-body">
+        ${(() => {
+          const allEx = load(SK.exercises) || [];
+          const muscleData = {};
+          r.exercises.forEach(ex => {
+            const libEx = allEx.find(e => e.id === ex.id || e.name === ex.name);
+            const pm = libEx?.primaryMuscle || ex.primaryMuscle;
+            if (pm) muscleData[pm] = 1;
+          });
+          const hasPrimary = Object.keys(muscleData).length > 0;
+          const mapId = `routine-map-${r.id}`;
+          if (hasPrimary) {
+            setTimeout(() => renderMuscleMap(mapId, muscleData, false), 0);
+            return `<div id="${mapId}" class="routine-muscle-map"></div>`;
+          }
+          return '';
+        })()}
         ${r.exercises.map(ex => `
           <div class="routine-ex-item">
             <div class="routine-ex-info">
@@ -3539,8 +3806,55 @@ function renderStats() {
 
 function renderOverview(sessions, fromDate, toDate) {
   renderKPIs(sessions, fromDate, toDate);
-  renderMuscleBars(sessions);
+  renderStatsBodyMap(sessions);
   renderWeeklyFreqChart(sessions, fromDate, toDate);
+}
+
+function renderStatsBodyMap(sessions) {
+  const muscleData = {};
+  const allEx = load(SK.exercises) || [];
+  sessions.forEach(s => {
+    (s.exercises || []).forEach(ex => {
+      const libEx = allEx.find(e => e.id === ex.id || e.name === ex.name);
+      const pm = libEx?.primaryMuscle || ex.primaryMuscle;
+      if (!pm) return;
+      const logged = Array.isArray(ex.sets) ? ex.sets.filter(st => st.logged).length : (ex.sets || 1);
+      muscleData[pm] = (muscleData[pm] || 0) + logged;
+    });
+  });
+
+  // Find or create the stats body map card — replaces muscle bars
+  let mapCard = document.getElementById('stats-body-map-card');
+  if (!mapCard) {
+    const overviewTab = document.getElementById('stats-tab-overview');
+    if (!overviewTab) return;
+    mapCard = document.createElement('div');
+    mapCard.id = 'stats-body-map-card';
+    mapCard.className = 'stat-card';
+    mapCard.style.marginBottom = '8px';
+    // Insert before the first stat-card in the overview (replaces muscle bars card)
+    const firstCard = overviewTab.querySelector('.stat-card');
+    if (firstCard) overviewTab.insertBefore(mapCard, firstCard);
+    else overviewTab.prepend(mapCard);
+  }
+
+  const hasPrimary = Object.keys(muscleData).length > 0;
+  mapCard.innerHTML = `
+    <div class="stat-card-title">Primary muscle heat map</div>
+    ${hasPrimary ? `
+      <div id="stats-body-map-inner" class="stats-body-map"></div>
+      <div class="stats-map-legend">
+        <span class="legend-dot" style="background:rgba(255,180,0,0.3)"></span><span>Low</span>
+        <span class="legend-dot" style="background:rgba(255,120,0,0.65)"></span><span>Med</span>
+        <span class="legend-dot" style="background:#ff4500"></span><span>High</span>
+      </div>` : `
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(241,236,226,0.28);letter-spacing:0.06em;padding:8px 0;">
+        Set primary muscles on exercises to see the heat map
+      </div>`}`;
+
+  if (hasPrimary) {
+    setTimeout(() => renderMuscleMap('stats-body-map-inner', muscleData, true), 0);
+  }
 }
 
 
