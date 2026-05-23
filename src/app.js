@@ -4540,7 +4540,7 @@ function appendRoutinePreview(routine) {
   container.scrollTop = container.scrollHeight;
 }
 
-function saveCoachRoutine(btn) {
+async function saveCoachRoutine(btn) {
   try {
     const routine = JSON.parse(btn.dataset.routine);
     const allEx = load(SK.exercises) || [];
