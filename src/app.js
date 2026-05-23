@@ -255,7 +255,7 @@ async function supabaseFetch(table, params = '', method = 'GET', body = null) {
       const parsed = JSON.parse(stored);
       token = parsed.access_token || parsed[0]?.access_token || SUPA_KEY;
     }
-  } catch(e) { /* use anon key */ }
+  } catch(e) {}
 
   // Split table from params if params contains on_conflict (upsert)
   const isUpsert = params.includes('on_conflict');
@@ -3070,7 +3070,7 @@ function saveInventory() {
       updated_at: new Date().toISOString(),
     })
   );
-  Promise.all(upserts).catch(() => { /* offline — localStorage already saved */ });
+  Promise.all(upserts).catch(() => {});
 }
 
 async function loadInventoryFromCloud() {
