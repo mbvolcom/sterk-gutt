@@ -3,6 +3,8 @@
 // Future: split into db.js, ui/workout.js, ui/routines.js etc.
 
 import { createClient } from '@supabase/supabase-js';
+import * as BodyMuscles from 'body-muscles';
+window.BodyMuscles = BodyMuscles;
 
 // Re-export createClient so the rest of the file can use sb directly
 const SUPA_URL = 'https://fzbovpdnpvsfdnxyftqv.supabase.co';
@@ -4803,10 +4805,11 @@ function appendCoachMsg(role, text) {
   if (!container) return;
   const div = document.createElement('div');
   div.className = `coach-msg ${role}`;
-  // Convert markdown-ish *text* to <em> and **text** to <strong>
+  const boldRe = /\*{2}(.+?)\*{2}/g;
+  const italRe = /\*(.+?)\*/g;
   const html = text
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(boldRe, '<strong>$1</strong>')
+    .replace(italRe, '<em>$1</em>')
     .replace(/\n/g, '<br>');
   div.innerHTML = role === 'assistant'
     ? `<div class="coach-avatar">AI</div><div class="coach-msg-bubble">${html}</div>`
