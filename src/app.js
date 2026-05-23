@@ -2155,58 +2155,6 @@ const BODY_SVG_BACK = `
 /**
  * Build muscle map SVG string.
  * @param {Object} muscleData - { 'Quads': 1 } for binary, or { 'Quads': 24 } for heat
- * @param {boolean} heatMode - if true, scale opacity by value magnitude
- */
-function buildMuscleMapSVG(muscleData, heatMode = false) {
-  const vals = Object.values(muscleData).filter(v => v > 0);
-  const maxVal = vals.length ? Math.max(...vals) : 1;
-
-  function fillOpacity(val) {
-    if (!val) return 0.06;
-    if (!heatMode) return 0.75;
-    return 0.15 + (val / maxVal) * 0.75;
-  }
-  function strokeOpacity(val) {
-    if (!val) return 0.10;
-    if (!heatMode) return 0.60;
-    return 0.20 + (val / maxVal) * 0.50;
-  }
-
-  const ellipses = Object.entries(MUSCLE_MAP_REGIONS).map(([name, r]) => {
-    const val = muscleData[name] || 0;
-    const fo = fillOpacity(val);
-    const so = strokeOpacity(val);
-    const sw = val > 0 ? '1.2' : '0.5';
-    return `<ellipse cx="${r.cx}" cy="${r.cy}" rx="${r.rx}" ry="${r.ry}" fill="rgba(200,240,110,${fo})" stroke="rgba(200,240,110,${so})" stroke-width="${sw}"/>`;
-  }).join('');
-
-  return `<svg viewBox="0 0 200 335" width="100%" xmlns="http://www.w3.org/2000/svg">
-    <text x="74" y="52" text-anchor="middle" fill="rgba(241,236,226,0.25)" font-size="8" font-family="JetBrains Mono,monospace" letter-spacing="1.5">FRONT</text>
-    <text x="128" y="52" text-anchor="middle" fill="rgba(241,236,226,0.25)" font-size="8" font-family="JetBrains Mono,monospace" letter-spacing="1.5">BACK</text>
-    ${BODY_SVG_FRONT}${BODY_SVG_BACK}${ellipses}
-  </svg>`;
-}
-
-/**
- * Build muscle data object from a list of exercises.
- * Returns { primaryMuscle: count } for heat mode, or { primaryMuscle: 1 } for binary.
- */
-function buildMusclDataFromExercises(exercises, heatMode = false) {
-  const data = {};
-  (exercises || []).forEach(ex => {
-    const pm = ex.primaryMuscle;
-    if (!pm) return;
-    if (heatMode) {
-      const sets = Array.isArray(ex.sets)
-        ? ex.sets.filter(s => s.logged || s.state === 'logged').length || ex.sets
-        : (ex.sets || 1);
-      data[pm] = (data[pm] || 0) + (typeof sets === 'number' ? sets : 1);
-    } else {
-      data[pm] = 1;
-    }
-  });
-  return data;
-}
 
 function saveSplits() {
   if (!USER_ID || USER_ID === 'pending') return;
