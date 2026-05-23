@@ -2008,11 +2008,11 @@ function getBodyMusclesLib() {
   return null;
 }
 
-/**
- * Build a bodyState object for body-muscles library from muscle data.
- * @param {Object} muscleData - { 'Quads': 24, 'Pecs': 12, ... }
- * @param {boolean} heatMode - scale 0-10 by relative volume, or binary 0/10
- */
+ //
+ // Build a bodyState object for body-muscles library from muscle data.
+ // @param {Object} muscleData - { 'Quads': 24, 'Pecs': 12, ... }
+ // @param {boolean} heatMode - scale 0-10 by relative volume, or binary 0/10
+
 function buildBodyState(muscleData, heatMode) {
   const bodyState = {};
   const vals = Object.values(muscleData).filter(v => v > 0);
@@ -2035,10 +2035,10 @@ function buildBodyState(muscleData, heatMode) {
   return bodyState;
 }
 
-/**
- * Render a muscle map into a container div using body-muscles library.
- * Returns { frontChart, backChart } or null if library not available.
- */
+ //
+ // Render a muscle map into a container div using body-muscles library.
+ // Returns { frontChart, backChart } or null if library not available.
+
 function renderMuscleMap(containerId, muscleData, heatMode = false) {
   const container = document.getElementById(containerId);
   if (!container) return null;
@@ -2154,9 +2154,9 @@ const BODY_SVG_BACK = `
   <path d="M106,272 Q104,295 108,312 Q112,316 117,312 Q121,295 120,272 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
   <path d="M136,272 Q134,295 138,312 Q142,316 147,312 Q151,295 150,272 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>`;
 
-/**
- * Build muscle map SVG string.
- * @param {Object} muscleData - { 'Quads': 1 } for binary, or { 'Quads': 24 } for heat
+ //
+ // Build muscle map SVG string.
+ // @param {Object} muscleData - { 'Quads': 1 } for binary, or { 'Quads': 24 } for heat
 
 function saveSplits() {
   if (!USER_ID || USER_ID === 'pending') return;
