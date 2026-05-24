@@ -1411,3 +1411,142 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
   border-color: rgba(200,240,110,0.6);
   color: #c8f06e;
 }
+
+/* ══ MUSCLE MAP — tooltip, expand button, fullscreen ════════════════════ */
+
+/* Tooltip — shown on muscle click */
+.muscle-map-tooltip {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #c8f06e;
+  color: #0a0907;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  pointer-events: none;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+/* Expand button */
+.muscle-map-expand-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 1px solid rgba(200,240,110,0.25);
+  color: rgba(200,240,110,0.55);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  cursor: pointer;
+  margin: 0 auto 10px;
+  display: flex;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.12s, color 0.12s;
+}
+.muscle-map-expand-btn:active { border-color: #c8f06e; color: #c8f06e; }
+
+/* Fullscreen overlay */
+.muscle-map-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #0a0907;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.muscle-map-fs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+.muscle-map-fs-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f4efe5;
+}
+.muscle-map-fs-close {
+  background: none;
+  border: none;
+  color: rgba(241,236,226,0.45);
+  font-size: 22px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.muscle-map-fs-tooltip {
+  text-align: center;
+  padding: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c8f06e;
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.muscle-map-fs-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  padding: 8px;
+  gap: 8px;
+}
+.muscle-map-fs-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+.muscle-map-fs-lbl {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: rgba(200,240,110,0.3);
+  text-align: center;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.muscle-map-fs-col > div:last-child {
+  flex: 1;
+  overflow: hidden;
+}
+.muscle-map-fs-col > div:last-child svg,
+.muscle-map-fs-col > div:last-child > div {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.muscle-map-fs-hint {
+  text-align: center;
+  padding: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  color: rgba(241,236,226,0.22);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
