@@ -1400,3 +1400,14 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* Secondary muscle toggle buttons */
+.secondary-btn {
+  opacity: 0.7;
+}
+.secondary-btn.active {
+  opacity: 1;
+  background: rgba(200,240,110,0.15);
+  border-color: rgba(200,240,110,0.6);
+  color: #c8f06e;
+}
