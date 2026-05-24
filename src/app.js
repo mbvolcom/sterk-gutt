@@ -4,9 +4,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import * as BodyMuscles from 'body-muscles';
-import * as BodyHighlighter from 'body-highlighter';
 window.BodyMuscles = BodyMuscles;
-window.BodyHighlighter = BodyHighlighter;
 
 // Re-export createClient so the rest of the file can use sb directly
 const SUPA_URL = 'https://fzbovpdnpvsfdnxyftqv.supabase.co';
@@ -1986,282 +1984,7 @@ let editorExercises = []; // exercises in the routine being edited
 let pickerExIdx = null;   // which slot in editorExercises we're picking for (null = new)
 
 // ═══════════════════════════════════════════
-// MUSCLE BODY MAP — body-highlighter (primary) + body-muscles (fallback)
 // ═══════════════════════════════════════════
-
-// Maps our primaryMuscle names → body-highlighter slugs
-const PM_TO_BH_SLUG = {
-  'Upper Pecs':           'chest',
-  'Lower Pecs':           'chest',
-  'Pecs':                 'chest',
-  'Front Delts':          'front-deltoids',
-  'Side Delts':           'front-deltoids',
-  'Rear Delts':           'back-deltoids',
-  'Biceps':               'biceps',
-  'Brachialis':           'biceps',
-  'Forearm':              'forearm',
-  'Abs':                  'abs',
-  'Obliques':             'obliques',
-  'Transverse Abdominis': 'abs',
-  'Quads':                'quadriceps',
-  'Adductors':            'adductor',
-  'Hip Flexors':          'abs',
-  'Calves':               'calves',
-  'Lats':                 'upper-back',
-  'Traps':                'trapezius',
-  'Rhomboids':            'upper-back',
-  'Erectors':             'lower-back',
-  'Triceps Long Head':    'triceps',
-  'Triceps Lateral Head': 'triceps',
-  'Triceps Medial Head':  'triceps',
-  'Triceps':              'triceps',
-  'Glutes':               'gluteal',
-  'Hamstrings':           'hamstring',
-};
-
-// Clean label when a slug is clicked
-const BH_SLUG_TO_LABEL = {
-  'chest':           'Pecs',
-  'front-deltoids':  'Front / Side Delts',
-  'back-deltoids':   'Rear Delts',
-  'biceps':          'Biceps',
-  'triceps':         'Triceps',
-  'forearm':         'Forearm',
-  'abs':             'Abs',
-  'obliques':        'Obliques',
-  'quadriceps':      'Quads',
-  'adductor':        'Adductors',
-  'abductors':       'Abductors',
-  'hamstring':       'Hamstrings',
-  'calves':          'Calves',
-  'gluteal':         'Glutes',
-  'upper-back':      'Lats / Rhomboids',
-  'lower-back':      'Erectors',
-  'trapezius':       'Traps',
-  'neck':            'Traps',
-  'head':            'Head',
-};
-
-// Also keep body-muscles mapping as fallback
-const PM_TO_BODY_IDS = {
-  'Upper Pecs':            ['chest-upper-left','chest-upper-right'],
-  'Lower Pecs':            ['chest-lower-left','chest-lower-right'],
-  'Pecs':                  ['chest-upper-left','chest-upper-right','chest-lower-left','chest-lower-right'],
-  'Front Delts':           ['shoulder-front-left','shoulder-front-right'],
-  'Side Delts':            ['shoulder-side-left','shoulder-side-right'],
-  'Rear Delts':            ['deltoid-rear-left','deltoid-rear-right'],
-  'Biceps':                ['biceps-left','biceps-right'],
-  'Brachialis':            ['biceps-left','biceps-right'],
-  'Forearm':               ['forearm-left','forearm-right','forearm-flexors-left','forearm-flexors-right','forearm-extensors-left','forearm-extensors-right'],
-  'Abs':                   ['abs-upper-left','abs-upper-right','abs-lower-left','abs-lower-right'],
-  'Obliques':              ['obliques-left','obliques-right'],
-  'Transverse Abdominis':  ['abs-lower-left','abs-lower-right'],
-  'Quads':                 ['quads-left','quads-right'],
-  'Adductors':             ['adductors-left','adductors-right'],
-  'Hip Flexors':           ['hip-flexor-left','hip-flexor-right'],
-  'Calves':                ['tibialis-anterior-left','tibialis-anterior-right','calves-gastroc-medial-left','calves-gastroc-lateral-left','calves-soleus-left','calves-gastroc-medial-right','calves-gastroc-lateral-right','calves-soleus-right'],
-  'Lats':                  ['lats-upper-left','lats-mid-left','lats-lower-left','lats-upper-right','lats-mid-right','lats-lower-right'],
-  'Traps':                 ['neck-left','neck-right','traps-upper-left','traps-mid-left','traps-lower-left','traps-upper-right','traps-mid-right','traps-lower-right'],
-  'Rhomboids':             ['traps-mid-left','traps-mid-right'],
-  'Erectors':              ['lower-back-erectors-left','lower-back-erectors-right'],
-  'Triceps Long Head':     ['triceps-long-left','triceps-long-right'],
-  'Triceps Lateral Head':  ['triceps-lateral-left','triceps-lateral-right'],
-  'Triceps Medial Head':   ['triceps-lateral-left','triceps-lateral-right'],
-  'Triceps':               ['triceps-long-left','triceps-long-right','triceps-lateral-left','triceps-lateral-right'],
-  'Glutes':                ['gluteus-maximus-left','gluteus-maximus-right','gluteus-medius-left','gluteus-medius-right'],
-  'Hamstrings':            ['hamstrings-medial-left','hamstrings-lateral-left','hamstrings-medial-right','hamstrings-lateral-right'],
-};
-
-const BODY_ID_TO_LABEL = {
-  'chest-upper-left':'Upper Pecs','chest-upper-right':'Upper Pecs',
-  'chest-lower-left':'Lower Pecs','chest-lower-right':'Lower Pecs',
-  'shoulder-front-left':'Front Delts','shoulder-front-right':'Front Delts',
-  'shoulder-side-left':'Side Delts','shoulder-side-right':'Side Delts',
-  'deltoid-rear-left':'Rear Delts','deltoid-rear-right':'Rear Delts',
-  'biceps-left':'Biceps','biceps-right':'Biceps',
-  'forearm-left':'Forearm','forearm-right':'Forearm',
-  'forearm-flexors-left':'Forearm','forearm-flexors-right':'Forearm',
-  'forearm-extensors-left':'Forearm','forearm-extensors-right':'Forearm',
-  'abs-upper-left':'Abs','abs-upper-right':'Abs',
-  'abs-lower-left':'Abs','abs-lower-right':'Abs',
-  'obliques-left':'Obliques','obliques-right':'Obliques',
-  'serratus-anterior-left':'Obliques','serratus-anterior-right':'Obliques',
-  'hip-flexor-left':'Hip Flexors','hip-flexor-right':'Hip Flexors',
-  'quads-left':'Quads','quads-right':'Quads',
-  'adductors-left':'Adductors','adductors-right':'Adductors',
-  'tibialis-anterior-left':'Calves','tibialis-anterior-right':'Calves',
-  'calves-gastroc-medial-left':'Calves','calves-gastroc-lateral-left':'Calves','calves-soleus-left':'Calves',
-  'calves-gastroc-medial-right':'Calves','calves-gastroc-lateral-right':'Calves','calves-soleus-right':'Calves',
-  'neck-left':'Traps','neck-right':'Traps','nape':'Traps',
-  'traps-upper-left':'Traps','traps-mid-left':'Traps','traps-lower-left':'Traps',
-  'traps-upper-right':'Traps','traps-mid-right':'Traps','traps-lower-right':'Traps',
-  'lats-upper-left':'Lats','lats-mid-left':'Lats','lats-lower-left':'Lats',
-  'lats-upper-right':'Lats','lats-mid-right':'Lats','lats-lower-right':'Lats',
-  'lower-back-erectors-left':'Erectors','lower-back-erectors-right':'Erectors',
-  'lower-back-ql-left':'Erectors','lower-back-ql-right':'Erectors',
-  'spine':'Erectors',
-  'triceps-long-left':'Triceps Long Head','triceps-long-right':'Triceps Long Head',
-  'triceps-lateral-left':'Triceps Lateral Head','triceps-lateral-right':'Triceps Lateral Head',
-  'gluteus-maximus-left':'Glutes','gluteus-maximus-right':'Glutes',
-  'gluteus-medius-left':'Glutes','gluteus-medius-right':'Glutes',
-  'hamstrings-medial-left':'Hamstrings','hamstrings-lateral-left':'Hamstrings',
-  'hamstrings-medial-right':'Hamstrings','hamstrings-lateral-right':'Hamstrings',
-  'head':'Head','face':'Face','head-back':'Head',
-  'elbow-left':'Elbow','elbow-right':'Elbow',
-  'knee-left':'Knee','knee-right':'Knee',
-  'hand-left':'Hand','hand-right':'Hand',
-  'foot-left':'Foot','foot-right':'Foot',
-};
-
-function getBHLib() {
-  return (typeof window.BodyHighlighter !== 'undefined') ? window.BodyHighlighter : null;
-}
-
-function getBodyMusclesLib() {
-  if (typeof window.BodyMuscles !== 'undefined') return window.BodyMuscles;
-  return null;
-}
-
-// Build body-highlighter v3 data array from muscle data
-// v3 uses { name, muscles[] } exercise format — frequency drives color intensity
-function buildBHData(muscleData, secondaryData, heatMode) {
-  const exercises = [];
-  const vals = Object.values(muscleData).filter(v => v > 0);
-  const maxVal = vals.length ? Math.max(...vals) : 1;
-
-  // Primary muscles — add multiple entries to simulate intensity via frequency
-  Object.entries(muscleData).forEach(([pm, val]) => {
-    const slug = PM_TO_BH_SLUG[pm];
-    if (!slug || !val) return;
-    const freq = heatMode ? Math.max(1, Math.round((val / maxVal) * 3)) : 3;
-    for (let i = 0; i < freq; i++) {
-      exercises.push({ name: pm + '_' + i, muscles: [slug] });
-    }
-  });
-
-  // Secondary muscles — add once at low frequency
-  Object.entries(secondaryData || {}).forEach(([pm, val]) => {
-    const slug = PM_TO_BH_SLUG[pm];
-    if (!slug || !val) return;
-    // Don't add if already covered by primary
-    const alreadyPrimary = Object.keys(muscleData).some(p => PM_TO_BH_SLUG[p] === slug);
-    if (!alreadyPrimary) {
-      exercises.push({ name: pm + '_sec', muscles: [slug] });
-    }
-  });
-
-  return exercises;
-}
-
-// Build body-muscles bodyState (fallback)
-function buildBodyState(muscleData, secondaryMuscleData, heatMode) {
-  const bodyState = {};
-  const vals = Object.values(muscleData).filter(v => v > 0);
-  const maxVal = vals.length ? Math.max(...vals) : 1;
-  Object.entries(muscleData).forEach(([pm, val]) => {
-    if (!val) return;
-    const ids = PM_TO_BODY_IDS[pm];
-    if (!ids) return;
-    const intensity = heatMode ? Math.max(1, Math.round((val / maxVal) * 10)) : 10;
-    ids.forEach(id => {
-      if (!bodyState[id] || bodyState[id].intensity < intensity)
-        bodyState[id] = { intensity, selected: false };
-    });
-  });
-  Object.entries(secondaryMuscleData || {}).forEach(([pm, val]) => {
-    if (!val) return;
-    const ids = PM_TO_BODY_IDS[pm];
-    if (!ids) return;
-    const intensity = heatMode ? Math.max(1, Math.round((val / maxVal) * 5)) : 5;
-    ids.forEach(id => { if (!bodyState[id]) bodyState[id] = { intensity, selected: false }; });
-  });
-  return bodyState;
-}
-
-function renderMuscleMap(containerId, muscleData, heatMode = false, secondaryData = {}) {
-  const container = document.getElementById(containerId);
-  if (!container) return null;
-
-  const bhLib = getBHLib();
-  const bmLib = getBodyMusclesLib();
-
-  if (!bhLib && !bmLib) {
-    container.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(241,236,226,0.28);letter-spacing:0.06em;padding:12px 0;text-align:center;">Set primary muscles on exercises to enable the body map</div>`;
-    return null;
-  }
-
-  container.innerHTML = '';
-  container.style.position = 'relative';
-
-  // Tooltip
-  const tooltip = document.createElement('div');
-  tooltip.className = 'muscle-map-tooltip';
-  tooltip.style.display = 'none';
-  container.appendChild(tooltip);
-
-  // Expand button
-  const expandBtn = document.createElement('button');
-  expandBtn.className = 'muscle-map-expand-btn';
-  expandBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg> Expand`;
-  expandBtn.onclick = () => openFullscreenMap(muscleData, secondaryData, heatMode);
-  container.appendChild(expandBtn);
-
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'display:flex;gap:4px;justify-content:center;';
-  container.appendChild(wrap);
-
-  // Use body-highlighter if available
-  if (bhLib) {
-    return _renderBH(wrap, tooltip, muscleData, secondaryData, heatMode, bhLib);
-  }
-  // Fallback to body-muscles
-  return _renderBM(wrap, tooltip, muscleData, secondaryData, heatMode, bmLib);
-}
-
-function _renderBH(wrap, tooltip, muscleData, secondaryData, heatMode, bhLib) {
-  const data = buildBHData(muscleData, secondaryData, heatMode);
-  let selectedSlug = null;
-
-  const colors = ['rgba(200,240,110,0.25)', 'rgba(200,240,110,0.55)', '#c8f06e'];
-  const bodyColor = '#1a1f12';
-
-  const frontEl = document.createElement('div');
-  frontEl.style.cssText = 'flex:1;max-width:48%;';
-  const backEl = document.createElement('div');
-  backEl.style.cssText = 'flex:1;max-width:48%;';
-  wrap.appendChild(frontEl);
-  wrap.appendChild(backEl);
-
-  function onMuscleClick({ muscle }) {
-    const label = BH_SLUG_TO_LABEL[muscle] || muscle;
-    if (selectedSlug === muscle) {
-      selectedSlug = null;
-      tooltip.style.display = 'none';
-      frontChart.update({ data });
-      backChart.update({ data });
-    } else {
-      selectedSlug = muscle;
-      tooltip.textContent = label;
-      tooltip.style.display = 'block';
-      // Highlight selected in blue by adding it with a custom color via extra entry
-      const highlighted = data.filter(d => !d.muscles.includes(selectedSlug));
-      highlighted.push({ name: '__selected__', muscles: [selectedSlug] });
-      frontChart.update({ data: highlighted, highlightedColors: ['#60c8f0'] });
-      backChart.update({ data: highlighted, highlightedColors: ['#60c8f0'] });
-    }
-  }
-
-  const frontChart = bhLib.createBodyHighlighter({
-    container: frontEl, data, type: bhLib.ModelType.ANTERIOR,
-    highlightedColors: colors, bodyColor, onClick: onMuscleClick,
-  });
-  const backChart = bhLib.createBodyHighlighter({
-    container: backEl, data, type: bhLib.ModelType.POSTERIOR,
-    highlightedColors: colors, bodyColor, onClick: onMuscleClick,
-  });
-
-  return { frontChart, backChart };
-}
 
 function _renderBM(wrap, tooltip, muscleData, secondaryData, heatMode, lib) {
   const bodyState = buildBodyState(muscleData, secondaryData, heatMode);
@@ -2300,9 +2023,8 @@ function _renderBM(wrap, tooltip, muscleData, secondaryData, heatMode, lib) {
 }
 
 function openFullscreenMap(muscleData, secondaryData, heatMode) {
-  const bhLib = getBHLib();
-  const bmLib = getBodyMusclesLib();
-  if (!bhLib && !bmLib) return;
+  const lib = getBodyMusclesLib();
+  if (!lib) return;
 
   const overlay = document.createElement('div');
   overlay.className = 'muscle-map-fullscreen';
@@ -2323,56 +2045,42 @@ function openFullscreenMap(muscleData, secondaryData, heatMode) {
     const frontEl = document.getElementById('fs-front');
     const backEl  = document.getElementById('fs-back');
     const tt = document.getElementById('fs-tooltip');
+    const bodyState = buildBodyState(muscleData, secondaryData, heatMode);
+    let selectedLabel = null;
+    let fsFront, fsBack;
 
-    if (bhLib) {
-      const data = buildBHData(muscleData, secondaryData, heatMode);
-      const colors = ['rgba(200,240,110,0.25)', 'rgba(200,240,110,0.55)', '#c8f06e'];
-      const bodyColor = '#1a1f12';
-      let selectedSlug = null;
-
-      function onMuscleClick({ muscle }) {
-        const label = BH_SLUG_TO_LABEL[muscle] || muscle;
-        if (selectedSlug === muscle) {
-          selectedSlug = null;
-          tt.style.display = 'none';
-          fsFront.update({ data, highlightedColors: colors });
-          fsBack.update({ data, highlightedColors: colors });
-        } else {
-          selectedSlug = muscle;
-          tt.textContent = label;
-          tt.style.display = 'block';
-          const highlighted = data.filter(d => !d.muscles.includes(selectedSlug));
-          highlighted.push({ name: '__selected__', muscles: [selectedSlug] });
-          fsFront.update({ data: highlighted, highlightedColors: ['#60c8f0'] });
-          fsBack.update({ data: highlighted, highlightedColors: ['#60c8f0'] });
-        }
-      }
-
-      const fsFront = bhLib.createBodyHighlighter({ container: frontEl, data, type: bhLib.ModelType.ANTERIOR, highlightedColors: colors, bodyColor, onClick: onMuscleClick });
-      const fsBack  = bhLib.createBodyHighlighter({ container: backEl,  data, type: bhLib.ModelType.POSTERIOR, highlightedColors: colors, bodyColor, onClick: onMuscleClick });
-    } else {
-      const bodyState = buildBodyState(muscleData, secondaryData, heatMode);
-      let selectedLabel = null;
-      let fsFront, fsBack;
-
-      function onMuscleClick(id) {
-        const label = BODY_ID_TO_LABEL[id] || id;
-        if (selectedLabel === label) { selectedLabel = null; tt.style.display = 'none'; }
-        else { selectedLabel = label; tt.textContent = label; tt.style.display = 'block'; }
-        const newState = { ...bodyState };
-        Object.entries(BODY_ID_TO_LABEL).forEach(([bid, blabel]) => {
-          if (newState[bid]) newState[bid] = { ...newState[bid], selected: blabel === selectedLabel };
-          else if (blabel === selectedLabel) newState[bid] = { intensity: 0, selected: true };
-        });
-        fsFront.update({ bodyState: newState });
-        fsBack.update({ bodyState: newState });
-      }
-
-      fsFront = new bmLib.BodyChart(frontEl, { view: bmLib.ViewSide.FRONT, bodyState, enableTransitions: false, onMuscleClick });
-      fsBack  = new bmLib.BodyChart(backEl,  { view: bmLib.ViewSide.BACK,  bodyState, enableTransitions: false, onMuscleClick });
+    function onMuscleClick(id) {
+      const label = BODY_ID_TO_LABEL[id] || id;
+      if (selectedLabel === label) { selectedLabel = null; tt.style.display = 'none'; }
+      else { selectedLabel = label; tt.textContent = label; tt.style.display = 'block'; }
+      const newState = { ...bodyState };
+      Object.entries(BODY_ID_TO_LABEL).forEach(([bid, blabel]) => {
+        if (newState[bid]) newState[bid] = { ...newState[bid], selected: blabel === selectedLabel };
+        else if (blabel === selectedLabel) newState[bid] = { intensity: 0, selected: true };
+      });
+      fsFront.update({ bodyState: newState });
+      fsBack.update({ bodyState: newState });
     }
+
+    fsFront = new lib.BodyChart(frontEl, { view: lib.ViewSide.FRONT, bodyState, enableTransitions: false, onMuscleClick });
+    fsBack  = new lib.BodyChart(backEl,  { view: lib.ViewSide.BACK,  bodyState, enableTransitions: false, onMuscleClick });
   }, 50);
 }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'muscle-map-fullscreen';
+  overlay.innerHTML = `
+    <div class="muscle-map-fs-header">
+      <span class="muscle-map-fs-title">Muscle Map</span>
+      <button class="muscle-map-fs-close" onclick="this.closest('.muscle-map-fullscreen').remove()">✕</button>
+    </div>
+    <div class="muscle-map-fs-tooltip" id="fs-tooltip" style="display:none;"></div>
+    <div class="muscle-map-fs-body">
+      <div class="muscle-map-fs-col"><div class="muscle-map-fs-lbl">FRONT</div><div id="fs-front"></div></div>
+      <div class="muscle-map-fs-col"><div class="muscle-map-fs-lbl">BACK</div><div id="fs-back"></div></div>
+    </div>
+    <div class="muscle-map-fs-hint">Tap any muscle to see its name</div>`;
+  document.body.appendChild(overlay);
 function saveSplits() {
   if (!USER_ID || USER_ID === 'pending') return;
   localStorage.setItem(`sg_splits_${USER_ID}`, JSON.stringify(_splits));
