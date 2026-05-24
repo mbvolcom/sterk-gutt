@@ -2122,28 +2122,35 @@ function getBodyMusclesLib() {
   return null;
 }
 
-// Build body-highlighter data array from muscle data
-// Primary = full intensity (3), secondary = half (1-2)
+// Build body-highlighter v3 data array from muscle data
+// v3 uses { name, muscles[] } exercise format — frequency drives color intensity
 function buildBHData(muscleData, secondaryData, heatMode) {
-  const slugMap = {};
+  const exercises = [];
   const vals = Object.values(muscleData).filter(v => v > 0);
   const maxVal = vals.length ? Math.max(...vals) : 1;
 
+  // Primary muscles — add multiple entries to simulate intensity via frequency
   Object.entries(muscleData).forEach(([pm, val]) => {
     const slug = PM_TO_BH_SLUG[pm];
-    if (!slug) return;
-    const intensity = heatMode ? Math.max(1, Math.round((val / maxVal) * 3)) : 3;
-    if (!slugMap[slug] || slugMap[slug] < intensity) slugMap[slug] = intensity;
+    if (!slug || !val) return;
+    const freq = heatMode ? Math.max(1, Math.round((val / maxVal) * 3)) : 3;
+    for (let i = 0; i < freq; i++) {
+      exercises.push({ name: pm + '_' + i, muscles: [slug] });
+    }
   });
 
+  // Secondary muscles — add once at low frequency
   Object.entries(secondaryData || {}).forEach(([pm, val]) => {
     const slug = PM_TO_BH_SLUG[pm];
-    if (!slug || slugMap[slug]) return;
-    const intensity = heatMode ? 1 : 2;
-    slugMap[slug] = intensity;
+    if (!slug || !val) return;
+    // Don't add if already covered by primary
+    const alreadyPrimary = Object.keys(muscleData).some(p => PM_TO_BH_SLUG[p] === slug);
+    if (!alreadyPrimary) {
+      exercises.push({ name: pm + '_sec', muscles: [slug] });
+    }
   });
 
-  return Object.entries(slugMap).map(([slug, intensity]) => ({ slug, intensity }));
+  return exercises;
 }
 
 // Build body-muscles bodyState (fallback)
@@ -2215,7 +2222,6 @@ function _renderBH(wrap, tooltip, muscleData, secondaryData, heatMode, bhLib) {
   const data = buildBHData(muscleData, secondaryData, heatMode);
   let selectedSlug = null;
 
-  // Lime heat colours: intensity 1=dim, 2=mid, 3=bright
   const colors = ['rgba(200,240,110,0.25)', 'rgba(200,240,110,0.55)', '#c8f06e'];
   const bodyColor = '#1a1f12';
 
@@ -2231,22 +2237,18 @@ function _renderBH(wrap, tooltip, muscleData, secondaryData, heatMode, bhLib) {
     if (selectedSlug === muscle) {
       selectedSlug = null;
       tooltip.style.display = 'none';
+      frontChart.update({ data });
+      backChart.update({ data });
     } else {
       selectedSlug = muscle;
       tooltip.textContent = label;
       tooltip.style.display = 'block';
+      // Highlight selected in blue by adding it with a custom color via extra entry
+      const highlighted = data.filter(d => !d.muscles.includes(selectedSlug));
+      highlighted.push({ name: '__selected__', muscles: [selectedSlug] });
+      frontChart.update({ data: highlighted, highlightedColors: ['#60c8f0'] });
+      backChart.update({ data: highlighted, highlightedColors: ['#60c8f0'] });
     }
-    // Re-render with selected slug highlighted blue
-    const selectedColor = '#60c8f0';
-    const updatedData = data.map(d => d.slug === selectedSlug
-      ? { ...d, color: selectedColor }
-      : d
-    );
-    if (selectedSlug && !updatedData.find(d => d.slug === selectedSlug)) {
-      updatedData.push({ slug: selectedSlug, intensity: 3, color: selectedColor });
-    }
-    frontChart.update({ data: updatedData });
-    backChart.update({ data: updatedData });
   }
 
   const frontChart = bhLib.createBodyHighlighter({
@@ -2321,22 +2323,29 @@ function openFullscreenMap(muscleData, secondaryData, heatMode) {
     const frontEl = document.getElementById('fs-front');
     const backEl  = document.getElementById('fs-back');
     const tt = document.getElementById('fs-tooltip');
-    let selectedSlug = null;
 
     if (bhLib) {
       const data = buildBHData(muscleData, secondaryData, heatMode);
       const colors = ['rgba(200,240,110,0.25)', 'rgba(200,240,110,0.55)', '#c8f06e'];
       const bodyColor = '#1a1f12';
+      let selectedSlug = null;
 
       function onMuscleClick({ muscle }) {
         const label = BH_SLUG_TO_LABEL[muscle] || muscle;
-        if (selectedSlug === muscle) { selectedSlug = null; tt.style.display = 'none'; }
-        else { selectedSlug = muscle; tt.textContent = label; tt.style.display = 'block'; }
-        const updatedData = data.map(d => d.slug === selectedSlug ? { ...d, color: '#60c8f0' } : d);
-        if (selectedSlug && !updatedData.find(d => d.slug === selectedSlug))
-          updatedData.push({ slug: selectedSlug, intensity: 3, color: '#60c8f0' });
-        fsFront.update({ data: updatedData });
-        fsBack.update({ data: updatedData });
+        if (selectedSlug === muscle) {
+          selectedSlug = null;
+          tt.style.display = 'none';
+          fsFront.update({ data, highlightedColors: colors });
+          fsBack.update({ data, highlightedColors: colors });
+        } else {
+          selectedSlug = muscle;
+          tt.textContent = label;
+          tt.style.display = 'block';
+          const highlighted = data.filter(d => !d.muscles.includes(selectedSlug));
+          highlighted.push({ name: '__selected__', muscles: [selectedSlug] });
+          fsFront.update({ data: highlighted, highlightedColors: ['#60c8f0'] });
+          fsBack.update({ data: highlighted, highlightedColors: ['#60c8f0'] });
+        }
       }
 
       const fsFront = bhLib.createBodyHighlighter({ container: frontEl, data, type: bhLib.ModelType.ANTERIOR, highlightedColors: colors, bodyColor, onClick: onMuscleClick });
