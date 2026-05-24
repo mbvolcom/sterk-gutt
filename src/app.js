@@ -4,7 +4,9 @@
 
 import { createClient } from '@supabase/supabase-js';
 import * as BodyMuscles from 'body-muscles';
+import * as BodyHighlighter from 'body-highlighter';
 window.BodyMuscles = BodyMuscles;
+window.BodyHighlighter = BodyHighlighter;
 
 // Re-export createClient so the rest of the file can use sb directly
 const SUPA_URL = 'https://fzbovpdnpvsfdnxyftqv.supabase.co';
@@ -490,7 +492,7 @@ const MUSCLE_GROUPS = ['Abs','Back','Biceps','Chest','Legs','Shoulders','Triceps
 const PRIMARY_MUSCLES = {
   Abs:       ['Abs', 'Obliques', 'Transverse Abdominis'],
   Back:      ['Lats', 'Traps', 'Rhomboids', 'Rear Delts', 'Erectors'],
-  Biceps:    ['Biceps', 'Brachialis', 'Brachioradialis'],
+  Biceps:    ['Biceps', 'Brachialis', 'Forearm'],
   Chest:     ['Pecs', 'Upper Pecs', 'Lower Pecs'],
   Legs:      ['Quads', 'Hamstrings', 'Glutes', 'Calves', 'Hip Flexors', 'Adductors'],
   Shoulders: ['Front Delts', 'Side Delts', 'Rear Delts'],
@@ -1984,20 +1986,73 @@ let editorExercises = []; // exercises in the routine being edited
 let pickerExIdx = null;   // which slot in editorExercises we're picking for (null = new)
 
 // ═══════════════════════════════════════════
-// MUSCLE BODY MAP — powered by body-muscles
+// MUSCLE BODY MAP — body-highlighter (primary) + body-muscles (fallback)
 // ═══════════════════════════════════════════
 
-// Map our primaryMuscle names → body-muscles IDs (both left+right)
+// Maps our primaryMuscle names → body-highlighter slugs
+const PM_TO_BH_SLUG = {
+  'Upper Pecs':           'chest',
+  'Lower Pecs':           'chest',
+  'Pecs':                 'chest',
+  'Front Delts':          'front-deltoids',
+  'Side Delts':           'front-deltoids',
+  'Rear Delts':           'back-deltoids',
+  'Biceps':               'biceps',
+  'Brachialis':           'biceps',
+  'Forearm':              'forearm',
+  'Abs':                  'abs',
+  'Obliques':             'obliques',
+  'Transverse Abdominis': 'abs',
+  'Quads':                'quadriceps',
+  'Adductors':            'adductor',
+  'Hip Flexors':          'abs',
+  'Calves':               'calves',
+  'Lats':                 'upper-back',
+  'Traps':                'trapezius',
+  'Rhomboids':            'upper-back',
+  'Erectors':             'lower-back',
+  'Triceps Long Head':    'triceps',
+  'Triceps Lateral Head': 'triceps',
+  'Triceps Medial Head':  'triceps',
+  'Triceps':              'triceps',
+  'Glutes':               'gluteal',
+  'Hamstrings':           'hamstring',
+};
+
+// Clean label when a slug is clicked
+const BH_SLUG_TO_LABEL = {
+  'chest':           'Pecs',
+  'front-deltoids':  'Front / Side Delts',
+  'back-deltoids':   'Rear Delts',
+  'biceps':          'Biceps',
+  'triceps':         'Triceps',
+  'forearm':         'Forearm',
+  'abs':             'Abs',
+  'obliques':        'Obliques',
+  'quadriceps':      'Quads',
+  'adductor':        'Adductors',
+  'abductors':       'Abductors',
+  'hamstring':       'Hamstrings',
+  'calves':          'Calves',
+  'gluteal':         'Glutes',
+  'upper-back':      'Lats / Rhomboids',
+  'lower-back':      'Erectors',
+  'trapezius':       'Traps',
+  'neck':            'Traps',
+  'head':            'Head',
+};
+
+// Also keep body-muscles mapping as fallback
 const PM_TO_BODY_IDS = {
   'Upper Pecs':            ['chest-upper-left','chest-upper-right'],
   'Lower Pecs':            ['chest-lower-left','chest-lower-right'],
   'Pecs':                  ['chest-upper-left','chest-upper-right','chest-lower-left','chest-lower-right'],
-  'Front Delts':           ['shoulder-side-left','shoulder-side-right'],
-  'Side Delts':            ['shoulder-front-left','shoulder-front-right','shoulder-side-left','shoulder-side-right'],
+  'Front Delts':           ['shoulder-front-left','shoulder-front-right'],
+  'Side Delts':            ['shoulder-side-left','shoulder-side-right'],
   'Rear Delts':            ['deltoid-rear-left','deltoid-rear-right'],
   'Biceps':                ['biceps-left','biceps-right'],
   'Brachialis':            ['biceps-left','biceps-right'],
-  'Brachioradialis':       ['forearm-left','forearm-right','forearm-flexors-left','forearm-flexors-right','forearm-extensors-left','forearm-extensors-right'],
+  'Forearm':               ['forearm-left','forearm-right','forearm-flexors-left','forearm-flexors-right','forearm-extensors-left','forearm-extensors-right'],
   'Abs':                   ['abs-upper-left','abs-upper-right','abs-lower-left','abs-lower-right'],
   'Obliques':              ['obliques-left','obliques-right'],
   'Transverse Abdominis':  ['abs-lower-left','abs-lower-right'],
@@ -2017,17 +2072,16 @@ const PM_TO_BODY_IDS = {
   'Hamstrings':            ['hamstrings-medial-left','hamstrings-lateral-left','hamstrings-medial-right','hamstrings-lateral-right'],
 };
 
-// Clean display label for any library muscle ID clicked
 const BODY_ID_TO_LABEL = {
   'chest-upper-left':'Upper Pecs','chest-upper-right':'Upper Pecs',
   'chest-lower-left':'Lower Pecs','chest-lower-right':'Lower Pecs',
-  'shoulder-front-left':'Side Delts','shoulder-front-right':'Side Delts',
-  'shoulder-side-left':'Front Delts','shoulder-side-right':'Front Delts',
+  'shoulder-front-left':'Front Delts','shoulder-front-right':'Front Delts',
+  'shoulder-side-left':'Side Delts','shoulder-side-right':'Side Delts',
   'deltoid-rear-left':'Rear Delts','deltoid-rear-right':'Rear Delts',
   'biceps-left':'Biceps','biceps-right':'Biceps',
-  'forearm-left':'Brachioradialis','forearm-right':'Brachioradialis',
-  'forearm-flexors-left':'Brachioradialis','forearm-flexors-right':'Brachioradialis',
-  'forearm-extensors-left':'Brachioradialis','forearm-extensors-right':'Brachioradialis',
+  'forearm-left':'Forearm','forearm-right':'Forearm',
+  'forearm-flexors-left':'Forearm','forearm-flexors-right':'Forearm',
+  'forearm-extensors-left':'Forearm','forearm-extensors-right':'Forearm',
   'abs-upper-left':'Abs','abs-upper-right':'Abs',
   'abs-lower-left':'Abs','abs-lower-right':'Abs',
   'obliques-left':'Obliques','obliques-right':'Obliques',
@@ -2057,81 +2111,82 @@ const BODY_ID_TO_LABEL = {
   'knee-left':'Knee','knee-right':'Knee',
   'hand-left':'Hand','hand-right':'Hand',
   'foot-left':'Foot','foot-right':'Foot',
-  'knee-back-left':'Knee','knee-back-right':'Knee',
-  'foot-back-left':'Foot','foot-back-right':'Foot',
-  'hand-back-left':'Hand','hand-back-right':'Hand',
 };
 
-let _bodyMusclesLib = null;
+function getBHLib() {
+  return (typeof window.BodyHighlighter !== 'undefined') ? window.BodyHighlighter : null;
+}
 
 function getBodyMusclesLib() {
-  if (_bodyMusclesLib) return _bodyMusclesLib;
-  if (typeof window.BodyMuscles !== 'undefined') {
-    _bodyMusclesLib = window.BodyMuscles;
-    return _bodyMusclesLib;
-  }
+  if (typeof window.BodyMuscles !== 'undefined') return window.BodyMuscles;
   return null;
 }
 
- //
- // Build a bodyState object for body-muscles library from muscle data.
- // @param {Object} muscleData - { 'Quads': 24, 'Pecs': 12, ... }
- // @param {boolean} heatMode - scale 0-10 by relative volume, or binary 0/10
+// Build body-highlighter data array from muscle data
+// Primary = full intensity (3), secondary = half (1-2)
+function buildBHData(muscleData, secondaryData, heatMode) {
+  const slugMap = {};
+  const vals = Object.values(muscleData).filter(v => v > 0);
+  const maxVal = vals.length ? Math.max(...vals) : 1;
 
+  Object.entries(muscleData).forEach(([pm, val]) => {
+    const slug = PM_TO_BH_SLUG[pm];
+    if (!slug) return;
+    const intensity = heatMode ? Math.max(1, Math.round((val / maxVal) * 3)) : 3;
+    if (!slugMap[slug] || slugMap[slug] < intensity) slugMap[slug] = intensity;
+  });
+
+  Object.entries(secondaryData || {}).forEach(([pm, val]) => {
+    const slug = PM_TO_BH_SLUG[pm];
+    if (!slug || slugMap[slug]) return;
+    const intensity = heatMode ? 1 : 2;
+    slugMap[slug] = intensity;
+  });
+
+  return Object.entries(slugMap).map(([slug, intensity]) => ({ slug, intensity }));
+}
+
+// Build body-muscles bodyState (fallback)
 function buildBodyState(muscleData, secondaryMuscleData, heatMode) {
   const bodyState = {};
-  const allVals = [...Object.values(muscleData), ...Object.values(secondaryMuscleData).map(v => v * 0.5)].filter(v => v > 0);
-  const maxVal = allVals.length ? Math.max(...Object.values(muscleData)) : 1;
-
-  // Primary muscles — full intensity
+  const vals = Object.values(muscleData).filter(v => v > 0);
+  const maxVal = vals.length ? Math.max(...vals) : 1;
   Object.entries(muscleData).forEach(([pm, val]) => {
     if (!val) return;
     const ids = PM_TO_BODY_IDS[pm];
     if (!ids) return;
     const intensity = heatMode ? Math.max(1, Math.round((val / maxVal) * 10)) : 10;
     ids.forEach(id => {
-      if (!bodyState[id] || bodyState[id].intensity < intensity) {
+      if (!bodyState[id] || bodyState[id].intensity < intensity)
         bodyState[id] = { intensity, selected: false };
-      }
     });
   });
-
-  // Secondary muscles — half intensity, don't override primary
-  Object.entries(secondaryMuscleData).forEach(([pm, val]) => {
+  Object.entries(secondaryMuscleData || {}).forEach(([pm, val]) => {
     if (!val) return;
     const ids = PM_TO_BODY_IDS[pm];
     if (!ids) return;
     const intensity = heatMode ? Math.max(1, Math.round((val / maxVal) * 5)) : 5;
-    ids.forEach(id => {
-      if (!bodyState[id]) {
-        bodyState[id] = { intensity, selected: false };
-      }
-      // Don't override if primary already set it higher
-    });
+    ids.forEach(id => { if (!bodyState[id]) bodyState[id] = { intensity, selected: false }; });
   });
-
   return bodyState;
 }
-
- //
- // Render a muscle map into a container div using body-muscles library.
- // Returns { frontChart, backChart } or null if library not available.
 
 function renderMuscleMap(containerId, muscleData, heatMode = false, secondaryData = {}) {
   const container = document.getElementById(containerId);
   if (!container) return null;
 
-  const lib = getBodyMusclesLib();
-  if (!lib) {
+  const bhLib = getBHLib();
+  const bmLib = getBodyMusclesLib();
+
+  if (!bhLib && !bmLib) {
     container.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(241,236,226,0.28);letter-spacing:0.06em;padding:12px 0;text-align:center;">Set primary muscles on exercises to enable the body map</div>`;
     return null;
   }
 
-  const bodyState = buildBodyState(muscleData, secondaryData, heatMode);
   container.innerHTML = '';
   container.style.position = 'relative';
 
-  // Tooltip — persistent until another muscle clicked
+  // Tooltip
   const tooltip = document.createElement('div');
   tooltip.className = 'muscle-map-tooltip';
   tooltip.style.display = 'none';
@@ -2146,21 +2201,80 @@ function renderMuscleMap(containerId, muscleData, heatMode = false, secondaryDat
 
   const wrap = document.createElement('div');
   wrap.style.cssText = 'display:flex;gap:4px;justify-content:center;';
-  const frontEl = document.createElement('div');
-  frontEl.style.cssText = 'flex:1;max-width:48%;';
-  const backEl  = document.createElement('div');
-  backEl.style.cssText  = 'flex:1;max-width:48%;';
-  wrap.appendChild(frontEl);
-  wrap.appendChild(backEl);
   container.appendChild(wrap);
 
-  // Tracks which muscle group is currently selected (for blue highlight)
+  // Use body-highlighter if available
+  if (bhLib) {
+    return _renderBH(wrap, tooltip, muscleData, secondaryData, heatMode, bhLib);
+  }
+  // Fallback to body-muscles
+  return _renderBM(wrap, tooltip, muscleData, secondaryData, heatMode, bmLib);
+}
+
+function _renderBH(wrap, tooltip, muscleData, secondaryData, heatMode, bhLib) {
+  const data = buildBHData(muscleData, secondaryData, heatMode);
+  let selectedSlug = null;
+
+  // Lime heat colours: intensity 1=dim, 2=mid, 3=bright
+  const colors = ['rgba(200,240,110,0.25)', 'rgba(200,240,110,0.55)', '#c8f06e'];
+  const bodyColor = '#1a1f12';
+
+  const frontEl = document.createElement('div');
+  frontEl.style.cssText = 'flex:1;max-width:48%;';
+  const backEl = document.createElement('div');
+  backEl.style.cssText = 'flex:1;max-width:48%;';
+  wrap.appendChild(frontEl);
+  wrap.appendChild(backEl);
+
+  function onMuscleClick({ muscle }) {
+    const label = BH_SLUG_TO_LABEL[muscle] || muscle;
+    if (selectedSlug === muscle) {
+      selectedSlug = null;
+      tooltip.style.display = 'none';
+    } else {
+      selectedSlug = muscle;
+      tooltip.textContent = label;
+      tooltip.style.display = 'block';
+    }
+    // Re-render with selected slug highlighted blue
+    const selectedColor = '#60c8f0';
+    const updatedData = data.map(d => d.slug === selectedSlug
+      ? { ...d, color: selectedColor }
+      : d
+    );
+    if (selectedSlug && !updatedData.find(d => d.slug === selectedSlug)) {
+      updatedData.push({ slug: selectedSlug, intensity: 3, color: selectedColor });
+    }
+    frontChart.update({ data: updatedData });
+    backChart.update({ data: updatedData });
+  }
+
+  const frontChart = bhLib.createBodyHighlighter({
+    container: frontEl, data, type: bhLib.ModelType.ANTERIOR,
+    highlightedColors: colors, bodyColor, onClick: onMuscleClick,
+  });
+  const backChart = bhLib.createBodyHighlighter({
+    container: backEl, data, type: bhLib.ModelType.POSTERIOR,
+    highlightedColors: colors, bodyColor, onClick: onMuscleClick,
+  });
+
+  return { frontChart, backChart };
+}
+
+function _renderBM(wrap, tooltip, muscleData, secondaryData, heatMode, lib) {
+  const bodyState = buildBodyState(muscleData, secondaryData, heatMode);
   let selectedLabel = null;
   let frontChart, backChart;
 
+  const frontEl = document.createElement('div');
+  frontEl.style.cssText = 'flex:1;max-width:48%;';
+  const backEl = document.createElement('div');
+  backEl.style.cssText = 'flex:1;max-width:48%;';
+  wrap.appendChild(frontEl);
+  wrap.appendChild(backEl);
+
   function onMuscleClick(id) {
     const label = BODY_ID_TO_LABEL[id] || id;
-    // Toggle off if same muscle clicked again
     if (selectedLabel === label) {
       selectedLabel = null;
       tooltip.style.display = 'none';
@@ -2169,14 +2283,10 @@ function renderMuscleMap(containerId, muscleData, heatMode = false, secondaryDat
       tooltip.textContent = label;
       tooltip.style.display = 'block';
     }
-    // Update bodyState — highlight all IDs sharing this label in blue
     const newState = { ...bodyState };
     Object.entries(BODY_ID_TO_LABEL).forEach(([bid, blabel]) => {
-      if (newState[bid]) {
-        newState[bid] = { ...newState[bid], selected: blabel === selectedLabel };
-      } else if (blabel === selectedLabel) {
-        newState[bid] = { intensity: 0, selected: true };
-      }
+      if (newState[bid]) newState[bid] = { ...newState[bid], selected: blabel === selectedLabel };
+      else if (blabel === selectedLabel) newState[bid] = { intensity: 0, selected: true };
     });
     frontChart.update({ bodyState: newState });
     backChart.update({ bodyState: newState });
@@ -2184,13 +2294,13 @@ function renderMuscleMap(containerId, muscleData, heatMode = false, secondaryDat
 
   frontChart = new lib.BodyChart(frontEl, { view: lib.ViewSide.FRONT, bodyState, enableTransitions: false, onMuscleClick });
   backChart  = new lib.BodyChart(backEl,  { view: lib.ViewSide.BACK,  bodyState, enableTransitions: false, onMuscleClick });
-
   return { frontChart, backChart };
 }
 
 function openFullscreenMap(muscleData, secondaryData, heatMode) {
-  const lib = getBodyMusclesLib();
-  if (!lib) return;
+  const bhLib = getBHLib();
+  const bmLib = getBodyMusclesLib();
+  if (!bhLib && !bmLib) return;
 
   const overlay = document.createElement('div');
   overlay.className = 'muscle-map-fullscreen';
@@ -2205,123 +2315,55 @@ function openFullscreenMap(muscleData, secondaryData, heatMode) {
       <div class="muscle-map-fs-col"><div class="muscle-map-fs-lbl">BACK</div><div id="fs-back"></div></div>
     </div>
     <div class="muscle-map-fs-hint">Tap any muscle to see its name</div>`;
-
   document.body.appendChild(overlay);
 
-  const bodyState = buildBodyState(muscleData, secondaryData, heatMode);
-
-  let selectedLabel = null;
-  let fsFront, fsBack;
-
-  function onMuscleClick(id) {
-    const label = BODY_ID_TO_LABEL[id] || id;
-    const tt = document.getElementById('fs-tooltip');
-    if (selectedLabel === label) {
-      selectedLabel = null;
-      if (tt) tt.style.display = 'none';
-    } else {
-      selectedLabel = label;
-      if (tt) { tt.textContent = label; tt.style.display = 'block'; }
-    }
-    const newState = { ...bodyState };
-    Object.entries(BODY_ID_TO_LABEL).forEach(([bid, blabel]) => {
-      if (newState[bid]) newState[bid] = { ...newState[bid], selected: blabel === selectedLabel };
-      else if (blabel === selectedLabel) newState[bid] = { intensity: 0, selected: true };
-    });
-    fsFront.update({ bodyState: newState });
-    fsBack.update({ bodyState: newState });
-  }
-
   setTimeout(() => {
-    fsFront = new lib.BodyChart(document.getElementById('fs-front'), {
-      view: lib.ViewSide.FRONT, bodyState, enableTransitions: false, onMuscleClick,
-    });
-    fsBack = new lib.BodyChart(document.getElementById('fs-back'), {
-      view: lib.ViewSide.BACK, bodyState, enableTransitions: false, onMuscleClick,
-    });
+    const frontEl = document.getElementById('fs-front');
+    const backEl  = document.getElementById('fs-back');
+    const tt = document.getElementById('fs-tooltip');
+    let selectedSlug = null;
+
+    if (bhLib) {
+      const data = buildBHData(muscleData, secondaryData, heatMode);
+      const colors = ['rgba(200,240,110,0.25)', 'rgba(200,240,110,0.55)', '#c8f06e'];
+      const bodyColor = '#1a1f12';
+
+      function onMuscleClick({ muscle }) {
+        const label = BH_SLUG_TO_LABEL[muscle] || muscle;
+        if (selectedSlug === muscle) { selectedSlug = null; tt.style.display = 'none'; }
+        else { selectedSlug = muscle; tt.textContent = label; tt.style.display = 'block'; }
+        const updatedData = data.map(d => d.slug === selectedSlug ? { ...d, color: '#60c8f0' } : d);
+        if (selectedSlug && !updatedData.find(d => d.slug === selectedSlug))
+          updatedData.push({ slug: selectedSlug, intensity: 3, color: '#60c8f0' });
+        fsFront.update({ data: updatedData });
+        fsBack.update({ data: updatedData });
+      }
+
+      const fsFront = bhLib.createBodyHighlighter({ container: frontEl, data, type: bhLib.ModelType.ANTERIOR, highlightedColors: colors, bodyColor, onClick: onMuscleClick });
+      const fsBack  = bhLib.createBodyHighlighter({ container: backEl,  data, type: bhLib.ModelType.POSTERIOR, highlightedColors: colors, bodyColor, onClick: onMuscleClick });
+    } else {
+      const bodyState = buildBodyState(muscleData, secondaryData, heatMode);
+      let selectedLabel = null;
+      let fsFront, fsBack;
+
+      function onMuscleClick(id) {
+        const label = BODY_ID_TO_LABEL[id] || id;
+        if (selectedLabel === label) { selectedLabel = null; tt.style.display = 'none'; }
+        else { selectedLabel = label; tt.textContent = label; tt.style.display = 'block'; }
+        const newState = { ...bodyState };
+        Object.entries(BODY_ID_TO_LABEL).forEach(([bid, blabel]) => {
+          if (newState[bid]) newState[bid] = { ...newState[bid], selected: blabel === selectedLabel };
+          else if (blabel === selectedLabel) newState[bid] = { intensity: 0, selected: true };
+        });
+        fsFront.update({ bodyState: newState });
+        fsBack.update({ bodyState: newState });
+      }
+
+      fsFront = new bmLib.BodyChart(frontEl, { view: bmLib.ViewSide.FRONT, bodyState, enableTransitions: false, onMuscleClick });
+      fsBack  = new bmLib.BodyChart(backEl,  { view: bmLib.ViewSide.BACK,  bodyState, enableTransitions: false, onMuscleClick });
+    }
   }, 50);
 }
-
-// Legacy shim — keep old call signature working
-function buildMuscleMapSVG() { return ''; }
-function buildMusclDataFromExercises(exercises, heatMode) {
-  const data = {};
-  (exercises || []).forEach(ex => {
-    const pm = ex.primaryMuscle;
-    if (!pm) return;
-    if (heatMode) {
-      const sets = Array.isArray(ex.sets)
-        ? ex.sets.filter(s => s.logged || s.state === 'logged').length || 1
-        : (ex.sets || 1);
-      data[pm] = (data[pm] || 0) + sets;
-    } else {
-      data[pm] = 1;
-    }
-  });
-  return data;
-}
-
-const MUSCLE_MAP_REGIONS = {
-  'Upper Pecs':          { cx:78,  cy:106, rx:17, ry:11, side:'front' },
-  'Lower Pecs':          { cx:78,  cy:120, rx:14, ry:8,  side:'front' },
-  'Pecs':                { cx:78,  cy:112, rx:17, ry:16, side:'front' },
-  'Front Delts':         { cx:44,  cy:100, rx:10, ry:10, side:'front' },
-  'Side Delts':          { cx:38,  cy:109, rx:9,  ry:10, side:'front' },
-  'Biceps':              { cx:36,  cy:130, rx:8,  ry:14, side:'front' },
-  'Brachialis':          { cx:36,  cy:145, rx:7,  ry:7,  side:'front' },
-  'Brachioradialis':     { cx:35,  cy:157, rx:6,  ry:8,  side:'front' },
-  'Abs':                 { cx:78,  cy:145, rx:12, ry:20, side:'front' },
-  'Obliques':            { cx:63,  cy:148, rx:8,  ry:16, side:'front' },
-  'Transverse Abdominis':{ cx:78,  cy:155, rx:10, ry:10, side:'front' },
-  'Quads':               { cx:72,  cy:218, rx:14, ry:27, side:'front' },
-  'Hip Flexors':         { cx:78,  cy:185, rx:10, ry:9,  side:'front' },
-  'Adductors':           { cx:84,  cy:218, rx:7,  ry:20, side:'front' },
-  'Calves':              { cx:72,  cy:288, rx:9,  ry:17, side:'front' },
-  'Lats':                { cx:128, cy:128, rx:15, ry:22, side:'back' },
-  'Traps':               { cx:122, cy:97,  rx:17, ry:11, side:'back' },
-  'Rhomboids':           { cx:122, cy:111, rx:11, ry:9,  side:'back' },
-  'Rear Delts':          { cx:158, cy:100, rx:10, ry:10, side:'back' },
-  'Erectors':            { cx:122, cy:148, rx:7,  ry:18, side:'back' },
-  'Triceps Long Head':   { cx:162, cy:128, rx:7,  ry:13, side:'back' },
-  'Triceps Lateral Head':{ cx:156, cy:133, rx:6,  ry:11, side:'back' },
-  'Triceps Medial Head': { cx:160, cy:143, rx:5,  ry:7,  side:'back' },
-  'Triceps':             { cx:160, cy:133, rx:8,  ry:16, side:'back' },
-  'Hamstrings':          { cx:126, cy:218, rx:14, ry:27, side:'back' },
-  'Glutes':              { cx:122, cy:184, rx:17, ry:15, side:'back' },
-};
-
-const BODY_SVG_FRONT = `
-  <ellipse cx="74" cy="72" rx="12" ry="13" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <rect x="70" y="83" width="8" height="8" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M55,90 Q50,95 50,150 L50,175 Q55,180 74,180 Q93,180 98,175 L98,150 Q98,95 93,90 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M55,175 Q48,185 50,200 L98,200 Q100,185 93,175 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M55,92 Q44,95 40,120 Q38,140 38,165 Q42,168 46,165 Q48,140 50,120 Q52,100 58,95 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M93,92 Q104,95 108,120 Q110,140 110,165 Q106,168 102,165 Q100,140 98,120 Q96,100 90,95 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M40,162 Q38,180 40,200 Q43,202 46,200 Q48,180 46,162 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M108,162 Q110,180 108,200 Q105,202 102,200 Q100,180 102,162 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M56,198 Q52,210 52,260 Q54,275 60,275 Q66,275 68,260 Q70,210 70,198 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M82,198 Q86,210 96,260 Q94,275 88,275 Q82,275 80,260 Q78,210 78,198 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M52,272 Q50,295 54,312 Q58,316 63,312 Q67,295 66,272 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M82,272 Q80,295 84,312 Q88,316 93,312 Q97,295 96,272 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>`;
-
-const BODY_SVG_BACK = `
-  <ellipse cx="128" cy="72" rx="12" ry="13" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <rect x="124" y="83" width="8" height="8" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M109,90 Q104,95 104,150 L104,175 Q109,180 128,180 Q147,180 152,175 L152,150 Q152,95 147,90 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M109,175 Q102,185 104,200 L152,200 Q154,185 147,175 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M109,92 Q98,95 94,120 Q92,140 92,165 Q96,168 100,165 Q102,140 104,120 Q106,100 112,95 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M147,92 Q158,95 162,120 Q164,140 164,165 Q160,168 156,165 Q154,140 152,120 Q150,100 144,95 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M94,162 Q92,180 94,200 Q97,202 100,200 Q102,180 100,162 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M162,162 Q164,180 162,200 Q159,202 156,200 Q154,180 156,162 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M110,198 Q106,210 106,260 Q108,275 114,275 Q120,275 122,260 Q124,210 124,198 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M146,198 Q150,210 150,260 Q148,275 142,275 Q136,275 134,260 Q132,210 132,198 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M106,272 Q104,295 108,312 Q112,316 117,312 Q121,295 120,272 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>
-  <path d="M136,272 Q134,295 138,312 Q142,316 147,312 Q151,295 150,272 Z" fill="#111113" stroke="rgba(200,240,110,0.15)" stroke-width="0.8"/>`;
-
- //
- // Build muscle map SVG string.
- // @param {Object} muscleData - { 'Quads': 1 } for binary, or { 'Quads': 24 } for heat
-
 function saveSplits() {
   if (!USER_ID || USER_ID === 'pending') return;
   localStorage.setItem(`sg_splits_${USER_ID}`, JSON.stringify(_splits));
