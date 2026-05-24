@@ -2085,6 +2085,20 @@ function renderMuscleMap(containerId, muscleData, heatMode = false, secondaryDat
   const bodyState = buildBodyState(muscleData, secondaryData, heatMode);
   container.innerHTML = '';
 
+  // Tooltip element
+  const tooltip = document.createElement('div');
+  tooltip.className = 'muscle-map-tooltip';
+  tooltip.style.display = 'none';
+  container.appendChild(tooltip);
+
+  // Expand button
+  const expandBtn = document.createElement('button');
+  expandBtn.className = 'muscle-map-expand-btn';
+  expandBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg> Expand`;
+  expandBtn.onclick = () => openFullscreenMap(muscleData, secondaryData, heatMode);
+  container.appendChild(expandBtn);
+
+  // Maps wrap
   const wrap = document.createElement('div');
   wrap.style.cssText = 'display:flex;gap:4px;justify-content:center;';
 
@@ -2097,10 +2111,64 @@ function renderMuscleMap(containerId, muscleData, heatMode = false, secondaryDat
   wrap.appendChild(backEl);
   container.appendChild(wrap);
 
-  const frontChart = new lib.BodyChart(frontEl, { view: lib.ViewSide.FRONT, bodyState, enableTransitions: false });
-  const backChart  = new lib.BodyChart(backEl,  { view: lib.ViewSide.BACK,  bodyState, enableTransitions: false });
+  function onMuscleClick(id, name) {
+    tooltip.textContent = name;
+    tooltip.style.display = 'block';
+    clearTimeout(tooltip._timer);
+    tooltip._timer = setTimeout(() => { tooltip.style.display = 'none'; }, 2500);
+  }
+
+  const frontChart = new lib.BodyChart(frontEl, {
+    view: lib.ViewSide.FRONT, bodyState, enableTransitions: false,
+    onMuscleClick,
+  });
+  const backChart = new lib.BodyChart(backEl, {
+    view: lib.ViewSide.BACK, bodyState, enableTransitions: false,
+    onMuscleClick,
+  });
 
   return { frontChart, backChart };
+}
+
+function openFullscreenMap(muscleData, secondaryData, heatMode) {
+  const lib = getBodyMusclesLib();
+  if (!lib) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'muscle-map-fullscreen';
+  overlay.innerHTML = `
+    <div class="muscle-map-fs-header">
+      <span class="muscle-map-fs-title">Muscle Map</span>
+      <button class="muscle-map-fs-close" onclick="this.closest('.muscle-map-fullscreen').remove()">✕</button>
+    </div>
+    <div class="muscle-map-fs-tooltip" id="fs-tooltip" style="display:none;"></div>
+    <div class="muscle-map-fs-body">
+      <div class="muscle-map-fs-col"><div class="muscle-map-fs-lbl">FRONT</div><div id="fs-front"></div></div>
+      <div class="muscle-map-fs-col"><div class="muscle-map-fs-lbl">BACK</div><div id="fs-back"></div></div>
+    </div>
+    <div class="muscle-map-fs-hint">Tap any muscle to see its name</div>`;
+
+  document.body.appendChild(overlay);
+
+  const bodyState = buildBodyState(muscleData, secondaryData, heatMode);
+
+  function onMuscleClick(id, name) {
+    const tt = document.getElementById('fs-tooltip');
+    if (!tt) return;
+    tt.textContent = name;
+    tt.style.display = 'block';
+    clearTimeout(tt._timer);
+    tt._timer = setTimeout(() => { tt.style.display = 'none'; }, 3000);
+  }
+
+  setTimeout(() => {
+    new lib.BodyChart(document.getElementById('fs-front'), {
+      view: lib.ViewSide.FRONT, bodyState, enableTransitions: false, onMuscleClick,
+    });
+    new lib.BodyChart(document.getElementById('fs-back'), {
+      view: lib.ViewSide.BACK, bodyState, enableTransitions: false, onMuscleClick,
+    });
+  }, 50);
 }
 
 // Legacy shim — keep old call signature working
@@ -4970,6 +5038,7 @@ Object.assign(window, {
   setEquipment, updateSet,
   // Routine editor
   createSplit, renameSplit, deleteSplit, assignRoutineToSplit,
+  openFullscreenMap,
   openRoutineEditor, saveRoutine, saveRoutineChanges, deleteRoutine,
   addExerciseToEditor, removeEditorEx, toggleRoutineCard,
   updateEditorExSets: (i, v) => { if (editorExercises[i]) editorExercises[i].sets = Math.max(1, +v || 1); },
