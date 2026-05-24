@@ -1989,9 +1989,9 @@ let pickerExIdx = null;   // which slot in editorExercises we're picking for (nu
 
 // Map our primaryMuscle names → body-muscles IDs (both left+right)
 const PM_TO_BODY_IDS = {
-  'Pecs':                  ['chest-upper-left','chest-upper-right','chest-lower-left','chest-lower-right'],
   'Upper Pecs':            ['chest-upper-left','chest-upper-right'],
   'Lower Pecs':            ['chest-lower-left','chest-lower-right'],
+  'Pecs':                  ['chest-upper-left','chest-upper-right','chest-lower-left','chest-lower-right'],
   'Front Delts':           ['shoulder-front-left','shoulder-front-right'],
   'Side Delts':            ['shoulder-side-left','shoulder-side-right'],
   'Rear Delts':            ['deltoid-rear-left','deltoid-rear-right'],
@@ -2002,19 +2002,61 @@ const PM_TO_BODY_IDS = {
   'Obliques':              ['obliques-left','obliques-right'],
   'Transverse Abdominis':  ['abs-lower-left','abs-lower-right'],
   'Quads':                 ['quads-left','quads-right'],
-  'Hip Flexors':           ['hip-flexor-left','hip-flexor-right'],
   'Adductors':             ['adductors-left','adductors-right'],
-  'Calves':                ['calves-gastroc-medial-left','calves-gastroc-lateral-left','calves-gastroc-medial-right','calves-gastroc-lateral-right'],
+  'Hip Flexors':           ['hip-flexor-left','hip-flexor-right'],
+  'Calves':                ['calves-gastroc-medial-left','calves-gastroc-lateral-left','calves-soleus-left','calves-gastroc-medial-right','calves-gastroc-lateral-right','calves-soleus-right'],
   'Lats':                  ['lats-upper-left','lats-mid-left','lats-lower-left','lats-upper-right','lats-mid-right','lats-lower-right'],
   'Traps':                 ['traps-upper-left','traps-mid-left','traps-lower-left','traps-upper-right','traps-mid-right','traps-lower-right'],
   'Rhomboids':             ['traps-mid-left','traps-mid-right'],
   'Erectors':              ['lower-back-erectors-left','lower-back-erectors-right'],
-  'Triceps':               ['triceps-long-left','triceps-lateral-left','triceps-long-right','triceps-lateral-right'],
   'Triceps Long Head':     ['triceps-long-left','triceps-long-right'],
   'Triceps Lateral Head':  ['triceps-lateral-left','triceps-lateral-right'],
   'Triceps Medial Head':   ['triceps-lateral-left','triceps-lateral-right'],
+  'Triceps':               ['triceps-long-left','triceps-long-right','triceps-lateral-left','triceps-lateral-right'],
   'Glutes':                ['gluteus-maximus-left','gluteus-maximus-right','gluteus-medius-left','gluteus-medius-right'],
   'Hamstrings':            ['hamstrings-medial-left','hamstrings-lateral-left','hamstrings-medial-right','hamstrings-lateral-right'],
+};
+
+// Clean display label for any library muscle ID clicked
+const BODY_ID_TO_LABEL = {
+  'chest-upper-left':'Upper Pecs','chest-upper-right':'Upper Pecs',
+  'chest-lower-left':'Lower Pecs','chest-lower-right':'Lower Pecs',
+  'shoulder-front-left':'Front Delts','shoulder-front-right':'Front Delts',
+  'shoulder-side-left':'Side Delts','shoulder-side-right':'Side Delts',
+  'deltoid-rear-left':'Rear Delts','deltoid-rear-right':'Rear Delts',
+  'biceps-left':'Biceps','biceps-right':'Biceps',
+  'forearm-left':'Brachioradialis','forearm-right':'Brachioradialis',
+  'forearm-flexors-left':'Brachioradialis','forearm-flexors-right':'Brachioradialis',
+  'forearm-extensors-left':'Brachioradialis','forearm-extensors-right':'Brachioradialis',
+  'abs-upper-left':'Abs','abs-upper-right':'Abs',
+  'abs-lower-left':'Abs','abs-lower-right':'Abs',
+  'obliques-left':'Obliques','obliques-right':'Obliques',
+  'serratus-anterior-left':'Obliques','serratus-anterior-right':'Obliques',
+  'hip-flexor-left':'Hip Flexors','hip-flexor-right':'Hip Flexors',
+  'quads-left':'Quads','quads-right':'Quads',
+  'adductors-left':'Adductors','adductors-right':'Adductors',
+  'tibialis-anterior-left':'Calves','tibialis-anterior-right':'Calves',
+  'calves-gastroc-medial-left':'Calves','calves-gastroc-lateral-left':'Calves','calves-soleus-left':'Calves',
+  'calves-gastroc-medial-right':'Calves','calves-gastroc-lateral-right':'Calves','calves-soleus-right':'Calves',
+  'traps-upper-left':'Traps','traps-mid-left':'Traps','traps-lower-left':'Traps',
+  'traps-upper-right':'Traps','traps-mid-right':'Traps','traps-lower-right':'Traps',
+  'lats-upper-left':'Lats','lats-mid-left':'Lats','lats-lower-left':'Lats',
+  'lats-upper-right':'Lats','lats-mid-right':'Lats','lats-lower-right':'Lats',
+  'lower-back-erectors-left':'Erectors','lower-back-erectors-right':'Erectors',
+  'lower-back-ql-left':'Erectors','lower-back-ql-right':'Erectors',
+  'spine':'Erectors','nape':'Traps',
+  'neck-left':'Traps','neck-right':'Traps',
+  'triceps-long-left':'Triceps Long Head','triceps-long-right':'Triceps Long Head',
+  'triceps-lateral-left':'Triceps Lateral Head','triceps-lateral-right':'Triceps Lateral Head',
+  'gluteus-maximus-left':'Glutes','gluteus-maximus-right':'Glutes',
+  'gluteus-medius-left':'Glutes','gluteus-medius-right':'Glutes',
+  'hamstrings-medial-left':'Hamstrings','hamstrings-lateral-left':'Hamstrings',
+  'hamstrings-medial-right':'Hamstrings','hamstrings-lateral-right':'Hamstrings',
+  'head':'Head','face':'Face','head-back':'Head',
+  'elbow-left':'Elbow','elbow-right':'Elbow',
+  'knee-left':'Knee','knee-right':'Knee',
+  'hand-left':'Hand','hand-right':'Hand',
+  'foot-left':'Foot','foot-right':'Foot',
 };
 
 let _bodyMusclesLib = null;
@@ -2084,8 +2126,9 @@ function renderMuscleMap(containerId, muscleData, heatMode = false, secondaryDat
 
   const bodyState = buildBodyState(muscleData, secondaryData, heatMode);
   container.innerHTML = '';
+  container.style.position = 'relative';
 
-  // Tooltip element
+  // Tooltip — persistent until another muscle clicked
   const tooltip = document.createElement('div');
   tooltip.className = 'muscle-map-tooltip';
   tooltip.style.display = 'none';
@@ -2098,34 +2141,46 @@ function renderMuscleMap(containerId, muscleData, heatMode = false, secondaryDat
   expandBtn.onclick = () => openFullscreenMap(muscleData, secondaryData, heatMode);
   container.appendChild(expandBtn);
 
-  // Maps wrap
   const wrap = document.createElement('div');
   wrap.style.cssText = 'display:flex;gap:4px;justify-content:center;';
-
   const frontEl = document.createElement('div');
   frontEl.style.cssText = 'flex:1;max-width:48%;';
-  const backEl = document.createElement('div');
-  backEl.style.cssText = 'flex:1;max-width:48%;';
-
+  const backEl  = document.createElement('div');
+  backEl.style.cssText  = 'flex:1;max-width:48%;';
   wrap.appendChild(frontEl);
   wrap.appendChild(backEl);
   container.appendChild(wrap);
 
-  function onMuscleClick(id, name) {
-    tooltip.textContent = name;
-    tooltip.style.display = 'block';
-    clearTimeout(tooltip._timer);
-    tooltip._timer = setTimeout(() => { tooltip.style.display = 'none'; }, 2500);
+  // Tracks which muscle group is currently selected (for blue highlight)
+  let selectedLabel = null;
+  let frontChart, backChart;
+
+  function onMuscleClick(id) {
+    const label = BODY_ID_TO_LABEL[id] || id;
+    // Toggle off if same muscle clicked again
+    if (selectedLabel === label) {
+      selectedLabel = null;
+      tooltip.style.display = 'none';
+    } else {
+      selectedLabel = label;
+      tooltip.textContent = label;
+      tooltip.style.display = 'block';
+    }
+    // Update bodyState — highlight all IDs sharing this label in blue
+    const newState = { ...bodyState };
+    Object.entries(BODY_ID_TO_LABEL).forEach(([bid, blabel]) => {
+      if (newState[bid]) {
+        newState[bid] = { ...newState[bid], selected: blabel === selectedLabel };
+      } else if (blabel === selectedLabel) {
+        newState[bid] = { intensity: 0, selected: true };
+      }
+    });
+    frontChart.update({ bodyState: newState });
+    backChart.update({ bodyState: newState });
   }
 
-  const frontChart = new lib.BodyChart(frontEl, {
-    view: lib.ViewSide.FRONT, bodyState, enableTransitions: false,
-    onMuscleClick,
-  });
-  const backChart = new lib.BodyChart(backEl, {
-    view: lib.ViewSide.BACK, bodyState, enableTransitions: false,
-    onMuscleClick,
-  });
+  frontChart = new lib.BodyChart(frontEl, { view: lib.ViewSide.FRONT, bodyState, enableTransitions: false, onMuscleClick });
+  backChart  = new lib.BodyChart(backEl,  { view: lib.ViewSide.BACK,  bodyState, enableTransitions: false, onMuscleClick });
 
   return { frontChart, backChart };
 }
@@ -2152,20 +2207,33 @@ function openFullscreenMap(muscleData, secondaryData, heatMode) {
 
   const bodyState = buildBodyState(muscleData, secondaryData, heatMode);
 
-  function onMuscleClick(id, name) {
+  let selectedLabel = null;
+  let fsFront, fsBack;
+
+  function onMuscleClick(id) {
+    const label = BODY_ID_TO_LABEL[id] || id;
     const tt = document.getElementById('fs-tooltip');
-    if (!tt) return;
-    tt.textContent = name;
-    tt.style.display = 'block';
-    clearTimeout(tt._timer);
-    tt._timer = setTimeout(() => { tt.style.display = 'none'; }, 3000);
+    if (selectedLabel === label) {
+      selectedLabel = null;
+      if (tt) tt.style.display = 'none';
+    } else {
+      selectedLabel = label;
+      if (tt) { tt.textContent = label; tt.style.display = 'block'; }
+    }
+    const newState = { ...bodyState };
+    Object.entries(BODY_ID_TO_LABEL).forEach(([bid, blabel]) => {
+      if (newState[bid]) newState[bid] = { ...newState[bid], selected: blabel === selectedLabel };
+      else if (blabel === selectedLabel) newState[bid] = { intensity: 0, selected: true };
+    });
+    fsFront.update({ bodyState: newState });
+    fsBack.update({ bodyState: newState });
   }
 
   setTimeout(() => {
-    new lib.BodyChart(document.getElementById('fs-front'), {
+    fsFront = new lib.BodyChart(document.getElementById('fs-front'), {
       view: lib.ViewSide.FRONT, bodyState, enableTransitions: false, onMuscleClick,
     });
-    new lib.BodyChart(document.getElementById('fs-back'), {
+    fsBack = new lib.BodyChart(document.getElementById('fs-back'), {
       view: lib.ViewSide.BACK, bodyState, enableTransitions: false, onMuscleClick,
     });
   }, 50);
