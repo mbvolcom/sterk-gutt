@@ -10,7 +10,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
     "body-muscles": "^1.0.0",
-    "body-highlighter": "^2.0.0"
+    "body-highlighter": "^3.0.2"
   },
   "devDependencies": {
     "vite": "^8.0.0"
