@@ -176,7 +176,7 @@ async function dbLoadExercises() {
       const seen = new Map();
       data.forEach(e => seen.set(e.name.toLowerCase(), e));
       _exercises = Array.from(seen.values()).map(e => ({
-        id:e.id, name:e.name, muscle:e.muscle, primaryMuscle:e.primary_muscle||null, unilateral:!!e.unilateral
+        id:e.id, name:e.name, muscle:e.muscle, primaryMuscle:e.primary_muscle||null, secondaryMuscles:e.secondary_muscles||[], unilateral:!!e.unilateral
       }));
       // Delete orphaned duplicate rows from Supabase silently
       const keptIds = new Set(_exercises.map(e => e.id));
@@ -195,14 +195,14 @@ async function dbSeedExercises() {
 }
 
 async function dbSaveExercise(ex) {
-  const clean = { id: ex.id, name: ex.name, muscle: ex.muscle||'', primaryMuscle: ex.primaryMuscle||null, unilateral: !!ex.unilateral };
+  const clean = { id: ex.id, name: ex.name, muscle: ex.muscle||'', primaryMuscle: ex.primaryMuscle||null, secondaryMuscles: ex.secondaryMuscles||[], unilateral: !!ex.unilateral };
   const idx = _exercises.findIndex(e => e.id === ex.id);
   if (idx >= 0) _exercises[idx] = clean;
   else          _exercises.push(clean);
   if (document.getElementById('page-exercises')?.classList.contains('active')) renderExerciseLibrary();
 
   try {
-    const row = { id: ex.id, name: ex.name, muscle: ex.muscle||'', primary_muscle: ex.primaryMuscle||null, unilateral: !!ex.unilateral, user_id: USER_ID };
+    const row = { id: ex.id, name: ex.name, muscle: ex.muscle||'', primary_muscle: ex.primaryMuscle||null, secondary_muscles: ex.secondaryMuscles||[], unilateral: !!ex.unilateral, user_id: USER_ID };
     await supabaseFetch('exercises', 'on_conflict=id', 'POST', row);
     setSyncStatus('ok');
   } catch(e) {
@@ -2033,25 +2033,38 @@ function getBodyMusclesLib() {
  // @param {Object} muscleData - { 'Quads': 24, 'Pecs': 12, ... }
  // @param {boolean} heatMode - scale 0-10 by relative volume, or binary 0/10
 
-function buildBodyState(muscleData, heatMode) {
+function buildBodyState(muscleData, secondaryMuscleData, heatMode) {
   const bodyState = {};
-  const vals = Object.values(muscleData).filter(v => v > 0);
-  const maxVal = vals.length ? Math.max(...vals) : 1;
+  const allVals = [...Object.values(muscleData), ...Object.values(secondaryMuscleData).map(v => v * 0.5)].filter(v => v > 0);
+  const maxVal = allVals.length ? Math.max(...Object.values(muscleData)) : 1;
 
+  // Primary muscles — full intensity
   Object.entries(muscleData).forEach(([pm, val]) => {
     if (!val) return;
     const ids = PM_TO_BODY_IDS[pm];
     if (!ids) return;
-    const intensity = heatMode
-      ? Math.max(1, Math.round((val / maxVal) * 10))
-      : 10;
+    const intensity = heatMode ? Math.max(1, Math.round((val / maxVal) * 10)) : 10;
     ids.forEach(id => {
-      // Take the max if multiple muscles map to same ID
       if (!bodyState[id] || bodyState[id].intensity < intensity) {
         bodyState[id] = { intensity, selected: false };
       }
     });
   });
+
+  // Secondary muscles — half intensity, don't override primary
+  Object.entries(secondaryMuscleData).forEach(([pm, val]) => {
+    if (!val) return;
+    const ids = PM_TO_BODY_IDS[pm];
+    if (!ids) return;
+    const intensity = heatMode ? Math.max(1, Math.round((val / maxVal) * 5)) : 5;
+    ids.forEach(id => {
+      if (!bodyState[id]) {
+        bodyState[id] = { intensity, selected: false };
+      }
+      // Don't override if primary already set it higher
+    });
+  });
+
   return bodyState;
 }
 
@@ -2059,7 +2072,7 @@ function buildBodyState(muscleData, heatMode) {
  // Render a muscle map into a container div using body-muscles library.
  // Returns { frontChart, backChart } or null if library not available.
 
-function renderMuscleMap(containerId, muscleData, heatMode = false) {
+function renderMuscleMap(containerId, muscleData, heatMode = false, secondaryData = {}) {
   const container = document.getElementById(containerId);
   if (!container) return null;
 
@@ -2069,7 +2082,7 @@ function renderMuscleMap(containerId, muscleData, heatMode = false) {
     return null;
   }
 
-  const bodyState = buildBodyState(muscleData, heatMode);
+  const bodyState = buildBodyState(muscleData, secondaryData, heatMode);
   container.innerHTML = '';
 
   const wrap = document.createElement('div');
@@ -2084,16 +2097,8 @@ function renderMuscleMap(containerId, muscleData, heatMode = false) {
   wrap.appendChild(backEl);
   container.appendChild(wrap);
 
-  const frontChart = new lib.BodyChart(frontEl, {
-    view: lib.ViewSide.FRONT,
-    bodyState,
-    enableTransitions: false,
-  });
-  const backChart = new lib.BodyChart(backEl, {
-    view: lib.ViewSide.BACK,
-    bodyState,
-    enableTransitions: false,
-  });
+  const frontChart = new lib.BodyChart(frontEl, { view: lib.ViewSide.FRONT, bodyState, enableTransitions: false });
+  const backChart  = new lib.BodyChart(backEl,  { view: lib.ViewSide.BACK,  bodyState, enableTransitions: false });
 
   return { frontChart, backChart };
 }
@@ -2296,16 +2301,18 @@ function renderRoutines() {
       <div class="routine-card-body">
         ${(() => {
           const allEx = load(SK.exercises) || [];
-          const muscleData = {};
+          const primaryData = {};
+          const secondaryData = {};
           r.exercises.forEach(ex => {
             const libEx = allEx.find(e => e.id === ex.id || e.name === ex.name);
             const pm = libEx?.primaryMuscle || ex.primaryMuscle;
-            if (pm) muscleData[pm] = 1;
+            if (pm) primaryData[pm] = 1;
+            (libEx?.secondaryMuscles || ex.secondaryMuscles || []).forEach(sm => { secondaryData[sm] = 1; });
           });
-          const hasPrimary = Object.keys(muscleData).length > 0;
+          const hasPrimary = Object.keys(primaryData).length > 0;
           const mapId = `routine-map-${r.id}`;
           if (hasPrimary) {
-            setTimeout(() => renderMuscleMap(mapId, muscleData, false), 0);
+            setTimeout(() => renderMuscleMap(mapId, primaryData, false, secondaryData), 0);
             return `<div id="${mapId}" class="routine-muscle-map"></div>`;
           }
           return '';
@@ -2656,20 +2663,46 @@ let libMuscleFilter = 'All';
 let editingExId = null;
 let selectedMuscle = '';
 let selectedPrimaryMuscle = '';
+let selectedSecondaryMuscles = []; // array — multiple allowed
 
 function selectMuscle(muscle, containerId) {
   selectedMuscle = muscle;
   selectedPrimaryMuscle = '';
+  selectedSecondaryMuscles = [];
   renderMusclePicker(containerId);
-  // Re-render primary muscle picker if present
-  const primaryId = containerId.replace('muscle-grid', 'primary-grid');
-  const primaryEl = document.getElementById(primaryId);
-  if (primaryEl) renderPrimaryMusclePicker(primaryId, containerId);
+  if (containerId === 'ex-lib-muscle-grid') {
+    const wrap = document.getElementById('ex-lib-primary-wrap');
+    if (wrap) wrap.style.display = selectedMuscle ? '' : 'none';
+    renderPrimaryMusclePicker('ex-lib-primary-grid', containerId);
+    renderSecondaryMusclePicker('ex-lib-secondary-grid');
+  }
 }
 
 function selectPrimaryMuscle(muscle, containerId) {
   selectedPrimaryMuscle = muscle;
   renderPrimaryMusclePicker(containerId.replace('primary-grid','primary-grid'), containerId);
+  // Re-render secondary excluding primary
+  renderSecondaryMusclePicker('ex-lib-secondary-grid');
+}
+
+function toggleSecondaryMuscle(muscle) {
+  const idx = selectedSecondaryMuscles.indexOf(muscle);
+  if (idx >= 0) selectedSecondaryMuscles.splice(idx, 1);
+  else selectedSecondaryMuscles.push(muscle);
+  renderSecondaryMusclePicker('ex-lib-secondary-grid');
+}
+
+function renderSecondaryMusclePicker(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const options = (PRIMARY_MUSCLES[selectedMuscle] || [])
+    .filter(m => m !== selectedPrimaryMuscle);
+  if (!options.length) { el.innerHTML = ''; return; }
+  el.innerHTML = options.map(m => {
+    const active = selectedSecondaryMuscles.includes(m);
+    return `<button class="muscle-btn secondary-btn ${active ? 'active' : ''}"
+      onclick="toggleSecondaryMuscle('${m}')">${m}</button>`;
+  }).join('');
 }
 
 function renderPrimaryMusclePicker(containerId, parentContainerId) {
@@ -2753,11 +2786,15 @@ function openExerciseLibEditor(exId) {
       document.getElementById('ex-lib-name').value = ex.name;
       selectedMuscle = ex.muscle || '';
       selectedPrimaryMuscle = ex.primaryMuscle || '';
+      selectedSecondaryMuscles = Array.isArray(ex.secondaryMuscles) ? [...ex.secondaryMuscles] : [];
       const isUni = !!ex.unilateral;
       renderMusclePicker('ex-lib-muscle-grid');
       const wrap = document.getElementById('ex-lib-primary-wrap');
       if (wrap) wrap.style.display = selectedMuscle ? '' : 'none';
       renderPrimaryMusclePicker('ex-lib-primary-grid', 'ex-lib-muscle-grid');
+      const secWrap = document.getElementById('ex-lib-secondary-wrap');
+      if (secWrap) secWrap.style.display = selectedMuscle ? '' : 'none';
+      renderSecondaryMusclePicker('ex-lib-secondary-grid');
       openModal('exercise-lib-editor');
       setTimeout(() => {
         const cb = document.getElementById('ex-lib-uni');
@@ -2769,9 +2806,12 @@ function openExerciseLibEditor(exId) {
 
   selectedMuscle = '';
   selectedPrimaryMuscle = '';
+  selectedSecondaryMuscles = [];
   renderMusclePicker('ex-lib-muscle-grid');
   const wrap = document.getElementById('ex-lib-primary-wrap');
   if (wrap) wrap.style.display = 'none';
+  const secWrap2 = document.getElementById('ex-lib-secondary-wrap');
+  if (secWrap2) secWrap2.style.display = 'none';
   openModal('exercise-lib-editor');
 }
 
@@ -2802,9 +2842,9 @@ function saveExerciseLib() {
   let savedEx;
   if (editingExId) {
     const idx = allEx.findIndex(e => e.id === editingExId);
-    if (idx >= 0) { allEx[idx] = { ...allEx[idx], name, muscle: selectedMuscle, primaryMuscle: selectedPrimaryMuscle||null, unilateral }; savedEx = allEx[idx]; }
+    if (idx >= 0) { allEx[idx] = { ...allEx[idx], name, muscle: selectedMuscle, primaryMuscle: selectedPrimaryMuscle||null, secondaryMuscles: [...selectedSecondaryMuscles], unilateral }; savedEx = allEx[idx]; }
   } else {
-    savedEx = { id: 'ex_' + Date.now(), name, muscle: selectedMuscle, primaryMuscle: selectedPrimaryMuscle||null, unilateral };
+    savedEx = { id: 'ex_' + Date.now(), name, muscle: selectedMuscle, primaryMuscle: selectedPrimaryMuscle||null, secondaryMuscles: [...selectedSecondaryMuscles], unilateral };
     allEx.push(savedEx);
   }
   save(SK.exercises, allEx);
@@ -3775,15 +3815,17 @@ function renderOverview(sessions, fromDate, toDate) {
 }
 
 function renderStatsBodyMap(sessions) {
-  const muscleData = {};
+  const primaryData = {};
+  const secondaryData = {};
   const allEx = load(SK.exercises) || [];
   sessions.forEach(s => {
     (s.exercises || []).forEach(ex => {
       const libEx = allEx.find(e => e.id === ex.id || e.name === ex.name);
-      const pm = libEx?.primaryMuscle || ex.primaryMuscle;
-      if (!pm) return;
       const logged = Array.isArray(ex.sets) ? ex.sets.filter(st => st.logged).length : (ex.sets || 1);
-      muscleData[pm] = (muscleData[pm] || 0) + logged;
+      const pm = libEx?.primaryMuscle || ex.primaryMuscle;
+      if (pm) primaryData[pm] = (primaryData[pm] || 0) + logged;
+      const secs = libEx?.secondaryMuscles || ex.secondaryMuscles || [];
+      secs.forEach(sm => { secondaryData[sm] = (secondaryData[sm] || 0) + logged; });
     });
   });
 
@@ -3802,7 +3844,7 @@ function renderStatsBodyMap(sessions) {
     else overviewTab.prepend(mapCard);
   }
 
-  const hasPrimary = Object.keys(muscleData).length > 0;
+  const hasPrimary = Object.keys(primaryData).length > 0;
   mapCard.innerHTML = `
     <div class="stat-card-title">Primary muscle heat map</div>
     ${hasPrimary ? `
@@ -3817,7 +3859,7 @@ function renderStatsBodyMap(sessions) {
       </div>`}`;
 
   if (hasPrimary) {
-    setTimeout(() => renderMuscleMap('stats-body-map-inner', muscleData, true), 0);
+    setTimeout(() => renderMuscleMap('stats-body-map-inner', primaryData, true, secondaryData), 0);
   }
 }
 
@@ -4933,7 +4975,7 @@ Object.assign(window, {
   updateEditorExSets: (i, v) => { if (editorExercises[i]) editorExercises[i].sets = Math.max(1, +v || 1); },
   // Exercise picker
   selectExerciseFromPicker, showNewExForm, hideNewExForm,
-  createAndAddExercise, selectMuscle, selectPrimaryMuscle,
+  createAndAddExercise, selectMuscle, selectPrimaryMuscle, toggleSecondaryMuscle,
   // Exercise library
   openExerciseLibEditor, saveExerciseLib, deleteExerciseLib, setLibFilter,
   // Stats
