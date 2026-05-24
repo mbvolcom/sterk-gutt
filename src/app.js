@@ -182,6 +182,16 @@ async function dbLoadExercises() {
       const keptIds = new Set(_exercises.map(e => e.id));
       const dupes = data.filter(e => !keptIds.has(e.id));
       dupes.forEach(e => supabaseFetch(`exercises?id=eq.${e.id}&user_id=eq.${USER_ID}`, '', 'DELETE').catch(()=>{}));
+      // Migrate Brachioradialis → Forearm
+      _exercises.forEach(ex => {
+        let changed = false;
+        if (ex.primaryMuscle === 'Brachioradialis') { ex.primaryMuscle = 'Forearm'; changed = true; }
+        if (Array.isArray(ex.secondaryMuscles)) {
+          const idx = ex.secondaryMuscles.indexOf('Brachioradialis');
+          if (idx >= 0) { ex.secondaryMuscles[idx] = 'Forearm'; changed = true; }
+        }
+        if (changed) dbSaveExercise(ex);
+      });
     } else {
       await dbSeedExercises();
     }
@@ -2724,14 +2734,27 @@ function toggleSecondaryMuscle(muscle) {
 function renderSecondaryMusclePicker(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  const options = (PRIMARY_MUSCLES[selectedMuscle] || [])
-    .filter(m => m !== selectedPrimaryMuscle);
-  if (!options.length) { el.innerHTML = ''; return; }
-  el.innerHTML = options.map(m => {
-    const active = selectedSecondaryMuscles.includes(m);
-    return `<button class="muscle-btn secondary-btn ${active ? 'active' : ''}"
-      onclick="toggleSecondaryMuscle('${m}')">${m}</button>`;
+  // Show ALL muscles across ALL groups, excluding the selected primary
+  const allMuscles = Object.values(PRIMARY_MUSCLES).flat()
+    .filter((m, i, arr) => arr.indexOf(m) === i) // unique
+    .filter(m => m !== selectedPrimaryMuscle)
+    .sort();
+  if (!allMuscles.length) { el.innerHTML = ''; return; }
+  // Group by muscle group for readability
+  const grouped = Object.entries(PRIMARY_MUSCLES).map(([group, muscles]) => {
+    const available = muscles.filter(m => m !== selectedPrimaryMuscle);
+    if (!available.length) return '';
+    const buttons = available.map(m => {
+      const active = selectedSecondaryMuscles.includes(m);
+      return `<button class="muscle-btn secondary-btn ${active ? 'active' : ''}"
+        onclick="toggleSecondaryMuscle('${m}')">${m}</button>`;
+    }).join('');
+    return `<div style="margin-bottom:8px;">
+      <div style="font-size:9px;letter-spacing:0.1em;color:rgba(241,236,226,0.3);text-transform:uppercase;margin-bottom:4px;">${group}</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;">${buttons}</div>
+    </div>`;
   }).join('');
+  el.innerHTML = grouped;
 }
 
 function renderPrimaryMusclePicker(containerId, parentContainerId) {
