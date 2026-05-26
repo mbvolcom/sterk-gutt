@@ -681,3 +681,32 @@
 }
 .set-num:active .set-num-label { opacity:0; }
 .set-num:active .set-num-remove { opacity:1; }
+
+/* ── WORKOUT PICKER SPLIT HEADERS ───────────────────────────── */
+.wp-split-header {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(200,240,110,0.5);
+  padding: 14px 16px 6px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: 4px;
+}
+.wp-split-header:first-child { border-top: none; margin-top: 0; padding-top: 4px; }
+
+/* ── EXERCISE DELETE BUTTON ──────────────────────────────────── */
+.ex-delete-btn {
+  background: none;
+  border: none;
+  color: rgba(255,68,102,0.45);
+  font-size: 14px;
+  padding: 4px 6px;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s;
+}
+.ex-delete-btn:active { color: #ff4466; }
