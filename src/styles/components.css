@@ -1371,15 +1371,37 @@ label{font-size:10px;color:var(--muted2);letter-spacing:1.5px;text-transform:upp
 
 /* Routine map size */
 .routine-muscle-map {
-  max-width: 240px;
+  max-width: 320px;
   margin: 0 auto 14px;
 }
 
-/* Stats map size — full width, enough height for complete figure */
+/* Stats map size — full width, properly centered */
 .stats-body-map {
   width: 100%;
+  max-width: 460px;
   margin: 0 auto;
   padding-bottom: 16px;
+}
+
+/* Force the inner flex container to be centered and full width */
+.routine-muscle-map > div,
+.stats-body-map > div {
+  width: 100% !important;
+  justify-content: center !important;
+}
+
+.routine-muscle-map > div > div,
+.stats-body-map > div > div {
+  max-width: 50% !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+}
+
+.routine-muscle-map svg,
+.stats-body-map svg {
+  width: 100% !important;
+  height: auto !important;
+  display: block;
 }
 
 /* Legend */
