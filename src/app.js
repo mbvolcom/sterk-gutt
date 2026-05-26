@@ -182,13 +182,21 @@ async function dbLoadExercises() {
       const keptIds = new Set(_exercises.map(e => e.id));
       const dupes = data.filter(e => !keptIds.has(e.id));
       dupes.forEach(e => supabaseFetch(`exercises?id=eq.${e.id}&user_id=eq.${USER_ID}`, '', 'DELETE').catch(()=>{}));
-      // Migrate Brachioradialis → Forearm
+      // Migrate Brachioradialis → Forearm, and Triceps variants → Triceps
+      const RENAMES = {
+        'Brachioradialis': 'Forearm',
+        'Triceps Long Head': 'Triceps',
+        'Triceps Lateral Head': 'Triceps',
+        'Triceps Medial Head': 'Triceps',
+      };
       _exercises.forEach(ex => {
         let changed = false;
-        if (ex.primaryMuscle === 'Brachioradialis') { ex.primaryMuscle = 'Forearm'; changed = true; }
+        if (RENAMES[ex.primaryMuscle]) { ex.primaryMuscle = RENAMES[ex.primaryMuscle]; changed = true; }
         if (Array.isArray(ex.secondaryMuscles)) {
-          const idx = ex.secondaryMuscles.indexOf('Brachioradialis');
-          if (idx >= 0) { ex.secondaryMuscles[idx] = 'Forearm'; changed = true; }
+          ex.secondaryMuscles = ex.secondaryMuscles.map(m => RENAMES[m] || m);
+          // Deduplicate (e.g. two triceps entries after rename)
+          ex.secondaryMuscles = [...new Set(ex.secondaryMuscles)];
+          changed = true;
         }
         if (changed) dbSaveExercise(ex);
       });
@@ -504,7 +512,7 @@ const PRIMARY_MUSCLES = {
   Chest:     ['Pecs', 'Upper Pecs', 'Lower Pecs'],
   Legs:      ['Quads', 'Hamstrings', 'Glutes', 'Calves', 'Hip Flexors', 'Adductors'],
   Shoulders: ['Front Delts', 'Side Delts', 'Rear Delts'],
-  Triceps:   ['Triceps Long Head', 'Triceps Lateral Head', 'Triceps Medial Head'],
+  Triceps:   ['Triceps'],
 };
 
 const MUSCLE_NORMALISE = {
@@ -2018,9 +2026,9 @@ const PM_TO_BODY_IDS = {
   'Traps':                 ['neck-left','neck-right','traps-upper-left','traps-mid-left','traps-lower-left','traps-upper-right','traps-mid-right','traps-lower-right'],
   'Rhomboids':             ['traps-mid-left','traps-mid-right'],
   'Erectors':              ['lower-back-erectors-left','lower-back-erectors-right'],
-  'Triceps Long Head':     ['triceps-long-left','triceps-long-right'],
-  'Triceps Lateral Head':  ['triceps-lateral-left','triceps-lateral-right'],
-  'Triceps Medial Head':   ['triceps-lateral-left','triceps-lateral-right'],
+  
+  
+  
   'Triceps':               ['triceps-long-left','triceps-long-right','triceps-lateral-left','triceps-lateral-right'],
   'Glutes':                ['gluteus-maximus-left','gluteus-maximus-right','gluteus-medius-left','gluteus-medius-right'],
   'Hamstrings':            ['hamstrings-medial-left','hamstrings-lateral-left','hamstrings-medial-right','hamstrings-lateral-right'],
@@ -2054,8 +2062,8 @@ const BODY_ID_TO_LABEL = {
   'lower-back-erectors-left':'Erectors','lower-back-erectors-right':'Erectors',
   'lower-back-ql-left':'Erectors','lower-back-ql-right':'Erectors',
   'spine':'Erectors',
-  'triceps-long-left':'Triceps Long Head','triceps-long-right':'Triceps Long Head',
-  'triceps-lateral-left':'Triceps Lateral Head','triceps-lateral-right':'Triceps Lateral Head',
+  'triceps-long-left':'Triceps','triceps-long-right':'Triceps',
+  'triceps-lateral-left':'Triceps','triceps-lateral-right':'Triceps',
   'gluteus-maximus-left':'Glutes','gluteus-maximus-right':'Glutes',
   'gluteus-medius-left':'Glutes','gluteus-medius-right':'Glutes',
   'hamstrings-medial-left':'Hamstrings','hamstrings-lateral-left':'Hamstrings',
