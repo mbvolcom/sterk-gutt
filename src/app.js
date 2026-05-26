@@ -991,7 +991,23 @@ function openWorkoutPicker() {
     return Math.floor((Date.now() - last.startedAt) / 86400000);
   }
 
-  const routineRows = routines.map(r => {
+  const splits = load(SK.splits) || [];
+
+  // Group routines by split
+  const grouped = {};
+  const ungrouped = [];
+  routines.forEach(r => {
+    if (r.splitId) {
+      const split = splits.find(s => s.id === r.splitId);
+      const splitName = split ? split.name : 'Other';
+      if (!grouped[splitName]) grouped[splitName] = [];
+      grouped[splitName].push(r);
+    } else {
+      ungrouped.push(r);
+    }
+  });
+
+  function renderRow(r) {
     const ds = daysSince(r.id);
     const daysLabel = ds === null ? 'NEVER' : ds === 0 ? 'TODAY' : `${ds}D AGO`;
     const exCount = r.exercises?.length || 0;
@@ -1003,7 +1019,21 @@ function openWorkoutPicker() {
         </div>
         <span class="wp-row-chevron">›</span>
       </div>`;
-  }).join('');
+  }
+
+  let html = '';
+
+  // Splits first
+  Object.entries(grouped).forEach(([splitName, splitRoutines]) => {
+    html += `<div class="wp-split-header">${splitName}</div>`;
+    html += splitRoutines.map(renderRow).join('');
+  });
+
+  // Ungrouped
+  if (ungrouped.length) {
+    if (Object.keys(grouped).length) html += `<div class="wp-split-header">Ungrouped</div>`;
+    html += ungrouped.map(renderRow).join('');
+  }
 
   const adHocRow = `
     <div class="wp-row wp-row-adhoc" onclick="startAdHocWorkout()">
@@ -1015,7 +1045,7 @@ function openWorkoutPicker() {
       <span class="wp-row-chevron" style="color:#c8f06e;">›</span>
     </div>`;
 
-  list.innerHTML = routineRows + adHocRow;
+  list.innerHTML = html + adHocRow;
   openModal('workout-picker');
 }
 
@@ -1348,6 +1378,20 @@ function updateHintAfterSet(ei) {
   }
 }
 
+function removeExFromWorkout(ei) {
+  if (!activeSession) return;
+  const ex = activeSession.exercises[ei];
+  if (!ex) return;
+  if (!confirm(`Remove "${ex.name}" from this workout? It won't affect your routine or history.`)) return;
+  activeSession.exercises.splice(ei, 1);
+  autoSaveSession();
+  const body = document.getElementById('workout-body');
+  if (!body) return;
+  body.innerHTML = '';
+  activeSession.exercises.forEach((e, i) => body.appendChild(buildExCard(e, i)));
+  updateWorkoutMeta();
+}
+
 function buildExCard(ex, ei) {
   const logged = ex.sets.filter(s => s.state === 'logged').length;
   const total  = ex.sets.length;
@@ -1374,6 +1418,7 @@ function buildExCard(ex, ei) {
         <div class="ex-card-name">${ex.name}</div>
         <div class="ex-card-meta" id="ex-meta-${ei}">${ex.muscle}${ex.unilateral?' · Uni':''} · ${logged}/${total} sets${eq?' · '+eq:''}</div>
       </div>
+      <button class="ex-delete-btn" onclick="removeExFromWorkout(${ei})" title="Remove from this workout">✕</button>
       <span class="ex-collapse-btn" onclick="toggleExCollapse(${ei})">▾</span>
     </div>
     <div class="ex-card-body" id="ex-body-${ei}">
@@ -1602,48 +1647,88 @@ function updateSet(ei, si, field, val) {
 }
 
 function openAddExerciseDuringWorkout() {
-  const allEx = load(SK.exercises) || [];
-  // Build a simple modal
+  const allEx = (load(SK.exercises) || []).slice().sort((a,b) => {
+    const ai = MUSCLE_GROUPS.indexOf(a.muscle), bi = MUSCLE_GROUPS.indexOf(b.muscle);
+    if (ai !== bi) return (ai<0?99:ai) - (bi<0?99:bi);
+    return a.name.localeCompare(b.name);
+  });
+
+  // Overlay
   const overlay = document.createElement('div');
   overlay.id = 'add-ex-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(7,8,12,0.92);z-index:3000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 16px 40px;';
 
   const panel = document.createElement('div');
-  panel.style.cssText = 'background:#151824;border:1px solid rgba(200,240,110,0.18);border-radius:16px;padding:20px;width:100%;max-width:420px;max-height:70vh;display:flex;flex-direction:column;';
+  panel.style.cssText = 'background:#151824;border:1px solid rgba(200,240,110,0.18);border-radius:16px;padding:20px 20px 16px;width:100%;max-width:420px;max-height:78vh;display:flex;flex-direction:column;';
 
+  // Header
   const header = document.createElement('div');
-  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;';
-  header.innerHTML = `<div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:#fff;">ADD EXERCISE</div><button onclick="document.getElementById('add-ex-overlay').remove()" style="background:none;border:none;color:#6b7280;font-size:18px;cursor:pointer;">✕</button>`;
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0;';
+  header.innerHTML = `<div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;letter-spacing:2px;color:#fff;">ADD EXERCISE</div>
+    <button onclick="document.getElementById('add-ex-overlay').remove()" style="background:none;border:none;color:#6b7280;font-size:20px;cursor:pointer;line-height:1;">✕</button>`;
 
   // Search input
   const search = document.createElement('input');
-  search.type = 'text'; search.placeholder = 'Search exercises…';
-  search.style.cssText = 'background:#0d0f17;border:1px solid rgba(200,240,110,0.15);border-radius:8px;padding:10px 12px;font-size:13px;color:#f0ede8;font-family:inherit;outline:none;margin-bottom:10px;width:100%;';
+  search.type = 'text';
+  search.placeholder = 'Search exercises…';
+  search.style.cssText = 'background:#0d0f17;border:1px solid rgba(200,240,110,0.15);border-radius:8px;padding:10px 12px;font-size:13px;color:#f0ede8;font-family:inherit;outline:none;margin-bottom:10px;width:100%;flex-shrink:0;box-sizing:border-box;';
 
-  // Exercise list
+  // List container
   const list = document.createElement('div');
-  list.style.cssText = 'overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:4px;';
+  list.style.cssText = 'overflow-y:auto;flex:1;';
 
-  function renderList(filter='') {
-    const filtered = allEx.filter(e => e.name.toLowerCase().includes(filter.toLowerCase()));
+  function renderList(filter) {
+    const q = (filter || '').toLowerCase().trim();
     list.innerHTML = '';
+
+    const filtered = q
+      ? allEx.filter(e => e.name.toLowerCase().includes(q) || (e.muscle||'').toLowerCase().includes(q))
+      : allEx;
+
     if (!filtered.length) {
       list.innerHTML = `<div style="color:#4b5563;font-size:12px;padding:12px 0;text-align:center;">No exercises found</div>`;
+      return;
     }
-    filtered.forEach(ex => {
-      const item = document.createElement('button');
-      item.style.cssText = 'background:#0d0f17;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:12px;text-align:left;cursor:pointer;color:#d1d5db;font-family:inherit;font-size:13px;';
-      item.innerHTML = `<span style="font-weight:600;">${ex.name}</span><span style="color:#4b5563;font-size:10px;margin-left:8px;">${ex.muscle||''}</span>`;
-      item.addEventListener('click', () => {
-        addExerciseToWorkout(ex);
-        overlay.remove();
+
+    if (q) {
+      // Flat search results
+      filtered.forEach(ex => {
+        list.appendChild(makeExItem(ex));
       });
-      list.appendChild(item);
+    } else {
+      // Grouped by muscle
+      const groups = {};
+      filtered.forEach(ex => {
+        const m = ex.muscle || 'Other';
+        if (!groups[m]) groups[m] = [];
+        groups[m].push(ex);
+      });
+      const order = [...MUSCLE_GROUPS, 'Other'];
+      order.forEach(muscle => {
+        if (!groups[muscle]) return;
+        const grpLabel = document.createElement('div');
+        grpLabel.style.cssText = 'font-family:"Barlow Condensed",sans-serif;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:rgba(200,240,110,0.5);padding:10px 4px 4px;';
+        grpLabel.textContent = muscle;
+        list.appendChild(grpLabel);
+        groups[muscle].forEach(ex => list.appendChild(makeExItem(ex)));
+      });
+    }
+  }
+
+  function makeExItem(ex) {
+    const item = document.createElement('button');
+    item.style.cssText = 'background:#0d0f17;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:11px 12px;text-align:left;cursor:pointer;color:#d1d5db;font-family:inherit;font-size:13px;width:100%;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;';
+    item.innerHTML = `<span style="font-weight:600;">${ex.name}${ex.unilateral ? ' <span style="font-size:10px;color:#6b7280;">Uni</span>' : ''}</span>
+      <span style="color:#4b5563;font-size:10px;letter-spacing:0.05em;">${ex.muscle||''}</span>`;
+    item.addEventListener('click', () => {
+      addExerciseToWorkout(ex);
+      overlay.remove();
     });
+    return item;
   }
 
   search.addEventListener('input', () => renderList(search.value));
-  renderList();
+  renderList('');
 
   panel.appendChild(header);
   panel.appendChild(search);
@@ -3419,6 +3504,12 @@ function buildSetSuggestions(points, exName, equipment, numSets) {
   const prevHitTop = prevWorking.length ? allHitTop(prevWorking) : false;
   const twoForTwo  = lastHitTop && prevHitTop;
 
+  // ── Reps above range: step up immediately (no need for 2-for-2) ──────────
+  const avgLastReps = lastWorking.length
+    ? lastWorking.reduce((a, s) => a + s.reps, 0) / lastWorking.length
+    : 0;
+  const wellAboveRange = avgLastReps > repMax;
+
   // ── Too heavy? avg working reps below floor ───────────────────────────────
   const avgWorkingReps = lastWorking.length
     ? lastWorking.reduce((a, s) => a + s.reps, 0) / lastWorking.length
@@ -3434,9 +3525,9 @@ function buildSetSuggestions(points, exName, equipment, numSets) {
   const n = numSets || Math.max(lastSets.length, 3);
 
   let overallDecision;
-  if (tooHeavy)       overallDecision = 'drop';
-  else if (twoForTwo) overallDecision = 'step_up';
-  else                overallDecision = 'consolidate';
+  if (tooHeavy)                       overallDecision = 'drop';
+  else if (twoForTwo || wellAboveRange) overallDecision = 'step_up';
+  else                                 overallDecision = 'consolidate';
 
   const sets = [];
   for (let i = 0; i < n; i++) {
@@ -3495,7 +3586,10 @@ function buildSetSuggestions(points, exName, equipment, numSets) {
   // ── Summary line ──────────────────────────────────────────────────────────
   let summary, subtext;
   if (overallDecision === 'step_up') {
-    summary = `Step up to ${fmtKg(nextStep)}kg — you hit ${repMax} reps ${twoForTwo ? 'two sessions running' : 'last session'}`;
+    const reason = wellAboveRange && !twoForTwo
+      ? `${Math.round(avgLastReps)} reps is above the ${repMax}-rep ceiling`
+      : `you hit ${repMax} reps ${twoForTwo ? 'two sessions running' : 'last session'}`;
+    summary = `Step up to ${fmtKg(nextStep)}kg — ${reason}`;
     subtext = bigJump
       ? `Big jump (+${stepGap}kg) — expect reps to drop, aim for ${repMin}+`
       : `Aim for ${repMin}–${repMax} reps at the new weight`;
@@ -5026,6 +5120,7 @@ Object.assign(window, {
   openWorkoutPicker, handleStravaHomeBtn, startAdHocWorkout,
   // Workout
   startWorkout, resumeWorkout, finishWorkout, togglePauseWorkout,
+  removeExFromWorkout,
   handleSetBtn, addSet, removeSet, removeLastSet, toggleExCollapse,
   setEquipment, updateSet,
   // Routine editor
