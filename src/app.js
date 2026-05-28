@@ -1387,8 +1387,19 @@ function removeExFromWorkout(ei) {
   autoSaveSession();
   const body = document.getElementById('workout-body');
   if (!body) return;
+  // Remove all exercise cards but keep the + ADD EXERCISE button
+  const addBtn = body.querySelector('.btn-ghost[style*="dashed"]');
   body.innerHTML = '';
   activeSession.exercises.forEach((e, i) => body.appendChild(buildExCard(e, i)));
+  if (addBtn) body.appendChild(addBtn);
+  else {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-ghost';
+    btn.style.cssText = 'width:100%;margin:12px 0 4px;border:1.5px dashed rgba(200,240,110,0.25);color:#c8f06e;letter-spacing:1px;';
+    btn.textContent = '+ ADD EXERCISE';
+    btn.addEventListener('click', () => openAddExerciseDuringWorkout());
+    body.appendChild(btn);
+  }
   updateWorkoutMeta();
 }
 
