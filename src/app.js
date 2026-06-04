@@ -2775,10 +2775,12 @@ function saveRoutine() {
   if (editorExercises.length === 0) { showToast('Add at least one exercise'); return; }
 
   const routines = load(SK.routines) || [];
+  const existing = routines.find(r => r.id === editingRoutineId);
   const routine = {
     id: editingRoutineId || 'r_' + Date.now(),
     name,
-    createdAt: editingRoutineId ? (routines.find(r => r.id === editingRoutineId)?.createdAt || Date.now()) : Date.now(),
+    createdAt: editingRoutineId ? (existing?.createdAt || Date.now()) : Date.now(),
+    splitId: existing?.splitId || null,
     exercises: editorExercises.map(ex => ({ ...ex, sets: Math.max(1, +ex.sets || 3) }))
   };
 
