@@ -710,3 +710,23 @@
   transition: color 0.15s;
 }
 .ex-delete-btn:active { color: #ff4466; }
+
+/* ── RESUME SESSION BUTTON (training log) ───────────────────── */
+.resume-session-btn {
+  background: none;
+  border: 1px solid rgba(200,240,110,0.4);
+  color: #c8f06e;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 5px 10px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.resume-session-btn:active {
+  background: rgba(200,240,110,0.1);
+  border-color: #c8f06e;
+}
