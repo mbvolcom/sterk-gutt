@@ -182,19 +182,20 @@ async function dbLoadExercises() {
       const keptIds = new Set(_exercises.map(e => e.id));
       const dupes = data.filter(e => !keptIds.has(e.id));
       dupes.forEach(e => supabaseFetch(`exercises?id=eq.${e.id}&user_id=eq.${USER_ID}`, '', 'DELETE').catch(()=>{}));
-      // Migrate Brachioradialis → Forearm, and Triceps variants → Triceps
+      // Migrate Brachioradialis → Forearm, Triceps variants → Triceps, Biceps/Triceps group → Arms
       const RENAMES = {
         'Brachioradialis': 'Forearm',
         'Triceps Long Head': 'Triceps',
         'Triceps Lateral Head': 'Triceps',
         'Triceps Medial Head': 'Triceps',
       };
+      const GROUP_RENAMES = { 'Biceps': 'Arms', 'Triceps': 'Arms' };
       _exercises.forEach(ex => {
         let changed = false;
+        if (GROUP_RENAMES[ex.muscle]) { ex.muscle = GROUP_RENAMES[ex.muscle]; changed = true; }
         if (RENAMES[ex.primaryMuscle]) { ex.primaryMuscle = RENAMES[ex.primaryMuscle]; changed = true; }
         if (Array.isArray(ex.secondaryMuscles)) {
           ex.secondaryMuscles = ex.secondaryMuscles.map(m => RENAMES[m] || m);
-          // Deduplicate (e.g. two triceps entries after rename)
           ex.secondaryMuscles = [...new Set(ex.secondaryMuscles)];
           changed = true;
         }
@@ -502,21 +503,21 @@ function getLastPerformance(exName) {
 // ═══════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════
-const MUSCLE_GROUPS = ['Abs','Back','Biceps','Chest','Legs','Shoulders','Triceps'];
+const MUSCLE_GROUPS = ['Abs','Arms','Back','Chest','Legs','Shoulders'];
 
 // Primary muscles per muscle group
 const PRIMARY_MUSCLES = {
   Abs:       ['Abs', 'Obliques', 'Transverse Abdominis'],
+  Arms:      ['Biceps', 'Brachialis', 'Forearm', 'Triceps'],
   Back:      ['Lats', 'Traps', 'Rhomboids', 'Rear Delts', 'Erectors'],
-  Biceps:    ['Biceps', 'Brachialis', 'Forearm'],
   Chest:     ['Pecs', 'Upper Pecs', 'Lower Pecs'],
   Legs:      ['Quads', 'Hamstrings', 'Glutes', 'Calves', 'Hip Flexors', 'Adductors'],
   Shoulders: ['Front Delts', 'Side Delts', 'Rear Delts'],
-  Triceps:   ['Triceps'],
 };
 
 const MUSCLE_NORMALISE = {
   'Quads': 'Legs', 'Hamstrings': 'Legs', 'Glutes': 'Legs', 'Calves': 'Legs',
+  'Biceps': 'Arms', 'Triceps': 'Arms', // old muscle group names → Arms
 };
 function normaliseMuscle(m) { return MUSCLE_NORMALISE[m] || m; }
 
@@ -655,6 +656,12 @@ function renderHome() {
     const weekday = d.toLocaleDateString('en-GB', { weekday:'short' }).toUpperCase();
     const metaStr = `${weekday} · ${dur} · ${totalSets} SETS`;
 
+    // Check if this session was finished today
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const sessionMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const isToday = sessionMidnight === todayMidnight;
+    const canResume = isToday && !activeSession;
+
     const item = document.createElement('div');
     item.className = 'recent-item';
     item.innerHTML = `
@@ -664,8 +671,10 @@ function renderHome() {
         <div class="recent-meta">${metaStr}</div>
       </div>
       <div class="recent-right">
-        <span class="recent-sets">${totalSets}</span>
-        <span class="recent-sets-label">sets</span>
+        ${canResume
+          ? `<button class="resume-session-btn" onclick="event.stopPropagation();resumeFinishedSession('${s.id}')">RESUME</button>`
+          : `<span class="recent-sets">${totalSets}</span><span class="recent-sets-label">sets</span>`
+        }
       </div>`;
 
     item.addEventListener('click', () => openSessionEditor(s.id));
@@ -966,6 +975,54 @@ function resumeWorkout() {
   renderWorkoutPage();
   showPage('workout', document.getElementById('nav-workout'));
   startGlobalTimer();
+}
+
+function resumeFinishedSession(sessionId) {
+  if (activeSession) { showToast('Finish your current workout first'); return; }
+
+  const allSessions = load(SK.sessions) || [];
+  const s = allSessions.find(x => x.id === sessionId);
+  if (!s) return;
+
+  const stravaWarning = s.stravaUploaded
+    ? '\n\nThis session was already uploaded to Strava. After resuming you can re-upload the full session, but you\'ll need to manually delete the original Strava activity first.'
+    : '';
+
+  if (!confirm(`Resume "${s.routineName}"?${stravaWarning}`)) return;
+
+  // Reopen as active session — preserve all existing logged sets
+  activeSession = {
+    id: s.id,
+    routineId: s.routineId,
+    routineName: s.routineName,
+    startedAt: s.startedAt,   // keep original start time
+    resumedAt: Date.now(),     // track resume time
+    duration: s.duration || 0, // carry forward elapsed time
+    exercises: s.exercises.map(ex => ({
+      ...ex,
+      sets: ex.sets.map(st => ({
+        ...st,
+        // Keep logged sets as-is, reset any active set to idle
+        state: st.state === 'active' ? 'idle' : st.state,
+      }))
+    })),
+    stravaUploaded: false,     // reset so re-upload is possible
+    is_active: true,
+  };
+
+  // Save as active
+  autoSaveSession();
+
+  // Remove from finished sessions list so it doesn't show as duplicate
+  // (doFinishWorkout will re-save it when done)
+  const idx = allSessions.findIndex(x => x.id === sessionId);
+  if (idx >= 0) allSessions.splice(idx, 1);
+  save(SK.sessions, allSessions);
+
+  renderWorkoutPage();
+  showPage('workout', document.getElementById('nav-workout'));
+  startGlobalTimer();
+  showToast(`Resumed ${s.routineName} ⚡`);
 }
 
 // ═══════════════════════════════════════════
@@ -2820,6 +2877,8 @@ function selectMuscle(muscle, containerId) {
     if (wrap) wrap.style.display = selectedMuscle ? '' : 'none';
     renderPrimaryMusclePicker('ex-lib-primary-grid', containerId);
     renderSecondaryMusclePicker('ex-lib-secondary-grid');
+    const secWrap = document.getElementById('ex-lib-secondary-wrap');
+    if (secWrap) secWrap.style.display = selectedMuscle ? '' : 'none';
   }
 }
 
@@ -5132,7 +5191,7 @@ Object.assign(window, {
   // Home
   openWorkoutPicker, handleStravaHomeBtn, startAdHocWorkout,
   // Workout
-  startWorkout, resumeWorkout, finishWorkout, togglePauseWorkout,
+  startWorkout, resumeWorkout, resumeFinishedSession, finishWorkout, togglePauseWorkout,
   removeExFromWorkout,
   handleSetBtn, addSet, removeSet, removeLastSet, toggleExCollapse,
   setEquipment, updateSet,
