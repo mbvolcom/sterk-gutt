@@ -972,6 +972,9 @@ function resumeWorkout() {
   if (!saved) return;
   activeSession = saved;
   _activeSession = saved;
+  // Restore paused time: previously accumulated + the gap since the app was last open
+  const closedGapMs = saved.lastSeenAt ? Date.now() - saved.lastSeenAt : 0;
+  totalPausedMs = (saved.pausedMs || 0) + closedGapMs;
   renderWorkoutPage();
   showPage('workout', document.getElementById('nav-workout'));
   startGlobalTimer();
@@ -1984,7 +1987,7 @@ function saveRoutineChanges() {
 function startGlobalTimer() {
   clearInterval(globalTimerInterval);
   workoutPaused = false;
-  totalPausedMs = 0;
+  // totalPausedMs is intentionally NOT reset here — resumeWorkout restores it from the session
   pausedAt = null;
   globalTimerInterval = setInterval(() => {
     if (!activeSession || workoutPaused) return;
@@ -2077,6 +2080,9 @@ const LS_ACTIVE = 'sg_active_session';
 
 function autoSaveSession() {
   if (activeSession) {
+    // Persist current paused accumulation and timestamp so resume can reconstruct elapsed correctly
+    activeSession.pausedMs = totalPausedMs + (workoutPaused && pausedAt ? Date.now() - pausedAt : 0);
+    activeSession.lastSeenAt = Date.now();
     // Write to localStorage first — survives app kill / swipe-up on iOS
     try { localStorage.setItem(LS_ACTIVE, JSON.stringify(activeSession)); } catch(e) {}
     dbSaveSession(activeSession); // Supabase in the background
@@ -3048,6 +3054,24 @@ function renderMusclePicker(containerId) {
 }
 
 
+// ── Retroactively rename an exercise across all saved sessions ──────────────
+async function migrateExerciseNameInSessions(oldName, newName) {
+  if (!oldName || oldName === newName) return;
+  let changed = false;
+  _sessions.forEach(s => {
+    (s.exercises || []).forEach(ex => {
+      if (ex.name === oldName) { ex.name = newName; changed = true; }
+    });
+  });
+  if (!changed) return;
+  const affected = _sessions.filter(s =>
+    (s.exercises || []).some(ex => ex.name === newName)
+  );
+  await Promise.all(affected.map(s =>
+    dbSaveSession(s).catch(e => console.warn('migrateExerciseNameInSessions save failed:', e.message))
+  ));
+}
+
 function saveExerciseLib() {
   const name = document.getElementById('ex-lib-name').value.trim();
   const unilateral = document.getElementById('ex-lib-uni').checked;
@@ -3057,9 +3081,14 @@ function saveExerciseLib() {
 
   const allEx = load(SK.exercises) || [];
   let savedEx;
+  let oldName = null;
   if (editingExId) {
     const idx = allEx.findIndex(e => e.id === editingExId);
-    if (idx >= 0) { allEx[idx] = { ...allEx[idx], name, muscle: selectedMuscle, primaryMuscle: selectedPrimaryMuscle||null, secondaryMuscles: [...selectedSecondaryMuscles], unilateral }; savedEx = allEx[idx]; }
+    if (idx >= 0) {
+      oldName = allEx[idx].name;
+      allEx[idx] = { ...allEx[idx], name, muscle: selectedMuscle, primaryMuscle: selectedPrimaryMuscle||null, secondaryMuscles: [...selectedSecondaryMuscles], unilateral };
+      savedEx = allEx[idx];
+    }
   } else {
     savedEx = { id: 'ex_' + Date.now(), name, muscle: selectedMuscle, primaryMuscle: selectedPrimaryMuscle||null, secondaryMuscles: [...selectedSecondaryMuscles], unilateral };
     allEx.push(savedEx);
@@ -3103,6 +3132,13 @@ function saveExerciseLib() {
   closeModal('exercise-lib-editor');
   renderExerciseLibrary();
   showToast(editingExId ? 'Exercise updated' : 'Exercise created');
+
+  // Migrate old name in all historical sessions so history stays linked
+  if (oldName && oldName !== name) {
+    migrateExerciseNameInSessions(oldName, name).catch(e =>
+      console.warn('Session name migration failed:', e.message)
+    );
+  }
 }
 
 // Re-render a single exercise card in the active workout (e.g. after unilateral flag change)
