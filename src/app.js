@@ -4924,8 +4924,18 @@ async function uploadToStrava(session, description) {
   });
 
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.message || 'Strava API error');
+    let errMsg = `HTTP ${res.status}`;
+    try {
+      const err = await res.json();
+      // Strava returns errors as { message, errors: [...] }
+      const detail = err.errors?.map(e => `${e.resource} ${e.field} ${e.code}`).join(', ');
+      errMsg = err.message ? `${err.message}${detail ? ': ' + detail : ''}` : errMsg;
+    } catch(e) {}
+    // 401/403 almost always means the token is expired — prompt reconnect
+    if (res.status === 401 || res.status === 403) {
+      errMsg += ' — try reconnecting Strava in settings';
+    }
+    throw new Error(errMsg);
   }
   return res.json();
 }
